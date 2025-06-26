@@ -2,10 +2,10 @@
 
 from fastapi import APIRouter
 import sqlalchemy
+from backend.settings.connection_routes import DB_URL
 
 router = APIRouter()
 
-DB_URL = "postgresql://myuser:1999@localhost:5432/one_project_db_milestone"
 
 @router.get("/sheetnames")
 async def get_sheet_names():
