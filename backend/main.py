@@ -7,11 +7,11 @@ import asyncpg
 
 from backend.db_to_hot_table import fetch_table_as_hotarray
 from backend.api import router as api_router
+from backend.settings.connection_points import DB_URL
 
 app = FastAPI()
 
 # Datenbank-URL (für Pool und fetch)
-DB_URL = "postgresql://myuser:1999@localhost:5432/one_project_db_milestone"
 
 # CORS erlauben (Frontend ↔ Backend)
 app.add_middleware(
@@ -53,7 +53,7 @@ app.include_router(api_router)
 # Tabelle als HotTable-kompatibel abrufen
 @app.get("/api/tabledata")
 async def get_tabledata(
-    table: str = Query("materialized_schutzgas_zapp200"),
+    table: str = Query("materialized_spuellen_miniproject"),
     limit: int = Query(500)
 ):
     headers, data = await fetch_table_as_hotarray(DB_URL, table, limit)

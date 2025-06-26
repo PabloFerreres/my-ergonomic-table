@@ -1,8 +1,7 @@
 import psycopg2
+from backend.settings.connection_points import DB_URL, project_id, base_view_id, views_to_show
 
-DB_URL = "postgresql://myuser:1999@localhost:5432/one_project_db_milestone"
-project_id = 1
-base_view_id = 1
+
 
 def get_view_id_from_sheet_name(sheet_name: str) -> int | None:
     conn = psycopg2.connect(DB_URL)
@@ -41,13 +40,11 @@ def create_materialized_table(view_id):
         SELECT c.name, c.display_name, vc.position
         FROM views_columns vc
         JOIN columns c ON vc.column_id = c.id
-        WHERE (
-            (vc.view_id = %s AND vc.project_id = %s)
-            OR (vc.base_view_id = %s)
-        )
+        WHERE vc.base_view_id = %s
         AND vc.visible = TRUE
         ORDER BY vc.position
-    """, (view_id, project_id, base_view_id))
+    """, (base_view_id,))
+
     layout_columns = cursor.fetchall()
 
     # Map lowercase layout name -> display (materialized column) name
@@ -151,7 +148,7 @@ def create_materialized_table(view_id):
     conn.close()
 
 def refresh_all_materialized():
-    for vid in range(1, 6):
+    for vid in views_to_show:
         create_materialized_table(view_id=vid)
     print("✅ Alle Materialized Tables wurden aktualisiert.")
 

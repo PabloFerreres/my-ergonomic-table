@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 import sqlalchemy
-from backend.settings.connection_routes import DB_URL
+from backend.settings.connection_points import DB_URL
 
 router = APIRouter()
 
