@@ -18,7 +18,7 @@ export function ConsolePanel({ logs }: { logs: ConsoleLog[] }) {
       className="console-scroll"
       style={{
         backgroundColor: "#000",
-        color: "#fff",
+        color: " #fff",
         borderRadius: "0.5rem",
         padding: "1rem",
         boxShadow: "0 0 10px rgba(255,255,255,0.1)",

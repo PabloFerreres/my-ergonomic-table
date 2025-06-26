@@ -13,6 +13,7 @@ import SquareSearch from "./uiSquares/SquareSearch";
 import { getEdits } from "../editierung/EditMap";
 import { setInitialInsertedId } from "../utils/insertIdManager";
 import { ConsolePanel } from "./uiSquares/ConsolePanel";
+import { subscribeToConsole, unsubscribeFromConsole } from "../utils/uiConsole";
 
 function App() {
   type SheetData = {
@@ -36,6 +37,14 @@ function App() {
     col: number;
   } | null>(null);
   const [isFilterActive, setIsFilterActive] = useState(false);
+
+  useEffect(() => {
+    const handler = (entry: { text: string; time: string }) => {
+      setLogs((prev) => [...prev, entry]);
+    };
+    subscribeToConsole(handler);
+    return () => unsubscribeFromConsole(handler);
+  }, []);
 
   useEffect(() => {
     const refs: Record<string, React.RefObject<HotTableClass>> = {};

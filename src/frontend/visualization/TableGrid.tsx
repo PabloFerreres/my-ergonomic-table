@@ -44,7 +44,9 @@ function TableGrid({
   sheetName,
   isBlocked = false, // default: false
 }: TableGridProps) {
-  const columnDefs = buildColumnDefs(colHeaders);
+  const columnDefs = colHeaders.map((header) => ({
+    readOnly: header === "project_article_id",
+  }));
   const rowIdIndex = colHeaders.indexOf("project_article_id");
 
   const getCellProps = useCellProperties(data, rowIdIndex, sheetName);

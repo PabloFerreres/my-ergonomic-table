@@ -1,5 +1,6 @@
 import type { EditEntry } from "../editierung/EditMap";
 import { getLastUsedInsertedId } from "../editierung/EditMap"; // ✅ NEU
+import { uiConsole } from "../utils/uiConsole"; // ggf. Pfad anpassen
 
 export async function sendEdits(sheet: string, edits: EditEntry[]) {
   try {
@@ -16,7 +17,8 @@ export async function sendEdits(sheet: string, edits: EditEntry[]) {
 
     if (!res.ok) throw new Error(`Server error`);
     const result = await res.json();
-    console.log(`✅ Edits gespeichert (${result.count}) für Sheet: ${sheet}`);
+    const msg = result.log || `✅ Edits gespeichert (${result.count}) für Sheet: ${sheet}`;
+    uiConsole(msg);
   } catch (err) {
     console.error("❌ Failed to sync edits:", err);
   }

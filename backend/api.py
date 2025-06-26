@@ -190,7 +190,11 @@ async def update_edits(request: Request):
 
     await conn.close()
     print(f"✅ Edits gespeichert: {updated_count} Änderungen")
-    return {"status": "ok", "count": updated_count}
+    return {
+    "status": "ok",
+    "count": updated_count,
+    "log": f"✅ Edits gespeichert: {updated_count} Änderung(en)"
+}
 
 
 @router.post("/api/rematerializeAll")
