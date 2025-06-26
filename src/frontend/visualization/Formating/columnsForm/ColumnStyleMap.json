@@ -1,0 +1,107 @@
+{
+
+  "header-purple": {
+    "color": " #B266FF",
+    "headers": [
+      "position",
+      "project_article_id"
+    ]
+  },
+
+  "header-green": {
+    "color": "#99CC00",
+    "headers": [
+      "lfd.Nr. aufsteigend!",
+      "Status",
+      "Relevance E-Tech.",
+      "Kommentar",
+      "RI-Char.",
+      "MSR / ANSI Char.",
+      "EMSR No.",
+      "ID",
+      "Beschreibung",
+      "beschreibung eng",
+      "Einbauort"
+    ]
+  },
+  "header-blue": {
+    "color": "#99CCFF",
+    "headers": [
+      "Lieferumfang",
+      "Medium",
+      "T. Daten Betriebspunkt",
+      "T. Daten Nennweite DN",
+      "T. Daten Druckklasse PN",
+      "T. Daten Anschluss Eingang",
+      "T. Daten Anschluss Ausgang",
+      "SPS 1-Band 2-Behandlung 3-Kunde",
+      "Hersteller",
+      "Bestellbezeichnung",
+      "Funktion",
+      "More Information",
+      "Funktions-Kurzbeschreibung für Stromlaufplan",
+      "Isteinstellung Inbetriebnahme",
+      "Grenzwerte",
+      "Anforderer",
+      "Anzahl",
+      "Einzelpreis",
+      "Rabatt [%]",
+      "Gesamtpreis",
+      "Lieferzeit (Wochen)",
+      "Bestelldatum",
+      "Liefertermin laut AB (KW)",
+      "Auftragsbestätigung",
+      "Geliefert"
+    ]
+  },
+  "header-yellow": {
+    "color": "#FFFF99",
+    "headers": [
+      "DI",
+      "DO",
+      "AI",
+      "AO",
+      "PN",
+      "Spannung / V",
+      "Strom / A",
+      "Leistung / kW",
+      "Geschwindigkeit / rpm",
+      "Stecker",
+      "Elektr. Daten",
+      "Safety",
+      "Beschreibung für Stromlaufplan"
+    ]
+  },
+  "header-peach": {
+    "color": "#FCD5B4",
+    "headers": [
+      "Zeichnungs-Nr.",
+      "Konstruktion verbaut / Änderung verarbeitet",
+      "Kommentar Konstruktion"
+    ]
+  },
+  "header-lavender": {
+    "color": "#CCC0DA",
+    "headers": [
+      "Schildertexte (automatisch generiert)",
+      "Schildertexte Bestellvorlage (manuell kopiert)",
+      "Schildmaterial",
+      "Schildbefestigung"
+    ]
+  },
+  "header-bright-yellow": {
+    "color": "#FFFF00",
+    "headers": [
+      "Anlagekategorie in Vault",
+      "Bauteil-ID",
+      "Änderungsindex",
+      "Kommentar zur Äanderung"
+    ]
+  },
+  "header-orange": {
+    "color": "#E26B0A",
+    "headers": [
+      "REVISION"
+    ]
+  }
+}

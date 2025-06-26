@@ -1,0 +1,11 @@
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* 🔒 prevents page scroll */
+}
+.htCore td {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

@@ -1,0 +1,62 @@
+/* 🔻 Make the dropdown filter icon bigger and shift it down */
+button.changeType {
+  transform: translateY(6px);
+  position: absolute !important;
+  top: auto !important;
+  bottom: -12px !important;
+  right: 0px !important;
+
+  width: 40px !important;     /* double width */
+  height: 20px !important;    /* double height */
+  padding: 0px !important;
+  font-size: 15px !important; /* if any icon is font-based */
+  background-size: 24px 24px !important; /* scale background icon */
+}
+
+
+/* 🔲 Make the multi-select checkbox list the focus */
+.htUIMultipleSelectHot {
+  width: 100% !important;
+  height: 300px !important;
+  max-height: 400px !important;
+  margin-top: 8px;
+  border: 2px solid #ccc;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+/* 🧱 Expand the handsontable instance inside it */
+.htUIMultipleSelectHot .ht_master {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.htUIMultipleSelectHot .wtHolder {
+  width: 100% !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+}
+
+/* 🧾 Widen checkbox rows */
+.htUIMultipleSelectHot .htCore td {
+  max-width: 100% !important;
+  white-space: normal !important;
+  padding: 8px 10px !important;
+  font-size: 15px !important;
+}
+
+/* ✅ Make checkbox labels take full width */
+.htCheckboxRendererLabel {
+  display: inline-block !important;
+  width: 100% !important;
+}
+
+.unsaved-edit {
+  background-color: #fff200 !important; /* Baugelb */
+  color: black !important;
+}
+
+
+.htDropdownMenu.handsontable {
+  transform: translateX(30px); /* nach rechts schieben */
+}
