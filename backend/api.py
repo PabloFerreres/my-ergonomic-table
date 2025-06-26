@@ -196,8 +196,9 @@ async def update_edits(request: Request):
 @router.post("/api/rematerializeAll")
 async def rematerialize_all():
     refresh_all_materialized()
-    print("🔁 All materialized tables refreshed")
-    return {"status": "all_rematerialized"}
+    log = "🔁 All materialized tables refreshed"
+    print(log)
+    return {"status": "all_rematerialized", "log": log}
 
 
 @router.get("/api/last_insert_id")

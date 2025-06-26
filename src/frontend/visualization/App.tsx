@@ -12,6 +12,7 @@ import SquareMover from "./uiSquares/SquareMover";
 import SquareSearch from "./uiSquares/SquareSearch";
 import { getEdits } from "../editierung/EditMap";
 import { setInitialInsertedId } from "../utils/insertIdManager";
+import { ConsolePanel } from "./uiSquares/ConsolePanel";
 
 function App() {
   type SheetData = {
@@ -26,6 +27,7 @@ function App() {
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [sheets, setSheets] = useState<Record<string, SheetData>>({});
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
+  const [logs, setLogs] = useState<{ text: string; time: string }[]>([]);
 
   const hotRefs = useRef<Record<string, React.RefObject<HotTableClass>>>({});
 
@@ -175,8 +177,15 @@ function App() {
                 if (!res.ok) throw new Error(`Server error ${res.status}`);
                 const result = await res.json();
                 console.log("🔁 All rematerialized:", result);
+                if (result.log) {
+                  const now = new Date().toLocaleTimeString();
+                  setLogs((prev) => [...prev, { text: result.log, time: now }]);
+                }
               } catch (err) {
-                console.error("❌ Rematerialize all failed:", err);
+                const errorMsg = "❌ Rematerialize all failed: " + String(err);
+                console.error(errorMsg);
+                const now = new Date().toLocaleTimeString();
+                setLogs((prev) => [...prev, { text: errorMsg, time: now }]);
               }
             }}
           >
@@ -201,25 +210,17 @@ function App() {
             matchIndex={matchIndex}
             matchCount={matchCount}
           />
-          <button
-            onClick={() => {
-              triggerLayoutCalculation(
-                sheets[activeSheet].headers,
-                sheets[activeSheet].data,
-                (layout) => {
-                  setSheets((prev) => ({
-                    ...prev,
-                    [activeSheet]: {
-                      ...prev[activeSheet],
-                      layout,
-                    },
-                  }));
-                }
-              );
+
+          <div
+            style={{
+              position: "absolute",
+              top: "1rem",
+              right: "1rem",
+              zIndex: 10,
             }}
           >
-            🔁 Recalculate Layout
-          </button>
+            <ConsolePanel logs={logs} />
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: "0.5rem", marginBottom: "4px" }}>
