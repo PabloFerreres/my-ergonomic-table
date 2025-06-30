@@ -51,12 +51,26 @@ button.changeType {
   width: 100% !important;
 }
 
-.unsaved-edit {
-  background-color: #fff200 !important; /* Baugelb */
-  color: black !important;
-}
 
 
 .htDropdownMenu.handsontable {
   transform: translateX(30px); /* nach rechts schieben */
+}
+
+.row-new {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.3),
+    rgba(255, 255, 255, 0.3) 2px,
+    transparent 2px,
+    transparent 6px
+  );
+  background-size: 8px 8px;
+  background-color: #fff1e0 !important;
+}
+
+
+.unsaved-edit {
+  background-color: #fff200 !important; /* Baugelb */
+  color: black !important;
 }

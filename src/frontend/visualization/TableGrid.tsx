@@ -12,6 +12,7 @@ import {
 import { useCellProperties } from "../hooks/useCellProperties";
 import { useAfterChange } from "../hooks/useAfterChange";
 import { useAfterRowMove } from "../hooks/useAfterRowMove";
+import { useAfterUndo } from "../hooks/useAfterUndo"; // ✅ NEU
 import Handsontable from "handsontable";
 import { buildVisualPositionMap } from "../utils/BuildVisualPositionMap";
 import { sendPositionMap } from "../utils/apiSync";
@@ -50,6 +51,7 @@ function TableGrid({
   const rowIdIndex = colHeaders.indexOf("project_article_id");
 
   const getCellProps = useCellProperties(data, rowIdIndex, sheetName);
+
   const onChange = useAfterChange(
     data,
     rowIdIndex,
@@ -58,12 +60,21 @@ function TableGrid({
     hotRef?.current?.hotInstance ?? null,
     isBlocked
   );
+
+  // ✅ NEU: Undo-Hook anhängen
+  useAfterUndo(
+    hotRef?.current?.hotInstance ?? null,
+    sheetName,
+    colHeaders,
+    data
+  );
+
   const onRowMove = useAfterRowMove(
     data,
     rowIdIndex,
     sheetName,
-    hotRef?.current?.hotInstance ?? null, // ✅ hot
-    colHeaders // ✅ headers
+    hotRef?.current?.hotInstance ?? null,
+    colHeaders
   );
 
   return (
