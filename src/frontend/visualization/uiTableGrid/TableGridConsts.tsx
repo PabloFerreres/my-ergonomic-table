@@ -19,6 +19,7 @@ export function buildColumnDefs(colHeaders: string[]) {
       wordWrap: true,
       className: ["htWrap", ...cellClasses].join(" "),
       filter: true,
+      readOnly: false,
     };
   });
 }
