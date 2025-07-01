@@ -45,12 +45,17 @@ function TableGrid({
   sheetName,
   isBlocked = false, // default: false
 }: TableGridProps) {
-  const columnDefs = colHeaders.map((header) => ({
-    readOnly: header === "project_article_id",
-  }));
   const rowIdIndex = colHeaders.indexOf("project_article_id");
 
   const getCellProps = useCellProperties(data, rowIdIndex, sheetName);
+
+  const columnDefs = buildColumnDefs(colHeaders).map((def, index) => {
+    const header = colHeaders[index];
+    return {
+      ...def,
+      readOnly: header === "project_article_id" ? true : def.readOnly,
+    };
+  });
 
   const onChange = useAfterChange(
     data,

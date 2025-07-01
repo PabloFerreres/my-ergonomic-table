@@ -30,6 +30,10 @@ def get_materialized_table_name(cursor, project_id, view_id):
     return f"materialized_{view_name.lower()}_{project_name.lower()}"
 
 def create_materialized_table(view_id):
+    import psycopg2
+    import json
+    from pathlib import Path
+
     conn = psycopg2.connect(DB_URL)
     cursor = conn.cursor()
 
@@ -52,6 +56,9 @@ def create_materialized_table(view_id):
     for name, display_name, _ in layout_columns:
         if name:
             layout_name_map[name.strip().lower()] = (display_name or name).strip()
+
+    # Load HEADER_MAP for inserted_rows matching
+    HEADER_MAP = json.loads(Path("backend/utils/header_name_map.json").read_text(encoding="utf-8"))
 
     # 2. Get all column names in inserted_rows
     cursor.execute("""
@@ -82,6 +89,9 @@ def create_materialized_table(view_id):
         }[table]
         colmap[key].add(col)
 
+    # NEU: ai (articles über inserted_rows) hat gleiche Felder wie a
+    colmap["ai"] = colmap["a"]
+
     # 4. Build column expressions from layout
     col_exprs = []
     col_exprs.append("(pd.data->>'project_article_id')::int AS project_article_id")
@@ -94,7 +104,7 @@ def create_materialized_table(view_id):
         in_d = layout_col in colmap["d"]
         in_p = layout_col in colmap["p"]
         in_a = layout_col in colmap["a"]
-        in_inserted = materialized_col in inserted_col_set
+        in_ai = layout_col in colmap["ai"]
 
         sources = []
         if in_i:
@@ -107,12 +117,23 @@ def create_materialized_table(view_id):
             sources.append(f'a."{layout_col}"')
 
         layout_expr = f"COALESCE({', '.join(sources)})" if sources else "NULL"
-        inserted_expr = f'ins."{materialized_col}"' if in_inserted else "NULL"
+
+        # ✅ Korrektes Mapping für inserted_rows Spalte
+        mapped_inserted_col = HEADER_MAP.get(layout_col, layout_col)
+        in_inserted = mapped_inserted_col in colmap["i"]
+        inserted_expr = f'ins."{mapped_inserted_col}"' if in_inserted else "NULL"
+
+        ai_expr = f'ai."{layout_col}"' if in_ai else "NULL"
+        coalesce_inserted_ai = f"COALESCE({inserted_expr}, {ai_expr})"
 
         expr = f"""
             CASE
                 WHEN (pd.data->>'project_article_id')::int > 0 THEN ({layout_expr})::text
-                WHEN (pd.data->>'project_article_id')::int < 0 THEN {inserted_expr}::text
+                WHEN (pd.data->>'project_article_id')::int < 0 THEN 
+                    CASE
+                        WHEN ins.article_id IS NOT NULL THEN {coalesce_inserted_ai}::text
+                        ELSE {inserted_expr}::text
+                    END
                 ELSE NULL
             END AS "{materialized_col}"
         """
@@ -139,6 +160,7 @@ def create_materialized_table(view_id):
         LEFT JOIN draft_project_articles dpa ON dpa.project_article_id = pa.id
         LEFT JOIN articles a ON pa.article_id = a.id
         LEFT JOIN inserted_rows ins ON ins.project_article_id = (pd.data->>'project_article_id')::int
+        LEFT JOIN articles ai ON ins.article_id = ai.id
         ORDER BY (pd.data->>'position')::int;
     '''
     cursor.execute(sql)

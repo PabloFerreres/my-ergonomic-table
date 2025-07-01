@@ -87,15 +87,29 @@ async def update_edits(request: Request):
     updated_count = 0
     edits_by_row = {}
 
+    # INT-Felder definieren
+    int_fields = {"project_article_id", "position","article_id"}
+
     for edit in edits:
         row_id = int(edit["rowId"])
         col = edit["colName"]
         val = edit["newValue"]
+
+        # Snake-Case-Mapping prüfen
+        mapped_col = HEADER_MAP.get(col, col)
+
+        # Wenn Feld INT: "" zu None, sonst cast
+        if mapped_col in int_fields:
+            if val == '' or val is None:
+                val = None
+            else:
+                val = int(val)
+
         if row_id not in edits_by_row:
             edits_by_row[row_id] = {}
         edits_by_row[row_id][col] = val
 
-    # Alle bekannten IDs aus inserted_rows laden
+    # IDs laden
     existing_ids_result = await conn.fetch("SELECT project_article_id FROM inserted_rows")
     existing_inserted_ids = {r["project_article_id"] for r in existing_ids_result}
     print(f"📋 Inserted IDs (aus DB): {sorted(existing_inserted_ids)}")
@@ -104,22 +118,30 @@ async def update_edits(request: Request):
         print(f"\n🔄 Bearbeite row_id = {row_id}, Updates: {updates}")
 
         if row_id < 0:
+            # mapped_updates plus INT fix
+            mapped_updates = {}
+            for col, val in updates.items():
+                mapped_col = HEADER_MAP.get(col, col)
+                if mapped_col in int_fields:
+                    if val == '':
+                        val = None
+                    else:
+                        val = int(val)
+                mapped_updates[mapped_col] = val
+
             if row_id in existing_inserted_ids:
-                # UPDATE inserted_rows
-                set_clause = ", ".join([f'"{col}" = ${i+1}' for i, col in enumerate(updates.keys())])
+                set_clause = ", ".join([f'"{col}" = ${i+1}' for i, col in enumerate(mapped_updates.keys())])
                 sql = f"""
                     UPDATE inserted_rows
                     SET {set_clause}
-                    WHERE project_article_id = ${len(updates) + 1}
+                    WHERE project_article_id = ${len(mapped_updates) + 1}
                 """
-                values = list(updates.values())
-                print("✏️ UPDATE inserted_rows SQL:", sql)
-                print("✏️ VALUES:", values + [row_id])
+                values = list(mapped_updates.values())
                 await conn.execute(sql, *values, row_id)
+
             else:
-                # INSERT inserted_rows
-                columns = list(updates.keys())
-                values = [updates[col] for col in columns]
+                columns = list(mapped_updates.keys())
+                values = list(mapped_updates.values())
 
                 if "project_article_id" not in columns:
                     columns.insert(0, "project_article_id")
@@ -130,27 +152,33 @@ async def update_edits(request: Request):
                     INSERT INTO inserted_rows ({', '.join(f'"{c}"' for c in columns)})
                     VALUES ({placeholders})
                 """
-                print("➕ INSERT inserted_rows SQL:", sql)
-                print("➕ VALUES:", values)
                 await conn.execute(sql, *values)
 
         else:
-            # draft_project_articles → snake_case via HEADER_MAP
             columns = []
+            values = []
+
             for col in updates.keys():
                 mapped = HEADER_MAP.get(col)
                 if mapped:
                     columns.append(mapped)
+                    val = updates[col]
+                    if mapped in int_fields:
+                        if val == '':
+                            val = None
+                        else:
+                            val = int(val)
+                    values.append(val)
 
             if not columns:
                 print(f"⚠️ Keine gültigen Mappings für: {updates.keys()}")
                 continue
 
-            row = await conn.fetchrow("SELECT 1 FROM draft_project_articles WHERE project_article_id = $1", row_id)
-            values = [updates[col] for col in updates.keys() if HEADER_MAP.get(col)]
+            row = await conn.fetchrow(
+                "SELECT 1 FROM draft_project_articles WHERE project_article_id = $1", row_id
+            )
 
             if row:
-                # UPDATE draft
                 set_clause = ", ".join([f"{col} = ${i+1}" for i, col in enumerate(columns)])
                 sql = f"""
                     UPDATE draft_project_articles
@@ -161,7 +189,6 @@ async def update_edits(request: Request):
                 print("✏️ VALUES:", values + [row_id])
                 await conn.execute(sql, *values, row_id)
             else:
-                # INSERT draft
                 insert_columns = list(columns)
                 insert_values = values
 
@@ -191,10 +218,11 @@ async def update_edits(request: Request):
     await conn.close()
     print(f"✅ Edits gespeichert: {updated_count} Änderungen")
     return {
-    "status": "ok",
-    "count": updated_count,
-    "log": f"✅ Edits gespeichert: {updated_count} Änderung(en)"
-}
+        "status": "ok",
+        "count": updated_count,
+        "log": f"✅ Edits gespeichert: {updated_count} Änderung(en)"
+    }
+
 
 
 @router.post("/api/rematerializeAll")

@@ -3,7 +3,6 @@
 import { TraitsRenderer } from "./TraitsRenderer";
 import Handsontable from "handsontable";
 
-
 export const WrappedTraitsRenderer = (
   instance: Handsontable,
   td: HTMLTableCellElement,
@@ -13,7 +12,7 @@ export const WrappedTraitsRenderer = (
   value: unknown,
   cellProperties: Handsontable.CellProperties
 ): HTMLTableCellElement => {
-  // Ensure TraitsRenderer receives the correct `this` context
+  // 1️⃣ Original TraitsRenderer anwenden
   TraitsRenderer.call(
     instance,
     instance,
@@ -25,9 +24,15 @@ export const WrappedTraitsRenderer = (
     cellProperties
   );
 
+  // 2️⃣ Word wrapping aktivieren
   td.style.whiteSpace = "normal";
   td.style.wordBreak = "break-word";
   td.style.overflowWrap = "break-word";
+
+  // 3️⃣ Dein *text* → <span> Ersetzung
+  if (typeof value === "string") {
+    td.innerHTML = value.replace(/\*(.*?)\*/g, '<span class="red-inline">$1</span>');
+  }
 
   return td;
 };

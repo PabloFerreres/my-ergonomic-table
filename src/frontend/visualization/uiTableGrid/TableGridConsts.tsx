@@ -17,7 +17,7 @@ export function buildColumnDefs(colHeaders: string[]) {
       type: traits.type,
       renderer: WrappedTraitsRenderer,
       wordWrap: true,
-      customClass: cellClasses.join(" "),
+      className: ["htWrap", ...cellClasses].join(" "),
       filter: true,
     };
   });

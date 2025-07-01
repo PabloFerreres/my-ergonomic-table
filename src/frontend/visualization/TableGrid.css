@@ -74,3 +74,8 @@ button.changeType {
   background-color: #fff200 !important; /* Baugelb */
   color: black !important;
 }
+
+.red-inline {
+  color: red;
+  font-weight: normal;
+}
