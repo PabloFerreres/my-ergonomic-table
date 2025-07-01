@@ -122,6 +122,20 @@ function TableGrid({
               name: "Insert row below",
               disabled: () => isBlocked,
             },
+            insert_5_below: {
+              name: "Insert 5 rows below",
+              disabled: () => isBlocked,
+              callback: function () {
+                const hot = hotRef?.current?.hotInstance;
+                if (!hot) return;
+
+                const selected = hot.getSelectedLast();
+                if (!selected) return;
+
+                const row = selected[0];
+                hot.alter("insert_row_below", row, 5);
+              },
+            },
             remove_row: {
               name: "Remove row",
               disabled: () => isBlocked,
