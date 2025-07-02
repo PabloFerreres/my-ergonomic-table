@@ -241,3 +241,155 @@ async def get_last_insert_id(request: Request, project_id: int):
             SELECT last_id FROM inserted_id_meta WHERE project_id = $1
         """, project_id)
         return {"lastId": row["last_id"] if row else -1}
+
+    
+
+@router.post("/api/importOrUpdateArticles")
+async def import_or_update_articles(request: Request):
+    payload = await request.json()
+    ids = payload.get("ids", [])
+    if not ids:
+        return {"status": "no_ids"}
+
+    conn = await asyncpg.connect(DB_URL)
+
+    # Hole alle Inserted-Rows-Daten für die IDs
+    rows = await conn.fetch(
+        "SELECT * FROM inserted_rows WHERE project_article_id = ANY($1::int[])", ids
+    )
+
+    # Hole last_import_article_id aus import_article_meta
+    meta = await conn.fetchrow(
+        "SELECT last_import_article_id FROM import_article_meta WHERE id = 1"
+    )
+    last_import_id = meta["last_import_article_id"] if meta else -1
+
+    # Hole gültige Spalten + Typen aus articles
+    article_cols_result = await conn.fetch(
+        """
+        SELECT column_name, data_type
+        FROM information_schema.columns
+        WHERE table_name = 'articles'
+        """
+    )
+    article_columns = {r["column_name"]: r["data_type"] for r in article_cols_result}
+
+    new_id = last_import_id
+    inserted_count = 0
+    updated_count = 0
+    skipped_count = 0
+
+    for row in rows:
+        inserted = dict(row)
+        project_article_id = inserted["project_article_id"]
+        article_id = inserted.get("article_id")
+
+        # absichern
+        if article_id == "" or article_id is None:
+            article_id = None
+        else:
+            try:
+                article_id = int(article_id)
+            except ValueError:
+                article_id = None
+
+        if not article_id:
+            # Neuer Insert
+            new_id -= 1
+
+            cols = []
+            vals = []
+
+            for k, v in inserted.items():
+                if k in article_columns and k != "id":
+                    if v == "":
+                        v = None
+                    col_type = article_columns[k]
+                    if col_type in ("text", "character varying") and v is not None:
+                        v = str(v)
+                    vals.append(v)
+                    cols.append(f'"{k}"')
+
+            # ID vorne anhängen
+            cols.insert(0, "id")
+            vals.insert(0, new_id)
+
+            # Platzhalter generieren
+            placeholders = [f"${i+1}" for i in range(len(vals))]
+
+            sql = f"""
+                INSERT INTO articles ({', '.join(cols)})
+                VALUES ({', '.join(placeholders)})
+            """
+            await conn.execute(sql, *vals)
+
+            # inserted_rows aktualisieren
+            await conn.execute(
+                """
+                UPDATE inserted_rows
+                SET article_id = $1
+                WHERE project_article_id = $2
+                """,
+                new_id, project_article_id
+            )
+
+            print(f"➕ Inserted new article {new_id}")
+            inserted_count += 1
+
+        elif article_id < 0:
+            # Bestehenden Artikel updaten
+            cols = []
+            vals = []
+
+            for k, v in inserted.items():
+                if k in article_columns and k != "id":
+                    if v == "":
+                        v = None
+                    col_type = article_columns[k]
+                    if col_type in ("text", "character varying") and v is not None:
+                        v = str(v)
+                    cols.append(f'"{k}" = ${len(vals)+1}')
+                    vals.append(v)
+
+            if cols:
+                sql = f"""
+                    UPDATE articles
+                    SET {', '.join(cols)}
+                    WHERE id = ${len(vals)+1}::int
+                """
+                vals.append(int(article_id))
+                await conn.execute(sql, *vals)
+
+                print(f"✏️ Updated article {article_id}")
+                updated_count += 1
+            else:
+                print(f"⚠️ Nothing to update for {article_id}")
+
+        else:
+            print(f"✔️ Skipped: article_id = {article_id}")
+            skipped_count += 1
+
+    # Speichere neuen Zähler
+    await conn.execute(
+        """
+        UPDATE import_article_meta
+        SET last_import_article_id = $1
+        WHERE id = 1
+        """,
+        new_id
+    )
+
+    await conn.close()
+    return {
+        "status": "done",
+        "inserted": inserted_count,
+        "updated": updated_count,
+        "skipped": skipped_count,
+        "new_last_id": new_id,
+        "log": [
+        f"➕ Inserted {inserted_count} new article(s)",
+        f"✏️ Updated {updated_count} article(s)"
+        ]
+    }
+
+

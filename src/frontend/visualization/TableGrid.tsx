@@ -16,6 +16,7 @@ import { useAfterUndo } from "../hooks/useAfterUndo"; // ✅ NEU
 import Handsontable from "handsontable";
 import { buildVisualPositionMap } from "../utils/BuildVisualPositionMap";
 import { sendPositionMap } from "../utils/apiSync";
+import { uiConsole } from "../utils/uiConsole";
 
 interface TableGridProps {
   data: (string | number)[][];
@@ -134,6 +135,55 @@ function TableGrid({
 
                 const row = selected[0];
                 hot.alter("insert_row_below", row, 5);
+              },
+            },
+            send_update_articles: {
+              name: "Send/Update Articles",
+              disabled: () => isBlocked,
+              callback: async function () {
+                const hot = hotRef?.current?.hotInstance;
+                if (!hot) return;
+
+                const selected = hot.getSelected();
+                if (!selected) return;
+
+                const rows = [...new Set(selected.map((sel) => sel[0]))];
+                const ids: number[] = [];
+
+                rows.forEach((row) => {
+                  const projectArticleId = data[row][rowIdIndex];
+                  if (typeof projectArticleId === "number") {
+                    ids.push(projectArticleId);
+                  }
+                });
+
+                if (ids.length === 0) {
+                  uiConsole("⚠️ Keine gültigen Zeilen markiert!");
+                  return;
+                }
+
+                try {
+                  const res = await fetch(
+                    "http://localhost:8000/api/importOrUpdateArticles",
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ ids }),
+                    }
+                  );
+                  const result = await res.json();
+
+                  if (result.log && Array.isArray(result.log)) {
+                    result.log.forEach((line: string) => uiConsole(line));
+                  } else {
+                    uiConsole(
+                      "✅ Import/Update fertig, keine weiteren Details."
+                    );
+                  }
+                } catch (err) {
+                  console.error(err);
+                  uiConsole(`❌ Fehler beim Import/Update: ${err}`);
+                }
               },
             },
             remove_row: {
