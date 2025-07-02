@@ -246,12 +246,34 @@ async def get_last_insert_id(request: Request, project_id: int):
 
 @router.post("/api/importOrUpdateArticles")
 async def import_or_update_articles(request: Request):
-    payload = await request.json()
-    ids = payload.get("ids", [])
-    if not ids:
-        return {"status": "no_ids"}
+    # Client sendet nur ausgewählte ROW-Indizes (Grid-Positionen, 0-basiert)
+    data = await request.json()
+    selection = data.get("selection", [])
+    if not selection:
+        return {"status": "no_selection"}
 
     conn = await asyncpg.connect(DB_URL)
+
+    # Hole PositionMap aus DB und parse sie sauber!
+    meta = await conn.fetchrow(
+        "SELECT position_map FROM position_meta WHERE id = 429"
+    )
+    position_map_raw = meta["position_map"] if meta else "[]"
+    position_map = json.loads(position_map_raw)  # <<< parse als JSON
+
+    # Sortiere PositionMap nach position ASC
+    position_map.sort(key=lambda x: x["position"])
+
+    # Mappe Auswahl: Row-Index (0-basiert) → PositionMap.position (1-basiert)
+    ids = [
+        entry["project_article_id"]
+        for idx, entry in enumerate(position_map)
+        if idx in selection
+    ]
+
+    if not ids:
+        await conn.close()
+        return {"status": "no_ids"}
 
     # Hole alle Inserted-Rows-Daten für die IDs
     rows = await conn.fetch(
@@ -284,7 +306,6 @@ async def import_or_update_articles(request: Request):
         project_article_id = inserted["project_article_id"]
         article_id = inserted.get("article_id")
 
-        # absichern
         if article_id == "" or article_id is None:
             article_id = None
         else:
@@ -294,7 +315,6 @@ async def import_or_update_articles(request: Request):
                 article_id = None
 
         if not article_id:
-            # Neuer Insert
             new_id -= 1
 
             cols = []
@@ -310,11 +330,9 @@ async def import_or_update_articles(request: Request):
                     vals.append(v)
                     cols.append(f'"{k}"')
 
-            # ID vorne anhängen
             cols.insert(0, "id")
             vals.insert(0, new_id)
 
-            # Platzhalter generieren
             placeholders = [f"${i+1}" for i in range(len(vals))]
 
             sql = f"""
@@ -323,7 +341,6 @@ async def import_or_update_articles(request: Request):
             """
             await conn.execute(sql, *vals)
 
-            # inserted_rows aktualisieren
             await conn.execute(
                 """
                 UPDATE inserted_rows
@@ -337,7 +354,6 @@ async def import_or_update_articles(request: Request):
             inserted_count += 1
 
         elif article_id < 0:
-            # Bestehenden Artikel updaten
             cols = []
             vals = []
 
@@ -369,7 +385,6 @@ async def import_or_update_articles(request: Request):
             print(f"✔️ Skipped: article_id = {article_id}")
             skipped_count += 1
 
-    # Speichere neuen Zähler
     await conn.execute(
         """
         UPDATE import_article_meta
@@ -394,5 +409,6 @@ async def import_or_update_articles(request: Request):
         "new_last_id": new_id,
         "log": logs
     }
+
 
 

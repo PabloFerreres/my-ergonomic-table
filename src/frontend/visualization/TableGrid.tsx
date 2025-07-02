@@ -152,16 +152,10 @@ function TableGrid({
                   for (let r = from; r <= to; r++) rows.add(r);
                 });
 
-                const ids: number[] = [];
-                rows.forEach((row) => {
-                  const projectArticleId = data[row][rowIdIndex];
-                  if (typeof projectArticleId === "number") {
-                    ids.push(projectArticleId);
-                  }
-                });
+                const selection = Array.from(rows);
 
-                if (ids.length === 0) {
-                  uiConsole("⚠️ Keine gültigen Zeilen markiert!");
+                if (selection.length === 0) {
+                  uiConsole("⚠️ Keine Zeilen markiert!");
                   return;
                 }
 
@@ -171,7 +165,7 @@ function TableGrid({
                     {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ ids }),
+                      body: JSON.stringify({ selection }), // <- HIER!
                     }
                   );
                   const result = await res.json();
