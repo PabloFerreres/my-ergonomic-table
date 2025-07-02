@@ -180,7 +180,7 @@ function TableGrid({
                     result.log.forEach((line: string) => uiConsole(line));
                   } else {
                     uiConsole(
-                      "✅ Import/Update fertig, keine weiteren Details."
+                      "⚠️ Keine Änderungen durchgeführt – nichts zu importieren oder updaten!"
                     );
                   }
                 } catch (err) {
