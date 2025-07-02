@@ -12,7 +12,7 @@ import {
 import { useCellProperties } from "../hooks/useCellProperties";
 import { useAfterChange } from "../hooks/useAfterChange";
 import { useAfterRowMove } from "../hooks/useAfterRowMove";
-import { useAfterUndo } from "../hooks/useAfterUndo"; // ✅ NEU
+import { useAfterUndo } from "../hooks/useAfterUndo";
 import Handsontable from "handsontable";
 import { buildVisualPositionMap } from "../utils/BuildVisualPositionMap";
 import { sendPositionMap } from "../utils/apiSync";
@@ -44,7 +44,7 @@ function TableGrid({
   afterSelection,
   afterFilter,
   sheetName,
-  isBlocked = false, // default: false
+  isBlocked = false,
 }: TableGridProps) {
   const rowIdIndex = colHeaders.indexOf("project_article_id");
 
@@ -67,7 +67,6 @@ function TableGrid({
     isBlocked
   );
 
-  // ✅ NEU: Undo-Hook anhängen
   useAfterUndo(
     hotRef?.current?.hotInstance ?? null,
     sheetName,
@@ -147,9 +146,15 @@ function TableGrid({
                 const selected = hot.getSelected();
                 if (!selected) return;
 
-                const rows = [...new Set(selected.map((sel) => sel[0]))];
-                const ids: number[] = [];
+                // ✅ Korrekte Zeilensammlung: alle Zeilen in allen Blöcken
+                const rows = new Set<number>();
+                selected.forEach(([startRow, , endRow]) => {
+                  const from = Math.min(startRow, endRow);
+                  const to = Math.max(startRow, endRow);
+                  for (let r = from; r <= to; r++) rows.add(r);
+                });
 
+                const ids: number[] = [];
                 rows.forEach((row) => {
                   const projectArticleId = data[row][rowIdIndex];
                   if (typeof projectArticleId === "number") {
