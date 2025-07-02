@@ -379,6 +379,12 @@ async def import_or_update_articles(request: Request):
         new_id
     )
 
+    logs = []
+    if inserted_count > 0:
+        logs.append(f"➕ Inserted {inserted_count} new article(s)")
+    if updated_count > 0:
+        logs.append(f"✏️ Updated {updated_count} article(s)")
+
     await conn.close()
     return {
         "status": "done",
@@ -386,10 +392,7 @@ async def import_or_update_articles(request: Request):
         "updated": updated_count,
         "skipped": skipped_count,
         "new_last_id": new_id,
-        "log": [
-        f"➕ Inserted {inserted_count} new article(s)",
-        f"✏️ Updated {updated_count} article(s)"
-        ]
+        "log": logs
     }
 
 

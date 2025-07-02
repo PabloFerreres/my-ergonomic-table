@@ -24,15 +24,10 @@ interface TableGridProps {
   colWidths?: (number | undefined)[];
   rowHeights?: number | number[];
   hotRef?: React.RefObject<HotTableClass | null>;
-  afterSelection?: (
-    row: number,
-    col: number,
-    row2: number,
-    col2: number
-  ) => void;
   afterFilter?: (isActive: boolean) => void;
   sheetName: string;
   isBlocked?: boolean;
+  onSelectionChange?: (cell: { row: number; col: number }) => void;
 }
 
 function TableGrid({
@@ -41,10 +36,10 @@ function TableGrid({
   colWidths,
   rowHeights,
   hotRef,
-  afterSelection,
   afterFilter,
   sheetName,
   isBlocked = false,
+  onSelectionChange,
 }: TableGridProps) {
   const rowIdIndex = colHeaders.indexOf("project_article_id");
 
@@ -82,6 +77,10 @@ function TableGrid({
     colHeaders
   );
 
+  const handleSelection = (row: number, col: number) => {
+    onSelectionChange?.({ row, col });
+  };
+
   return (
     <div style={{ height: "100%" }}>
       <HotTable
@@ -103,7 +102,7 @@ function TableGrid({
         height="100%"
         stretchH="none"
         licenseKey="non-commercial-and-evaluation"
-        afterSelection={afterSelection}
+        afterSelection={handleSelection}
         afterGetColHeader={(col, TH) => afterGetColHeader(col, TH, colHeaders)}
         afterFilter={() =>
           handleAfterFilter(
@@ -146,7 +145,6 @@ function TableGrid({
                 const selected = hot.getSelected();
                 if (!selected) return;
 
-                // ✅ Korrekte Zeilensammlung: alle Zeilen in allen Blöcken
                 const rows = new Set<number>();
                 selected.forEach(([startRow, , endRow]) => {
                   const from = Math.min(startRow, endRow);

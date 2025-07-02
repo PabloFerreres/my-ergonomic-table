@@ -29,14 +29,21 @@ function App() {
   const [sheets, setSheets] = useState<Record<string, SheetData>>({});
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
   const [logs, setLogs] = useState<{ text: string; time: string }[]>([]);
-
-  const hotRefs = useRef<Record<string, React.RefObject<HotTableClass>>>({});
-
+  const [isFilterActive, setIsFilterActive] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{
     row: number;
     col: number;
   } | null>(null);
-  const [isFilterActive, setIsFilterActive] = useState(false);
+
+  const hotRefs = useRef<Record<string, React.RefObject<HotTableClass>>>({});
+
+  const { moveRowsUp, moveRowsDown } = useRowMoverLogic(
+    hotRefs.current[activeSheet ?? ""]?.current?.hotInstance ?? null
+  );
+  const { search, goNext, goPrev, matchIndex, matchCount } = useSearchFunctions(
+    hotRefs.current[activeSheet ?? ""]?.current?.hotInstance ?? null
+  );
+  const searchBarRef = useRef<SearchBarHandle>(null);
 
   useEffect(() => {
     const handler = (entry: { text: string; time: string }) => {
@@ -53,14 +60,6 @@ function App() {
     });
     hotRefs.current = refs;
   }, [sheetNames]);
-
-  const { moveRowsUp, moveRowsDown } = useRowMoverLogic(
-    hotRefs.current[activeSheet ?? ""]?.current?.hotInstance ?? null
-  );
-  const { search, goNext, goPrev, matchIndex, matchCount } = useSearchFunctions(
-    hotRefs.current[activeSheet ?? ""]?.current?.hotInstance ?? null
-  );
-  const searchBarRef = useRef<SearchBarHandle>(null);
 
   useEffect(() => {
     // 🔽 Lade initialen last_insert_id von der DB
@@ -297,12 +296,10 @@ function App() {
                         }}
                       >
                         <TableGrid
+                          onSelectionChange={setSelectedCell}
                           data={sheet.data}
                           colHeaders={sheet.headers}
                           hotRef={hotRefs.current[name]}
-                          afterSelection={(row, col) =>
-                            setSelectedCell({ row, col })
-                          }
                           rowHeights={Object.values(sheet.layout.rowHeights)}
                           colWidths={sheet.headers.map(
                             (h) => sheet.layout.columnWidths[h] ?? undefined
