@@ -136,7 +136,7 @@ function TableGrid({
               },
             },
             send_update_articles: {
-              name: "Send/Update Articles",
+              name: "Send/Update Articles 📤🐘",
               disabled: () => isBlocked,
               callback: async function () {
                 const hot = hotRef?.current?.hotInstance;

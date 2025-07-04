@@ -53,8 +53,19 @@ button.changeType {
 
 
 
-.htDropdownMenu.handsontable {
-  transform: translateX(30px); /* nach rechts schieben */
+.htMenu.htContextMenu {
+  min-width: 300px !important; /* Container */
+  width: 300px !important;
+}
+
+.htMenu.htContextMenu .ht_master .htCore td {
+  font-size: 16px !important;
+  padding: 7px 0px !important; /* nur etwas */
+}
+
+.htMenu.htContextMenu .ht_master .htCore td span {
+  display: inline-block;
+  padding-right: 20px; /* rechter Abstand im Inhalt */
 }
 
 .row-new {
