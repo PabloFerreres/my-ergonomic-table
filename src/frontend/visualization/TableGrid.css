@@ -1,17 +1,34 @@
-/* 🔻 Make the dropdown filter icon bigger and shift it down */
-button.changeType {
-  transform: translateY(6px);
+.ht_clone_top .htCore thead th .colHeader {
   position: absolute !important;
-  top: auto !important;
-  bottom: -12px !important;
-  right: 0px !important;
-
-  width: 40px !important;     /* double width */
-  height: 20px !important;    /* double height */
-  padding: 0px !important;
-  font-size: 15px !important; /* if any icon is font-based */
-  background-size: 24px 24px !important; /* scale background icon */
+  bottom: 8px !important;  /* feiner Abstand */
+  left: 5px !important;    /* feiner Offset nach rechts */
+  transform: rotate(-45deg);
+  transform-origin: left bottom;
+  white-space: normal;
+  text-align: left;
 }
+
+button.changeType {
+  position: absolute !important;
+  right: 4px !important;
+  bottom: 0px !important;
+  top: auto !important;
+  left: auto !important;
+
+  width: 40px !important;
+  height: 20px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+
+  font-size: 15px !important;
+  background-size: 24px 24px !important;
+
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+  display: block !important;
+}
+
+
 
 
 /* 🔲 Make the multi-select checkbox list the focus */
@@ -89,4 +106,16 @@ button.changeType {
 .red-inline {
   color: red;
   font-weight: normal;
+}
+
+.ht_clone_top .htCore thead th {
+  vertical-align: bottom !important;
+}
+
+.ht_clone_top .htCore thead th .colHeader {
+  display: inline-block;
+  transform: rotate(-45deg);
+  transform-origin: left bottom;
+  white-space: normal;
+  text-align: left;
 }
