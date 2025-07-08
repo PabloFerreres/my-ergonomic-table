@@ -1,11 +1,18 @@
+.ht_clone_top .htCore thead th {
+  overflow: visible !important;
+}
+
 .ht_clone_top .htCore thead th .colHeader {
   position: absolute !important;
-  bottom: 8px !important;  /* feiner Abstand */
-  left: 5px !important;    /* feiner Offset nach rechts */
-  transform: rotate(-45deg);
+  bottom: 20px !important;  /* feiner Abstand */
+  left: 25px !important;    /* feiner Offset nach rechts */
+  transform: rotate(-30deg);
   transform-origin: left bottom;
   white-space: normal;
   text-align: left;
+  max-width: 110px;               /* statischer Wrap-Punkt */
+  word-break: break-word;        /* bricht im Wort, falls nötig */
+  white-space: normal;
 }
 
 button.changeType {
@@ -67,8 +74,6 @@ button.changeType {
   display: inline-block !important;
   width: 100% !important;
 }
-
-
 
 .htMenu.htContextMenu {
   min-width: 300px !important; /* Container */

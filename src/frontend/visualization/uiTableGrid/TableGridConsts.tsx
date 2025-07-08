@@ -70,8 +70,8 @@ export function afterGetColHeader(
     // ✅ Jetzt nur absolute Position vorbereiten — Rest macht CSS
     headerLabel.style.position = "absolute";
     headerLabel.style.bottom = "4px";
-    headerLabel.style.left = "8px";
-    headerLabel.style.transform = "rotate(-45deg)";
+    headerLabel.style.left = "-12px";
+    headerLabel.style.transform = "rotate(-30deg)";
     headerLabel.style.transformOrigin = "left bottom";
     headerLabel.style.whiteSpace = "normal";
     headerLabel.style.textAlign = "left";
