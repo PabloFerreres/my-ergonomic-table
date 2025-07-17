@@ -63,7 +63,7 @@ function App() {
 
   useEffect(() => {
     // 🔽 Lade initialen last_insert_id von der DB
-    fetch("http://localhost:8000/api/last_insert_id?project_id=1")
+    fetch("http://localhost:8000/api/last_insert_id")
       .then((res) => res.json())
       .then((data) => {
         console.log("📥 Loaded last_insert_id from DB:", data.lastId);

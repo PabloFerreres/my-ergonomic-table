@@ -1,36 +1,27 @@
+# backend/create.py
+
 import psycopg2
-from backend.settings.connection_points import DB_URL, project_id, base_view_id, views_to_show
-
-
-
-def get_view_id_from_sheet_name(sheet_name: str) -> int | None:
-    conn = psycopg2.connect(DB_URL)
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT v.id
-        FROM views v
-        JOIN project_views pv ON v.id = pv.view_id
-        JOIN projects p ON pv.project_id = p.id
-        WHERE LOWER(CONCAT('materialized_', v.name, '_', p.name)) = %s
-    """, (sheet_name.lower(),))
-    result = cursor.fetchone()
-    cursor.close()
-    conn.close()
-    return result[0] if result else None
+from backend.settings.connection_points import DB_URL, project_id, views_to_show, DEBUG
 
 def get_materialized_table_name(cursor, project_id, view_id):
     cursor.execute("""
         SELECT v.name AS view_name, p.name AS project_name
         FROM views v
-        JOIN project_views pv ON v.id = pv.view_id
-        JOIN projects p ON pv.project_id = p.id
+        JOIN projects p ON v.project_id = p.id
         WHERE v.id = %s AND p.id = %s
     """, (view_id, project_id))
-    view_name, project_name = cursor.fetchone()
-    return f"materialized_{view_name.lower()}_{project_name.lower()}"
+    row = cursor.fetchone()
+    if not row:
+        if DEBUG:
+            print(f"[DEBUG] No materialized table name found for view_id={view_id}, project_id={project_id}")
+        return None
+    view_name, project_name = row
+    table_name = f"materialized_{view_name.lower()}_{project_name.lower()}"
+    if DEBUG:
+        print(f"[DEBUG] Table name generated: {table_name}")
+    return table_name
 
-def create_materialized_table(view_id):
-    import psycopg2
+def create_materialized_table(view_id, base_view_id):
     import json
     from pathlib import Path
 
@@ -38,6 +29,12 @@ def create_materialized_table(view_id):
     cursor = conn.cursor()
 
     table_name = get_materialized_table_name(cursor, project_id, view_id)
+    if not table_name:
+        if DEBUG:
+            print(f"[DEBUG] Skipping create_materialized_table for view_id={view_id}: table name not found.")
+        cursor.close()
+        conn.close()
+        return
 
     # 1. Fetch visible layout columns
     cursor.execute("""
@@ -48,17 +45,20 @@ def create_materialized_table(view_id):
         AND vc.visible = TRUE
         ORDER BY vc.position
     """, (base_view_id,))
-
     layout_columns = cursor.fetchall()
+    if DEBUG:
+        print(f"[DEBUG] Layout columns for base_view_id={base_view_id}: {layout_columns}")
 
-    # Map lowercase layout name -> display (materialized column) name
+    # Map lowercase layout name -> display name
     layout_name_map = {}
     for name, display_name, _ in layout_columns:
         if name:
             layout_name_map[name.strip().lower()] = (display_name or name).strip()
 
-    # Load HEADER_MAP for inserted_rows matching
+    # Load HEADER_MAP
     HEADER_MAP = json.loads(Path("backend/utils/header_name_map.json").read_text(encoding="utf-8"))
+    if DEBUG:
+        print(f"[DEBUG] Loaded HEADER_MAP: {HEADER_MAP}")
 
     # 2. Get all column names in inserted_rows
     cursor.execute("""
@@ -67,6 +67,8 @@ def create_materialized_table(view_id):
         WHERE table_name = 'inserted_rows'
     """)
     inserted_col_set = {r[0].strip() for r in cursor.fetchall()}
+    if DEBUG:
+        print(f"[DEBUG] inserted_rows columns: {inserted_col_set}")
 
     # 3. Get all available columns from all layout sources
     cursor.execute("""
@@ -88,9 +90,9 @@ def create_materialized_table(view_id):
             "inserted_rows": "i"
         }[table]
         colmap[key].add(col)
-
-    # NEU: ai (articles über inserted_rows) hat gleiche Felder wie a
-    colmap["ai"] = colmap["a"]
+    colmap["ai"] = colmap["a"]  # NEU: ai wie a
+    if DEBUG:
+        print(f"[DEBUG] colmap: {colmap}")
 
     # 4. Build column expressions from layout
     col_exprs = []
@@ -108,22 +110,20 @@ def create_materialized_table(view_id):
 
         sources = []
         if in_i:
-            sources.append(f'ins."{layout_col}"')
+            sources.append(f'ins.\"{layout_col}\"')
         if in_d:
-            sources.append(f'dpa."{layout_col}"')
+            sources.append(f'dpa.\"{layout_col}\"')
         if in_p:
-            sources.append(f'pa."{layout_col}"')
+            sources.append(f'pa.\"{layout_col}\"')
         if in_a:
-            sources.append(f'a."{layout_col}"')
+            sources.append(f'a.\"{layout_col}\"')
 
         layout_expr = f"COALESCE({', '.join(sources)})" if sources else "NULL"
 
-        # ✅ Korrektes Mapping für inserted_rows Spalte
         mapped_inserted_col = HEADER_MAP.get(layout_col, layout_col)
         in_inserted = mapped_inserted_col in colmap["i"]
-        inserted_expr = f'ins."{mapped_inserted_col}"' if in_inserted else "NULL"
-
-        ai_expr = f'ai."{layout_col}"' if in_ai else "NULL"
+        inserted_expr = f'ins.\"{mapped_inserted_col}\"' if in_inserted else "NULL"
+        ai_expr = f'ai.\"{layout_col}\"' if in_ai else "NULL"
         coalesce_inserted_ai = f"COALESCE({inserted_expr}, {ai_expr})"
 
         expr = f"""
@@ -138,13 +138,13 @@ def create_materialized_table(view_id):
             END AS "{materialized_col}"
         """
         col_exprs.append(expr.strip())
-
     col_exprs_sql = ",\n    ".join(col_exprs)
+    if DEBUG:
+        print(f"[DEBUG] Column expressions:\n{col_exprs_sql}")
 
     # 5. Final SQL
     print(f"🧱 Creating table: {table_name}")
     cursor.execute(f'DROP TABLE IF EXISTS "{table_name}";')
-
     sql = f'''
         CREATE TABLE "{table_name}" AS
         WITH position_data AS (
@@ -163,6 +163,8 @@ def create_materialized_table(view_id):
         LEFT JOIN articles ai ON ins.article_id = ai.id
         ORDER BY (pd.data->>'position')::int;
     '''
+    if DEBUG:
+        print(f"[DEBUG] Running CREATE SQL:\n{sql}")
     cursor.execute(sql)
     conn.commit()
     print(f"✅ Created: {table_name}")
@@ -170,8 +172,16 @@ def create_materialized_table(view_id):
     conn.close()
 
 def refresh_all_materialized():
-    for vid in views_to_show:
-        create_materialized_table(view_id=vid)
+    for v in views_to_show:
+        if isinstance(v, dict):
+            view_id = v["view_id"]
+            base_view_id = v["base_view_id"]
+        else:
+            view_id = v
+            base_view_id = None  # Not expected, fallback
+        if DEBUG:
+            print(f"[DEBUG] Creating materialized for view_id={view_id}, base_view_id={base_view_id}")
+        create_materialized_table(view_id, base_view_id)
     print("✅ Alle Materialized Tables wurden aktualisiert.")
 
 if __name__ == "__main__":
