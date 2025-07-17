@@ -255,7 +255,7 @@ function App() {
             <>
               <div
                 style={{
-                  height: "78.5vh",
+                  height: "80.5vh",
                   width: "100%",
                   overflow: "hidden",
                   position: "relative",
@@ -281,7 +281,7 @@ function App() {
                       key={name}
                       style={{
                         display: name === activeSheet ? "block" : "none",
-                        height: "78.5vh",
+                        height: "80.5vh",
                         width: "100%",
                         overflow: "hidden",
                       }}
@@ -290,7 +290,7 @@ function App() {
                         style={{
                           transform: `scale(${zoom})`,
                           transformOrigin: "top left",
-                          height: `${78.5 / zoom}vh`,
+                          height: `${80.5 / zoom}vh`,
                           width: `${100 / zoom}%`,
                           overflow: "hidden",
                         }}
