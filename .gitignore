@@ -27,3 +27,7 @@ dist-ssr
 # Bytecode cache
 __pycache__/
 *.py[cod]
+
+
+config.json
+config2.json
