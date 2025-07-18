@@ -5,9 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 import asyncpg
 
+
+
+
 from backend.db_to_hot_table import fetch_table_as_hotarray
 from backend.api import router as api_router
 from backend.settings.connection_points import DB_URL, project_id, views_to_show, DEBUG
+
 
 app = FastAPI()
 

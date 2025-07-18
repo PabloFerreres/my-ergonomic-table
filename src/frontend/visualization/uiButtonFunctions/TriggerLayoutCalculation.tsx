@@ -1,3 +1,6 @@
+import config from "../../../../config.json";
+const API_PREFIX = config.BACKEND_URL;
+
 export async function triggerLayoutCalculation(
   headers: string[],
   data: (string | number)[][],
@@ -7,7 +10,7 @@ export async function triggerLayoutCalculation(
   }) => void
 ) {
   try {
-    const res = await fetch("http://localhost:8000/api/layout/estimate", {
+    const res = await fetch(`${API_PREFIX}/api/layout/estimate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ headers, data }),

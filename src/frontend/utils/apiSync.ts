@@ -1,6 +1,9 @@
 import type { EditEntry } from "../editierung/EditMap";
 import { getLastUsedInsertedId } from "../editierung/EditMap"; // ✅ NEU
 import { uiConsole } from "../utils/uiConsole"; // ggf. Pfad anpassen
+import config from '../../../config.json'; // Pfad ggf. anpassen!
+
+const API_PREFIX = config.BACKEND_URL;
 
 export async function sendEdits(sheet: string, edits: EditEntry[]) {
   try {
@@ -9,7 +12,7 @@ export async function sendEdits(sheet: string, edits: EditEntry[]) {
       lastUsedInsertedId: getLastUsedInsertedId(), // ✅ NEU
     };
 
-    const res = await fetch(`http://localhost:8000/api/updateEdits`, {
+    const res = await fetch(`${API_PREFIX}/api/updateEdits`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -32,7 +35,7 @@ export async function sendPositionMap(
 ) {
   try {
     const payload = [{ sheet, rows }]; // ✅ exakt wie bei updateDraft
-    const res = await fetch("http://localhost:8000/api/updatePosition", {
+    const res = await fetch(`${API_PREFIX}/api/updatePosition`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

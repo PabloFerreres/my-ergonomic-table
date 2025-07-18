@@ -18,6 +18,9 @@ import { buildVisualPositionMap } from "../utils/BuildVisualPositionMap";
 import { sendPositionMap } from "../utils/apiSync";
 import { uiConsole } from "../utils/uiConsole";
 
+import config from "../../../config.json";
+const API_PREFIX = config.BACKEND_URL;
+
 interface TableGridProps {
   data: (string | number)[][];
   colHeaders: string[];
@@ -161,7 +164,7 @@ function TableGrid({
 
                 try {
                   const res = await fetch(
-                    "http://localhost:8000/api/importOrUpdateArticles",
+                    `${API_PREFIX}/api/importOrUpdateArticles`,
                     {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },

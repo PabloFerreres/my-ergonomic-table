@@ -15,6 +15,9 @@ import { setInitialInsertedId } from "../utils/insertIdManager";
 import { ConsolePanel } from "./uiSquares/ConsolePanel";
 import { subscribeToConsole, unsubscribeFromConsole } from "../utils/uiConsole";
 
+import config from "../../../config.json";
+const API_PREFIX = config.BACKEND_URL;
+
 function App() {
   type SheetData = {
     headers: string[];
@@ -63,7 +66,7 @@ function App() {
 
   useEffect(() => {
     // 🔽 Lade initialen last_insert_id von der DB
-    fetch("http://localhost:8000/api/last_insert_id")
+    fetch(`${API_PREFIX}/api/last_insert_id`)
       .then((res) => res.json())
       .then((data) => {
         console.log("📥 Loaded last_insert_id from DB:", data.lastId);
@@ -73,7 +76,7 @@ function App() {
       .catch((err) => console.error("❌ Failed to fetch last_insert_id:", err));
 
     // 🔽 Lade Sheets wie bisher
-    fetch("http://localhost:8000/api/sheetnames")
+    fetch(`${API_PREFIX}/api/sheetnames`)
       .then((res) => res.json())
       .then((names: string[]) => {
         setSheetNames(names);
@@ -81,7 +84,7 @@ function App() {
 
         return Promise.all(
           names.map((name) =>
-            fetch(`http://localhost:8000/api/tabledata?table=${name}&limit=700`)
+            fetch(`${API_PREFIX}/api/tabledata?table=${name}&limit=700`)
               .then((res) => res.json())
               .then(
                 ({ headers, data }) =>
@@ -176,12 +179,9 @@ function App() {
           <button
             onClick={async () => {
               try {
-                const res = await fetch(
-                  `http://localhost:8000/api/rematerializeAll`,
-                  {
-                    method: "POST",
-                  }
-                );
+                const res = await fetch(`${API_PREFIX}/api/rematerializeAll`, {
+                  method: "POST",
+                });
                 if (!res.ok) throw new Error(`Server error ${res.status}`);
                 const result = await res.json();
                 console.log("🔁 All rematerialized:", result);
