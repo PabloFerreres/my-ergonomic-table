@@ -64,7 +64,7 @@ app.include_router(api_router)
 # Tabelle als HotTable-kompatibel abrufen
 @app.get("/api/tabledata")
 async def get_tabledata(
-    table: str = Query("materialized_spuellen_miniproject"),
+    table: str = Query(...),
     limit: int = Query(500)
 ):
     if DEBUG:
