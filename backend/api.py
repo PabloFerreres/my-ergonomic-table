@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from backend.routes.layout_routes import router as layout_router
 from backend.routes.sheetnames_routes import router as sheetnames_router
+from backend.routes.baseviews_routes import router as baseviews_router   # <--- HINZUGEFÜGT
 from backend.utils.update_draft_articles import apply_edits_to_draft
 from backend.loading.create_materialized_tables import refresh_all_materialized
 from backend.loading.rematerialize_control import debounce_rematerialize
@@ -13,6 +14,7 @@ from backend.settings.connection_points import DB_URL, DEBUG, views_to_show
 router = APIRouter()
 router.include_router(layout_router)
 router.include_router(sheetnames_router, prefix="/api")
+router.include_router(baseviews_router, prefix="/api")  # <--- HINZUGEFÜGT
 
 HEADER_MAP = json.loads(Path("backend/utils/header_name_map.json").read_text(encoding="utf-8"))
 

@@ -11,7 +11,7 @@ with open(config_path, 'r') as f:
 
 DB_URL = config["DB_URL"]
 
-project_id = 1
+project_id = 2
 DEBUG = True  # Debug-Ausgaben aktivieren/deaktivieren
 
 engine = create_engine(DB_URL)

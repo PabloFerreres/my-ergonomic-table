@@ -14,6 +14,7 @@ import { getEdits } from "../editierung/EditMap";
 import { setInitialInsertedId } from "../utils/insertIdManager";
 import { ConsolePanel } from "./uiSquares/ConsolePanel";
 import { subscribeToConsole, unsubscribeFromConsole } from "../utils/uiConsole";
+import SheetCreateMenu from "./uiButtonFunctions/SheetCreateMenu";
 
 import config from "../../../config.json";
 const API_PREFIX = config.BACKEND_URL;
@@ -38,6 +39,11 @@ function App() {
     col: number;
   } | null>(null);
 
+  const [showSheetMenu, setShowSheetMenu] = useState(false);
+  const [baseViews, setBaseViews] = useState<{ id: number; name: string }[]>(
+    []
+  );
+
   const hotRefs = useRef<Record<string, React.RefObject<HotTableClass>>>({});
 
   const { moveRowsUp, moveRowsDown } = useRowMoverLogic(
@@ -47,6 +53,15 @@ function App() {
     hotRefs.current[activeSheet ?? ""]?.current?.hotInstance ?? null
   );
   const searchBarRef = useRef<SearchBarHandle>(null);
+
+  useEffect(() => {
+    if (showSheetMenu) {
+      fetch(`${API_PREFIX}/api/baseviews`)
+        .then((res) => res.json())
+        .then(setBaseViews)
+        .catch(() => setBaseViews([]));
+    }
+  }, [showSheetMenu]);
 
   useEffect(() => {
     const handler = (entry: { text: string; time: string }) => {
@@ -231,23 +246,67 @@ function App() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "4px" }}>
-          {sheetNames.map((name) => (
-            <button
-              key={name}
-              onClick={() => setActiveSheet(name)}
-              style={{
-                padding: "0.4rem 0.8rem",
-                background: activeSheet === name ? "#555" : "#222",
-                color: "#fff",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-              }}
-            >
-              {name}
-            </button>
-          ))}
+        <div
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            marginBottom: "4px",
+            position: "relative",
+          }}
+        >
+          {/* Plus-Button ganz links */}
+          <button
+            style={{
+              padding: "0.4rem 0.8rem",
+              background: "#222",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+            title="Neues Sheet anlegen"
+            onClick={() => setShowSheetMenu(true)}
+          >
+            +
+          </button>
+
+          {/* Das Context-Menü (SheetCreateMenu) */}
+          <SheetCreateMenu
+            open={showSheetMenu}
+            baseViews={baseViews}
+            onCreate={(newTableName, baseViewId) => {
+              // TODO: when creating a new table send this to backend
+              setShowSheetMenu(false);
+            }}
+            onClose={() => setShowSheetMenu(false)}
+          />
+
+          {sheetNames.map((name) => {
+            let cleanName = name;
+            if (name.startsWith("materialized_")) {
+              cleanName = name.slice("materialized_".length);
+            }
+            if (cleanName.includes("_")) {
+              cleanName = cleanName.substring(0, cleanName.lastIndexOf("_"));
+            }
+            return (
+              <button
+                key={name}
+                onClick={() => setActiveSheet(name)}
+                style={{
+                  padding: "0.4rem 0.8rem",
+                  background: activeSheet === name ? "#555" : "#222",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                {cleanName}
+              </button>
+            );
+          })}
         </div>
 
         <Zoom>
