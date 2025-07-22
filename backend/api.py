@@ -248,7 +248,7 @@ async def rematerialize_all():
         print(f"[DEBUG] Rematerializing all materialized tables for project views: {views_to_show}")
     refresh_all_materialized()
     create_materialized_elektrik()
-    log = "🔁 All materialized tables refreshed"
+    log = "🔁 + ⚡️ All materialized tables refreshed"
     if DEBUG:
         print(log)
     return {"status": "all_rematerialized", "log": log}
