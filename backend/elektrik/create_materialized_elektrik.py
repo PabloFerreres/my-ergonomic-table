@@ -131,3 +131,7 @@ def create_materialized_elektrik():
 
 if __name__ == "__main__":
     create_materialized_elektrik()
+
+
+
+#TODO: create the logic for von_sheet, to set the origin of the data

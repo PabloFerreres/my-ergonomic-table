@@ -11,6 +11,7 @@ from backend.loading.create_materialized_tables import refresh_all_materialized
 from backend.loading.rematerialize_control import debounce_rematerialize
 from backend.settings.connection_points import DB_URL, DEBUG, views_to_show
 from backend.routes.elektrik_routes import router as elektrik_router
+from backend.elektrik.create_materialized_elektrik import create_materialized_elektrik
 
 
 
@@ -246,13 +247,11 @@ async def rematerialize_all():
     if DEBUG:
         print(f"[DEBUG] Rematerializing all materialized tables for project views: {views_to_show}")
     refresh_all_materialized()
+    create_materialized_elektrik()
     log = "🔁 All materialized tables refreshed"
     if DEBUG:
         print(log)
     return {"status": "all_rematerialized", "log": log}
-
-# Die restlichen Endpunkte (z.B. /api/importOrUpdateArticles) kannst du nach gleichem Muster debuggen,
-# bei Interesse einfach melden!
 
 
 @router.get("/api/last_insert_id")

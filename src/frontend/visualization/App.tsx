@@ -243,7 +243,7 @@ function App() {
                 });
                 if (!res.ok) throw new Error(`Server error ${res.status}`);
                 const result = await res.json();
-                console.log("🔁 All rematerialized:", result);
+                console.log("🔁 + ⚡️ All rematerialized:", result);
                 if (result.log) {
                   const now = new Date().toLocaleTimeString();
                   setLogs((prev) => [...prev, { text: result.log, time: now }]);
