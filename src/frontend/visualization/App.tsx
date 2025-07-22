@@ -10,7 +10,6 @@ import { useSearchFunctions } from "./uiButtonFunctions/useSearchFunctions";
 import "./App.css";
 import SquareMover from "./uiSquares/SquareMover";
 import SquareSearch from "./uiSquares/SquareSearch";
-import { getEdits } from "../editierung/EditMap";
 import { setInitialInsertedId } from "../utils/insertIdManager";
 import { ConsolePanel } from "./uiSquares/ConsolePanel";
 import { subscribeToConsole, unsubscribeFromConsole } from "../utils/uiConsole";
@@ -177,7 +176,39 @@ function App() {
       }}
     >
       <div style={{ padding: "1rem", flexShrink: 0, overflow: "hidden" }}>
-        <h3 style={{ margin: "0 0 0.25rem 0" }}>My-Ergonomic-Table</h3>
+        <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
+          <h3 style={{ margin: "0 0 0.25rem 0" }}>My-Ergonomic-Table</h3>
+          <button
+            style={{
+              padding: "0.38rem 1.1rem",
+              background: "#2170c4",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            title="Elektrik-Materialize"
+            onClick={async () => {
+              try {
+                const res = await fetch(
+                  `${API_PREFIX}/api/materialize_elektrik`,
+                  { method: "POST" }
+                );
+                const data = await res.json();
+                if (data.status === "ok") {
+                  alert("✅ Elektrik-Tabelle wurde erzeugt!");
+                } else {
+                  alert("Fehler beim Erzeugen!");
+                }
+              } catch (e) {
+                alert("Fehler beim Erzeugen der Elektrik-Tabelle: " + e);
+              }
+            }}
+          >
+            Elektrik-Tabelle erzeugen
+          </button>
+        </div>
 
         <div
           style={{
@@ -187,8 +218,21 @@ function App() {
             marginBottom: "0.5rem",
           }}
         >
-          <button onClick={() => console.log("editMap:", getEdits())}>
-            Log EditMap
+          <button
+            onClick={async () => {
+              try {
+                const res = await fetch(
+                  `${API_PREFIX}/api/elektrik_update`, // KEIN project_id nötig!
+                  { method: "POST" }
+                );
+                const data = await res.json();
+                alert("Elektrik-Liste wurde aktualisiert!\nIDs: " + data.count);
+              } catch (e) {
+                alert("Fehler beim Elektrik-Update: " + e);
+              }
+            }}
+          >
+            Elektrik-Liste aktualisieren
           </button>
 
           <button
