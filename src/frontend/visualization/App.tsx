@@ -15,6 +15,7 @@ import { ConsolePanel } from "./uiSquares/ConsolePanel";
 import { subscribeToConsole, unsubscribeFromConsole } from "../utils/uiConsole";
 import SheetCreateMenu from "./uiButtonFunctions/SheetCreateMenu";
 import WelcomeScreen from "./WelcomeScreen";
+import { clearEdits } from "../editierung/EditMap";
 
 import config from "../../../config.json";
 const API_PREFIX = config.BACKEND_URL;
@@ -196,33 +197,48 @@ function App() {
           <h3 style={{ margin: "0 0 0.25rem 0" }}>My-Ergonomic-Table</h3>
           <button
             style={{
-              padding: "0.38rem 1.1rem",
+              padding: "0.4rem 0.8rem",
               background: "#2170c4",
               color: "#fff",
               border: "none",
               borderRadius: "4px",
-              fontWeight: 600,
               cursor: "pointer",
+              fontWeight: "bold",
             }}
-            title="Elektrik-Materialize"
+            title="Alle geladenen Sheets neu laden"
             onClick={async () => {
               try {
-                const res = await fetch(
-                  `${API_PREFIX}/api/materialize_elektrik`,
-                  { method: "POST" }
+                const results = await Promise.all(
+                  sheetNames.map(async (name) => {
+                    const res = await fetch(
+                      `${API_PREFIX}/api/tabledata?table=${name}&limit=700`
+                    );
+                    const { headers, data } = await res.json();
+                    return new Promise<{
+                      name: string;
+                      headers: string[];
+                      data: (string | number)[][];
+                      layout: SheetData["layout"];
+                    }>((resolve) =>
+                      triggerLayoutCalculation(headers, data, (layout) =>
+                        resolve({ name, headers, data, layout })
+                      )
+                    );
+                  })
                 );
-                const data = await res.json();
-                if (data.status === "ok") {
-                  alert("✅ Elektrik-Tabelle wurde erzeugt!");
-                } else {
-                  alert("Fehler beim Erzeugen!");
-                }
-              } catch (e) {
-                alert("Fehler beim Erzeugen der Elektrik-Tabelle: " + e);
+                const loadedSheets: Record<string, SheetData> = {};
+                results.forEach(({ name, headers, data, layout }) => {
+                  loadedSheets[name] = { headers, data, layout };
+                });
+                setSheets(loadedSheets);
+
+                clearEdits(); // <<< ALLE Edits und gelbe Zellen zurücksetzen
+              } catch (err) {
+                alert("Fehler beim Aktualisieren der Tabellen: " + err);
               }
             }}
           >
-            Elektrik-Tabelle erzeugen
+            🔄 Alle Tabellen aktualisieren
           </button>
         </div>
 
