@@ -101,7 +101,7 @@ def create_materialized_elektrik():
 
     # 6. Drop und CREATE TABLE nur mit den relevanten IDs und E/ES Filter
     cursor.execute(f'DROP TABLE IF EXISTS "{table_name}";')
-    sql = f'''
+    sql = rf'''
         CREATE TABLE "{table_name}" AS
         SELECT {col_exprs_sql}
         FROM (
@@ -118,8 +118,21 @@ def create_materialized_elektrik():
         LEFT JOIN draft_project_articles dpa ON dpa.project_article_id = main.project_article_id
         LEFT JOIN project_articles pa ON pa.id = main.project_article_id
         LEFT JOIN articles a ON pa.article_id = a.id
-        ORDER BY main.project_article_id;
+        ORDER BY
+            -- 1. Prefix bis Bindestrich
+            SPLIT_PART(COALESCE(ins."einbauort", dpa."einbauort", pa."einbauort"), '-', 1),
+            -- 2. Nach-Bindestrich-Zahl, wenn sie eine Zahl ist, sonst NULL
+            CASE
+                WHEN SPLIT_PART(SPLIT_PART(COALESCE(ins."einbauort", dpa."einbauort", pa."einbauort"), ' ', 1), '-', 2) ~ '^[0-9]+(\.[0-9]+)?$'
+                    THEN SPLIT_PART(SPLIT_PART(COALESCE(ins."einbauort", dpa."einbauort", pa."einbauort"), ' ', 1), '-', 2)::float
+                ELSE NULL
+            END,
+            COALESCE(ins."einbauort", dpa."einbauort", pa."einbauort"),
+            COALESCE(ins."emsr_no", dpa."emsr_no", pa."emsr_no")
+
     '''
+
+    #TODO create a more precise logic for sorting with E-10 after
     if DEBUG:
         print("[ELEKTRIK] CREATE SQL:\n", sql)
     cursor.execute(sql, (ids, ids))
