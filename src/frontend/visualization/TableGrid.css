@@ -124,3 +124,9 @@ button.changeType {
   white-space: normal;
   text-align: left;
 }
+
+.row-entfallen {
+  text-decoration: line-through double !important;
+  opacity: 0.55; /* Optional für ausgegraut */
+  color: #2c2c2c !important; /* Optional, Farbe anpassen */
+}

@@ -14,9 +14,14 @@ import { setInitialInsertedId } from "../utils/insertIdManager";
 import { ConsolePanel } from "./uiSquares/ConsolePanel";
 import { subscribeToConsole, unsubscribeFromConsole } from "../utils/uiConsole";
 import SheetCreateMenu from "./uiButtonFunctions/SheetCreateMenu";
+import WelcomeScreen from "./WelcomeScreen";
 
 import config from "../../../config.json";
 const API_PREFIX = config.BACKEND_URL;
+
+// <--- Toggle für WelcomeScreen
+const ENABLE_WELCOME_SCREEN = false;
+//TODO: Set this to get and set real project_id and maybe show preview of project information
 
 function App() {
   type SheetData = {
@@ -27,6 +32,11 @@ function App() {
       rowHeights: Record<number, number>;
     };
   };
+
+  // WelcomeScreen-Logik
+  const [selectedProject, setSelectedProject] = useState<string | null>(
+    ENABLE_WELCOME_SCREEN ? null : "default"
+  );
 
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [sheets, setSheets] = useState<Record<string, SheetData>>({});
@@ -79,7 +89,9 @@ function App() {
   }, [sheetNames]);
 
   useEffect(() => {
-    // 🔽 Lade initialen last_insert_id von der DB
+    // Sheets + DB nur nach Projektwahl laden!
+    if (!selectedProject) return;
+
     fetch(`${API_PREFIX}/api/last_insert_id`)
       .then((res) => res.json())
       .then((data) => {
@@ -89,7 +101,6 @@ function App() {
       })
       .catch((err) => console.error("❌ Failed to fetch last_insert_id:", err));
 
-    // 🔽 Lade Sheets wie bisher
     fetch(`${API_PREFIX}/api/sheetnames`)
       .then((res) => res.json())
       .then((names: string[]) => {
@@ -124,7 +135,7 @@ function App() {
         setSheets(loadedSheets);
       })
       .catch((err) => console.error("Failed to load sheets", err));
-  }, []);
+  }, [selectedProject]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -151,6 +162,11 @@ function App() {
     filtersPlugin.filter();
     setIsFilterActive(false);
   };
+
+  // WelcomeScreen anzeigen, falls aktiviert und kein Projekt gewählt
+  if (ENABLE_WELCOME_SCREEN && !selectedProject) {
+    return <WelcomeScreen onSelect={setSelectedProject} />;
+  }
 
   if (!activeSheet || !sheets[activeSheet]) {
     return (
@@ -221,10 +237,9 @@ function App() {
           <button
             onClick={async () => {
               try {
-                const res = await fetch(
-                  `${API_PREFIX}/api/elektrik_update`, // KEIN project_id nötig!
-                  { method: "POST" }
-                );
+                const res = await fetch(`${API_PREFIX}/api/elektrik_update`, {
+                  method: "POST",
+                });
                 const data = await res.json();
                 alert("Elektrik-Liste wurde aktualisiert!\nIDs: " + data.count);
               } catch (e) {
@@ -315,12 +330,10 @@ function App() {
             +
           </button>
 
-          {/* Das Context-Menü (SheetCreateMenu) */}
           <SheetCreateMenu
             open={showSheetMenu}
             baseViews={baseViews}
             onCreate={(newTableName, baseViewId) => {
-              // TODO: when creating a new table send this to backend
               setShowSheetMenu(false);
             }}
             onClose={() => setShowSheetMenu(false)}

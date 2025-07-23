@@ -33,6 +33,17 @@ interface TableGridProps {
   onSelectionChange?: (cell: { row: number; col: number }) => void;
 }
 
+// Hilfsfunktion: Ist Kommentar-Spalte vorhanden & enthält sie "entfallen"?
+function isRowEntfallen(
+  data: (string | number)[][],
+  rowIdx: number,
+  kommentarIdx: number
+) {
+  if (kommentarIdx === -1) return false;
+  const val = String(data[rowIdx]?.[kommentarIdx] ?? "").toLowerCase();
+  return val.includes("entfallen");
+}
+
 function TableGrid({
   data,
   colHeaders,
@@ -45,8 +56,23 @@ function TableGrid({
   onSelectionChange,
 }: TableGridProps) {
   const rowIdIndex = colHeaders.indexOf("project_article_id");
+  const kommentarIdx = colHeaders.indexOf("Kommentar"); // <-- NEU
 
-  const getCellProps = useCellProperties(data, rowIdIndex, sheetName);
+  // Nur hier Hooks benutzen!
+  const baseCellProps = useCellProperties(data, rowIdIndex, sheetName);
+
+  // Patch für ENTFAILLEN
+  const getCellProps = (row: number, col: number) => {
+    const base = baseCellProps(row, col);
+    if (isRowEntfallen(data, row, kommentarIdx)) {
+      return {
+        ...base,
+        className:
+          (base.className ? base.className + " " : "") + "row-entfallen",
+      };
+    }
+    return base;
+  };
 
   const columnDefs = buildColumnDefs(colHeaders).map((def, index) => {
     const header = colHeaders[index];
@@ -168,7 +194,7 @@ function TableGrid({
                     {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ selection }), // <- HIER!
+                      body: JSON.stringify({ selection }),
                     }
                   );
                   const result = await res.json();
