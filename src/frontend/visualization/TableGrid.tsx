@@ -99,7 +99,8 @@ function TableGrid({
     hotRef?.current?.hotInstance ?? null,
     sheetName,
     colHeaders,
-    data
+    data,
+    selectedProject.id
   );
 
   const onRowMove = useAfterRowMove(
@@ -145,6 +146,7 @@ function TableGrid({
             afterFilter
           )
         }
+        //TODO: Modularize this Element
         contextMenu={{
           items: {
             row_above: {

@@ -9,21 +9,12 @@ export const useHandsontableRowHooks = (
   const rowIdIndex = colHeaders.indexOf("project_article_id");
 
   const registerRowHooks = (instance: Handsontable) => {
-    instance.addHook("afterCreateRow", (index, amount, source?: string) => {
-      if (source === "ContextMenu") {
-        for (let i = 0; i < amount; i++) {
-          const position = (index + i + 1) * 1000;
-          const emptyRow = new Array(colHeaders.length).fill("");
-          addRow(sheetName, position, emptyRow);
-        }
-      }
-    });
-
-    instance.addHook("afterRemoveRow", (_, __, rows: number[], source?: string) => {
-      if (source === "ContextMenu") {
+    
+    instance.addHook("afterRemoveRow", (_, __, rows?: number[], source?: string) => {
+      if (source === "ContextMenu" && rows) {
         for (const row of rows) {
           const rowId = data[row]?.[rowIdIndex];
-          if (rowId !== undefined) {
+          if (rowId !== undefined && rowId !== "") {
             deleteRow(sheetName, rowId);
           }
         }

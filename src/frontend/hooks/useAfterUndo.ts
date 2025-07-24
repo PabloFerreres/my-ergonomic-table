@@ -8,7 +8,8 @@ export function useAfterUndo(
   hotInstance: Handsontable | null,
   sheetName: string,
   colHeaders: string[],
-  data: (string | number)[][]
+  data: (string | number)[][],
+  projectId: number
 ) {
   if (!hotInstance) return;
 
@@ -19,7 +20,7 @@ export function useAfterUndo(
       undoTimer = setTimeout(() => {
         const posMap = buildVisualPositionMap(sheetName, hotInstance, colHeaders, data);
         if (posMap) {
-          sendPositionMap(posMap.sheet, posMap.rows);
+          sendPositionMap(posMap.sheet, posMap.rows, projectId);
           console.log("✅ afterUndo → remove_row → PositionMap gesendet");
         }
       }, 50); // 50ms Verzögerung: nur 1x

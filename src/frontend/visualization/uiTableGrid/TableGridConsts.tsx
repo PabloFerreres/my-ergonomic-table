@@ -11,8 +11,8 @@ export function buildColumnDefs(colHeaders: string[]) {
     );
     return {
       data: colIndex,
-      editor: "text",
-      type: traits.type,
+      editor: traits.type === "numeric" ? "numeric" : "text", // wichtig!
+      type: traits.type, // gibt "numeric" durch
       renderer: WrappedTraitsRenderer,
       wordWrap: true,
       className: ["htWrap", ...cellClasses].join(" "),
