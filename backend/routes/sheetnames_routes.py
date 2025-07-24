@@ -1,11 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 import sqlalchemy
-from backend.settings.connection_points import DB_URL, project_id
+from backend.settings.connection_points import DB_URL
 
 router = APIRouter()
 
 @router.get("/sheetnames")
-async def get_sheet_names():
+async def get_sheet_names(project_id: int= Query(...)):
     engine = sqlalchemy.create_engine(DB_URL)
     inspector = sqlalchemy.inspect(engine)
     all_tables = inspector.get_table_names()

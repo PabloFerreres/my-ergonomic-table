@@ -1,11 +1,11 @@
 import asyncio
 import psycopg2
-from backend.settings.connection_points import DB_URL, project_id, DEBUG
+from backend.settings.connection_points import DB_URL, DEBUG
 from backend.loading.create_materialized_tables import create_materialized_table
 
 debounce_tasks: dict[str, asyncio.Task] = {}
 
-def get_view_for_sheet_name(sheet_name: str) -> tuple[int, int] | None:
+def get_view_for_sheet_name(sheet_name: str, project_id: int) -> tuple[int, int] | None:
     conn = psycopg2.connect(DB_URL)
     cursor = conn.cursor()
     cursor.execute("""
@@ -22,16 +22,16 @@ def get_view_for_sheet_name(sheet_name: str) -> tuple[int, int] | None:
         print(f"[DEBUG] get_view_for_sheet_name: sheet_name={sheet_name}, result={result}")
     return (result[0], result[1]) if result else None
 
-def debounce_rematerialize(sheet_name: str, delay: float = 2.0):
+def debounce_rematerialize(sheet_name: str, project_id: int, delay: float = 2.0):
     async def delayed():
         await asyncio.sleep(delay)
-        res = get_view_for_sheet_name(sheet_name)
+        res = get_view_for_sheet_name(sheet_name, project_id)
         if res:
             view_id, base_view_id = res
             print(f"🔁 Rebuilding materialized table for: {sheet_name} (view_id={view_id}, base_view_id={base_view_id})")
-            create_materialized_table(view_id=view_id, base_view_id=base_view_id)
+            create_materialized_table(project_id, view_id=view_id, base_view_id=base_view_id)
         else:
-            print(f"⚠️ Sheet not found in DB: {sheet_name}")
+            print(f"⚠️ Sheet not found in DB: {sheet_name} (project_id={project_id})")
 
     if sheet_name in debounce_tasks:
         debounce_tasks[sheet_name].cancel()

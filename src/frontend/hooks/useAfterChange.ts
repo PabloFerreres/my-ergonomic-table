@@ -14,7 +14,8 @@ export function useAfterChange(
   colHeaders: string[],
   sheetName: string,
   hotInstance: Handsontable | null,
-  isBlocked: boolean // ✅ neu
+  isBlocked: boolean, // ✅ neu
+  projectId: number
 ) {
   return (changes: CellChange[] | null, source: ChangeSource) => {
     if (!changes || source === "loadData") return;
@@ -46,7 +47,7 @@ export function useAfterChange(
           // ✅ automatische PositionsMap senden bei neuer Zeile
           if (!isBlocked && hotInstance) {
             const posMap = buildVisualPositionMap(sheetName, hotInstance, colHeaders, data);
-            if (posMap) sendPositionMap(posMap.sheet, posMap.rows);
+            if (posMap) sendPositionMap(posMap.sheet, posMap.rows, projectId);
           }
         }
 
@@ -69,7 +70,7 @@ export function useAfterChange(
       const unsaved = getUnsavedEdits(sheetName);
       if (unsaved.length > 0) {
         console.log("📤 Sende Edits", unsaved);
-        sendEdits(sheetName, unsaved);
+        sendEdits(sheetName, unsaved, projectId);
       }
     }
   };

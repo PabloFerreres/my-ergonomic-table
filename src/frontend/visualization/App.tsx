@@ -16,13 +16,12 @@ import { subscribeToConsole, unsubscribeFromConsole } from "../utils/uiConsole";
 import SheetCreateMenu from "./uiButtonFunctions/SheetCreateMenu";
 import WelcomeScreen from "./WelcomeScreen";
 import { clearEdits } from "../editierung/EditMap";
+import type { Project } from "./SesionParameters"; // ← ggf. Pfad anpassen!
 
 import config from "../../../config.json";
 const API_PREFIX = config.BACKEND_URL;
 
-// <--- Toggle für WelcomeScreen
-const ENABLE_WELCOME_SCREEN = false;
-//TODO: Set this to get and set real project_id and maybe show preview of project information
+const ENABLE_WELCOME_SCREEN = true;
 
 function App() {
   type SheetData = {
@@ -34,9 +33,9 @@ function App() {
     };
   };
 
-  // WelcomeScreen-Logik
-  const [selectedProject, setSelectedProject] = useState<string | null>(
-    ENABLE_WELCOME_SCREEN ? null : "default"
+  // Project-Objekt statt String!
+  const [selectedProject, setSelectedProject] = useState<Project | null>(
+    ENABLE_WELCOME_SCREEN ? null : { id: 1, name: "Default" }
   );
 
   const [sheetNames, setSheetNames] = useState<string[]>([]);
@@ -66,12 +65,14 @@ function App() {
 
   useEffect(() => {
     if (showSheetMenu) {
-      fetch(`${API_PREFIX}/api/baseviews`)
+      fetch(
+        `${API_PREFIX}/api/baseviews?project_id=${selectedProject?.id ?? 1}`
+      )
         .then((res) => res.json())
         .then(setBaseViews)
         .catch(() => setBaseViews([]));
     }
-  }, [showSheetMenu]);
+  }, [showSheetMenu, selectedProject]);
 
   useEffect(() => {
     const handler = (entry: { text: string; time: string }) => {
@@ -93,7 +94,7 @@ function App() {
     // Sheets + DB nur nach Projektwahl laden!
     if (!selectedProject) return;
 
-    fetch(`${API_PREFIX}/api/last_insert_id`)
+    fetch(`${API_PREFIX}/api/last_insert_id?project_id=${selectedProject.id}`)
       .then((res) => res.json())
       .then((data) => {
         console.log("📥 Loaded last_insert_id from DB:", data.lastId);
@@ -102,7 +103,7 @@ function App() {
       })
       .catch((err) => console.error("❌ Failed to fetch last_insert_id:", err));
 
-    fetch(`${API_PREFIX}/api/sheetnames`)
+    fetch(`${API_PREFIX}/api/sheetnames?project_id=${selectedProject.id}`)
       .then((res) => res.json())
       .then((names: string[]) => {
         setSheetNames(names);
@@ -110,7 +111,9 @@ function App() {
 
         return Promise.all(
           names.map((name) =>
-            fetch(`${API_PREFIX}/api/tabledata?table=${name}&limit=700`)
+            fetch(
+              `${API_PREFIX}/api/tabledata?table=${name}&limit=700&project_id=${selectedProject.id}`
+            )
               .then((res) => res.json())
               .then(
                 ({ headers, data }) =>
@@ -195,6 +198,12 @@ function App() {
       <div style={{ padding: "1rem", flexShrink: 0, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
           <h3 style={{ margin: "0 0 0.25rem 0" }}>My-Ergonomic-Table</h3>
+          {/* Aktuelles Projekt anzeigen */}
+          {selectedProject && (
+            <span style={{ fontWeight: 600, color: "#fff", fontSize: "1em" }}>
+              Projekt: {selectedProject.name}
+            </span>
+          )}
           <button
             style={{
               padding: "0.4rem 0.8rem",
@@ -211,7 +220,7 @@ function App() {
                 const results = await Promise.all(
                   sheetNames.map(async (name) => {
                     const res = await fetch(
-                      `${API_PREFIX}/api/tabledata?table=${name}&limit=700`
+                      `${API_PREFIX}/api/tabledata?table=${name}&limit=700&project_id=${selectedProject?.id}`
                     );
                     const { headers, data } = await res.json();
                     return new Promise<{
@@ -232,7 +241,7 @@ function App() {
                 });
                 setSheets(loadedSheets);
 
-                clearEdits(); // <<< ALLE Edits und gelbe Zellen zurücksetzen
+                clearEdits();
               } catch (err) {
                 alert("Fehler beim Aktualisieren der Tabellen: " + err);
               }
@@ -253,9 +262,12 @@ function App() {
           <button
             onClick={async () => {
               try {
-                const res = await fetch(`${API_PREFIX}/api/elektrik_update`, {
-                  method: "POST",
-                });
+                const res = await fetch(
+                  `${API_PREFIX}/api/elektrik_update?project_id=${selectedProject?.id}`,
+                  {
+                    method: "POST",
+                  }
+                );
                 const data = await res.json();
                 alert("Elektrik-Liste wurde aktualisiert!\nIDs: " + data.count);
               } catch (e) {
@@ -269,9 +281,10 @@ function App() {
           <button
             onClick={async () => {
               try {
-                const res = await fetch(`${API_PREFIX}/api/rematerializeAll`, {
-                  method: "POST",
-                });
+                const res = await fetch(
+                  `${API_PREFIX}/api/rematerializeAll?project_id=${selectedProject?.id}`,
+                  { method: "POST" }
+                );
                 if (!res.ok) throw new Error(`Server error ${res.status}`);
                 const result = await res.json();
                 console.log("🔁 + ⚡️ All rematerialized:", result);
@@ -439,6 +452,7 @@ function App() {
                           afterFilter={setIsFilterActive}
                           sheetName={name}
                           isBlocked={isBlocked}
+                          selectedProject={selectedProject!}
                         />
                       </div>
                     </div>

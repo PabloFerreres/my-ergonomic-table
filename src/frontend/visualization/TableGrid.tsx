@@ -17,6 +17,7 @@ import Handsontable from "handsontable";
 import { buildVisualPositionMap } from "../utils/BuildVisualPositionMap";
 import { sendPositionMap } from "../utils/apiSync";
 import { uiConsole } from "../utils/uiConsole";
+import type { Project } from "./SesionParameters";
 
 import config from "../../../config.json";
 const API_PREFIX = config.BACKEND_URL;
@@ -31,6 +32,7 @@ interface TableGridProps {
   sheetName: string;
   isBlocked?: boolean;
   onSelectionChange?: (cell: { row: number; col: number }) => void;
+  selectedProject: Project;
 }
 
 // Hilfsfunktion: Ist Kommentar-Spalte vorhanden & enthält sie "entfallen"?
@@ -54,6 +56,7 @@ function TableGrid({
   sheetName,
   isBlocked = false,
   onSelectionChange,
+  selectedProject,
 }: TableGridProps) {
   const rowIdIndex = colHeaders.indexOf("project_article_id");
   const kommentarIdx = colHeaders.indexOf("Kommentar"); // <-- NEU
@@ -88,7 +91,8 @@ function TableGrid({
     colHeaders,
     sheetName,
     hotRef?.current?.hotInstance ?? null,
-    isBlocked
+    isBlocked,
+    selectedProject.id
   );
 
   useAfterUndo(
@@ -103,7 +107,8 @@ function TableGrid({
     rowIdIndex,
     sheetName,
     hotRef?.current?.hotInstance ?? null,
-    colHeaders
+    colHeaders,
+    selectedProject.id
   );
 
   const handleSelection = (row: number, col: number) => {
@@ -241,7 +246,7 @@ function TableGrid({
               colHeaders,
               data
             );
-            if (map) sendPositionMap(map.sheet, map.rows);
+            if (map) sendPositionMap(map.sheet, map.rows, selectedProject.id);
           }
         }}
       />

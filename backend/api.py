@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Query
 import asyncpg
 import asyncio
 import json
@@ -9,14 +9,16 @@ from backend.routes.baseviews_routes import router as baseviews_router
 from backend.utils.update_draft_articles import apply_edits_to_draft
 from backend.loading.create_materialized_tables import refresh_all_materialized
 from backend.loading.rematerialize_control import debounce_rematerialize
-from backend.settings.connection_points import DB_URL, DEBUG, views_to_show
+from backend.settings.connection_points import DB_URL, DEBUG, get_views_to_show
 from backend.routes.elektrik_routes import router as elektrik_router
 from backend.elektrik.create_materialized_elektrik import create_materialized_elektrik
+from backend.routes.projects_routes import router as project_router
 
 
 
 router = APIRouter()
 router.include_router(layout_router)
+router.include_router(project_router, prefix="/api")
 router.include_router(sheetnames_router, prefix="/api")
 router.include_router(baseviews_router, prefix="/api")
 router.include_router(elektrik_router, prefix="/api")
@@ -24,7 +26,7 @@ router.include_router(elektrik_router, prefix="/api")
 HEADER_MAP = json.loads(Path("backend/utils/header_name_map.json").read_text(encoding="utf-8"))
 
 @router.post("/api/updateDraft/{draft_id}")
-async def update_draft(draft_id: str, request: Request):
+async def update_draft(draft_id: str, request: Request, project_id):
     payload = await request.json()
     conn = await asyncpg.connect(DB_URL)
 
@@ -54,14 +56,15 @@ async def update_draft(draft_id: str, request: Request):
         print(f"✅ DB gespeichert: id={draft_id}, edits={len(payload.get('edits', []))}, positions={len(payload.get('positions', []))}")
 
     # Nur Materialisierung für dynamische Projekt-Views!
+    views_to_show= get_views_to_show(project_id)
     if DEBUG:
         print(f"[DEBUG] Refreshing materialized tables for views: {views_to_show}")
-    refresh_all_materialized()
+    refresh_all_materialized(project_id)
     await conn.close()
     return {"status": "saved", "id": draft_id, "sheets": len(payload.get("positions", []))}
 
 @router.post("/api/updatePosition")
-async def update_position(request: Request):
+async def update_position(request: Request, project_id: int = Query(...)):
     payload = await request.json()
     conn = await asyncpg.connect(DB_URL)
 
@@ -76,7 +79,7 @@ async def update_position(request: Request):
             ON CONFLICT (sheet_name)
             DO UPDATE SET position_map = EXCLUDED.position_map, updated_at = now()
         """, sheet_name, json.dumps(rows))
-        debounce_rematerialize(sheet_name)
+        debounce_rematerialize(sheet_name, project_id)
         if DEBUG:
             print(f"[DEBUG] Updated position_meta for sheet: {sheet_name}")
 
@@ -243,11 +246,12 @@ async def update_edits(request: Request):
     }
 
 @router.post("/api/rematerializeAll")
-async def rematerialize_all():
+async def rematerialize_all(project_id):
+    views_to_show= get_views_to_show(project_id)
     if DEBUG:
         print(f"[DEBUG] Rematerializing all materialized tables for project views: {views_to_show}")
-    refresh_all_materialized()
-    create_materialized_elektrik()
+    refresh_all_materialized(project_id)
+    create_materialized_elektrik(project_id)
     log = "🔁 + ⚡️ All materialized tables refreshed"
     if DEBUG:
         print(log)

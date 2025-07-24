@@ -1,11 +1,24 @@
-// src/frontend/visualization/WelcomeScreen.tsx
+import { useEffect, useState } from "react";
+import type { Project } from "./SesionParameters"; // Pfad ggf. anpassen
+import config from "../../../config.json";
+const API_PREFIX = config.BACKEND_URL;
+
 export default function WelcomeScreen({
   onSelect,
 }: {
-  onSelect: (proj: string) => void;
+  onSelect: (proj: Project) => void;
 }) {
-  // später dynamisch laden, jetzt einfach statisch
-  const projects = ["ProjektA", "ProjektB"];
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${API_PREFIX}/api/projects`)
+      .then((res) => res.json())
+      .then((data) => setProjects(data))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{ color: "#fff" }}>Lade Projekte…</div>;
 
   return (
     <div
@@ -24,7 +37,7 @@ export default function WelcomeScreen({
       <div style={{ display: "flex", gap: 20 }}>
         {projects.map((p) => (
           <button
-            key={p}
+            key={p.id}
             style={{
               padding: "1em 2em",
               fontSize: "1.2em",
@@ -32,10 +45,11 @@ export default function WelcomeScreen({
               border: "none",
               background: "#2170c4",
               color: "#fff",
+              cursor: "pointer",
             }}
             onClick={() => onSelect(p)}
           >
-            {p}
+            {p.name}
           </button>
         ))}
       </div>

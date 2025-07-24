@@ -1,9 +1,9 @@
 # backend/create.py
 
 import psycopg2
-from backend.settings.connection_points import DB_URL, project_id, views_to_show, DEBUG
+from backend.settings.connection_points import DB_URL, get_views_to_show, DEBUG
 
-def get_materialized_table_name(cursor, project_id, view_id):
+def get_materialized_table_name(cursor, project_id: int, view_id: int):
     cursor.execute("""
         SELECT v.name AS view_name, p.name AS project_name
         FROM views v
@@ -21,7 +21,7 @@ def get_materialized_table_name(cursor, project_id, view_id):
         print(f"[DEBUG] Table name generated: {table_name}")
     return table_name
 
-def create_materialized_table(view_id, base_view_id):
+def create_materialized_table(project_id:int, view_id, base_view_id):
     import json
     from pathlib import Path
 
@@ -171,7 +171,8 @@ def create_materialized_table(view_id, base_view_id):
     cursor.close()
     conn.close()
 
-def refresh_all_materialized():
+def refresh_all_materialized(project_id: int):
+    views_to_show = get_views_to_show(project_id)
     for v in views_to_show:
         if isinstance(v, dict):
             view_id = v["view_id"]
@@ -181,8 +182,8 @@ def refresh_all_materialized():
             base_view_id = None  # Not expected, fallback
         if DEBUG:
             print(f"[DEBUG] Creating materialized for view_id={view_id}, base_view_id={base_view_id}")
-        create_materialized_table(view_id, base_view_id)
+        create_materialized_table(project_id, view_id, base_view_id)
     print("✅ Alle Materialized Tables wurden aktualisiert.")
 
 if __name__ == "__main__":
-    refresh_all_materialized()
+    refresh_all_materialized(1)

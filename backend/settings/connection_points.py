@@ -1,5 +1,3 @@
-# backend/setting/connection_points.py
-
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 import json
@@ -10,8 +8,6 @@ with open(config_path, 'r') as f:
     config = json.load(f)
 
 DB_URL = config["DB_URL"]
-
-project_id = 1
 DEBUG = True  # Debug-Ausgaben aktivieren/deaktivieren
 
 engine = create_engine(DB_URL)
@@ -32,7 +28,10 @@ def get_views_for_project(project_id):
     finally:
         session.close()
 
-views_to_show = get_views_for_project(project_id)
+def get_views_to_show(project_id):
+    return get_views_for_project(project_id)
+
+# Kein globales views_to_show mehr!
 
 if DEBUG:
-    print(f"[DEBUG] views_to_show: {views_to_show}")
+    print(f"[DEBUG] connection_points ready")

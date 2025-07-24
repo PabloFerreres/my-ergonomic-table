@@ -1,7 +1,7 @@
 import psycopg2
 import json
 from pathlib import Path
-from backend.settings.connection_points import DB_URL, project_id, DEBUG
+from backend.settings.connection_points import DB_URL, DEBUG
 
 def get_elektrik_article_ids(cursor, project_id):
     cursor.execute("""
@@ -20,7 +20,7 @@ def get_project_name(cursor, project_id):
         raise Exception("Kein project_name gefunden!")
     return row[0].lower()
 
-def create_materialized_elektrik():
+def create_materialized_elektrik(project_id:int):
     conn = psycopg2.connect(DB_URL)
     cursor = conn.cursor()
     base_view_id = 2  # Elektrik-Layout!
@@ -143,7 +143,7 @@ def create_materialized_elektrik():
     conn.close()
 
 if __name__ == "__main__":
-    create_materialized_elektrik()
+    create_materialized_elektrik(1)
 
 
 

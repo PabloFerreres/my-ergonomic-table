@@ -10,7 +10,7 @@ import asyncpg
 
 from backend.db_to_hot_table import fetch_table_as_hotarray
 from backend.api import router as api_router
-from backend.settings.connection_points import DB_URL, project_id, views_to_show, DEBUG
+from backend.settings.connection_points import DB_URL, get_views_to_show, DEBUG
 
 
 app = FastAPI()
@@ -49,8 +49,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def startup():
     app.state.db = await asyncpg.create_pool(dsn=DB_URL)
     if DEBUG:
-        print(f"[DEBUG] Starte Backend mit project_id={project_id}")
-        print(f"[DEBUG] views_to_show: {views_to_show}")
+        print(f"[DEBUG] Starte Backend")
+        print(f"[DEBUG] views_to_show: {get_views_to_show}")
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -65,9 +65,11 @@ app.include_router(api_router)
 @app.get("/api/tabledata")
 async def get_tabledata(
     table: str = Query(...),
-    limit: int = Query(500)
+    limit: int = Query(500),
+    project_id: int = Query(...)  # <-- NEU
 ):
     if DEBUG:
-        print(f"[DEBUG] Abfrage tabledata für Tabelle: {table}, Limit: {limit}")
-    headers, data = await fetch_table_as_hotarray(DB_URL, table, limit)
+        print(f"[DEBUG] Abfrage tabledata für Tabelle: {table}, Limit: {limit}, Project: {project_id}")
+    headers, data = await fetch_table_as_hotarray(DB_URL, table, limit, project_id)
     return {"headers": headers, "data": data}
+

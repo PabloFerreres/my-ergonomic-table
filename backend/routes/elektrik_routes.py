@@ -4,15 +4,15 @@ from backend.elektrik.create_materialized_elektrik import create_materialized_el
 router = APIRouter()
 
 @router.post("/elektrik_update")
-async def trigger_elektrik_update():
-    ids = get_active_project_articles()  # Kein Parameter!
+async def trigger_elektrik_update(project_id):
+    ids = get_active_project_articles(project_id)  # Kein Parameter!
     return {"status": "ok", "count": len(ids) if ids else 0}
 
 
 router = APIRouter()
 
 @router.post("/materialize_elektrik")
-async def materialize_elektrik_api():
+async def materialize_elektrik_api(project_id):
     # Funktion macht alles synchron, daher kein async nötig
-    ok = create_materialized_elektrik()
+    ok = create_materialized_elektrik(project_id)
     return {"status": "ok" if ok else "error"}

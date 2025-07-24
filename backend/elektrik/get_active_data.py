@@ -4,10 +4,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.
 
 import psycopg2
 import json
-from backend.settings.connection_points import DB_URL, project_id
+from backend.settings.connection_points import DB_URL
 from psycopg2.extras import Json   # <-- HINZUFÜGEN
 
-def get_active_project_articles():
+def get_active_project_articles(project_id: int):
     """
     Sammelt alle project_article_id für das zentrale Projekt aus allen zugehörigen position_meta,
     speichert diese als JSON in elektrik_meta.project_articles_live,
@@ -67,4 +67,4 @@ def get_active_project_articles():
     conn.close()
 
 if __name__ == "__main__":
-    get_active_project_articles()
+    get_active_project_articles(1)
