@@ -1,6 +1,6 @@
 import type { EditEntry } from "../editierung/EditMap";
-import { getLastUsedInsertedId } from "../editierung/EditMap"; // ✅ NEU
-import { uiConsole } from "../utils/uiConsole"; // ggf. Pfad anpassen
+import { getLastUsedInsertedId } from "../editierung/EditMap";
+import { uiConsole } from "../utils/uiConsole";
 import config from '../../../config.json'; // Pfad ggf. anpassen!
 
 const API_PREFIX = config.BACKEND_URL;
@@ -27,8 +27,6 @@ export async function sendEdits(sheet: string, edits: EditEntry[], project_id: n
   }
 }
 
-
-
 export async function sendPositionMap(
   sheet: string,
   rows: { project_article_id: string | number; position: number }[],
@@ -46,4 +44,46 @@ export async function sendPositionMap(
   } catch (err) {
     console.error("❌ Failed to sync positionMap:", err);
   }
+}
+
+// ---- NEU: Sheet anlegen API ----
+
+/**
+ * Legt ein neues Sheet an (inkl. Materialized etc.)
+ * @returns { success: boolean, view_id?: number, sheet_name?: string, error?: string }
+ */
+export async function createSheetApiCall({
+  display_name,
+  base_view_id,
+  project_id,
+}: {
+  display_name: string;
+  base_view_id: number | string;
+  project_id: number | string;
+}) {
+  try {
+    const res = await fetch(`${API_PREFIX}/api/views/create_sheet`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        display_name,
+        base_view_id,
+        project_id,
+      }),
+    });
+    if (!res.ok) throw new Error("Server error");
+    return await res.json();
+  } catch (err) {
+    return { success: false, error: String(err) };
+  }
+}
+
+
+// utils/apiSync.ts
+
+export async function fetchNextInsertedId() {
+  const res = await fetch(`${API_PREFIX}/api/next_inserted_id`);
+  const data = await res.json();
+  if (!("next_id" in data)) throw new Error("No next_id from backend");
+  return data.next_id;
 }

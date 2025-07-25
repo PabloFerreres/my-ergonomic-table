@@ -58,16 +58,20 @@ function TableGrid({
   onSelectionChange,
   selectedProject,
 }: TableGridProps) {
+  // Workaround: Wenn data leer, aber colHeaders da → Dummy-Zeile anzeigen
+  const safeData =
+    Array.isArray(data) && data.length === 0 && colHeaders.length > 0
+      ? [colHeaders.map(() => "")]
+      : data;
+
   const rowIdIndex = colHeaders.indexOf("project_article_id");
-  const kommentarIdx = colHeaders.indexOf("Kommentar"); // <-- NEU
+  const kommentarIdx = colHeaders.indexOf("Kommentar");
 
-  // Nur hier Hooks benutzen!
-  const baseCellProps = useCellProperties(data, rowIdIndex, sheetName);
+  const baseCellProps = useCellProperties(safeData, rowIdIndex, sheetName);
 
-  // Patch für ENTFAILLEN
   const getCellProps = (row: number, col: number) => {
     const base = baseCellProps(row, col);
-    if (isRowEntfallen(data, row, kommentarIdx)) {
+    if (isRowEntfallen(safeData, row, kommentarIdx)) {
       return {
         ...base,
         className:
@@ -86,7 +90,7 @@ function TableGrid({
   });
 
   const onChange = useAfterChange(
-    data,
+    safeData,
     rowIdIndex,
     colHeaders,
     sheetName,
@@ -99,12 +103,12 @@ function TableGrid({
     hotRef?.current?.hotInstance ?? null,
     sheetName,
     colHeaders,
-    data,
+    safeData,
     selectedProject.id
   );
 
   const onRowMove = useAfterRowMove(
-    data,
+    safeData,
     rowIdIndex,
     sheetName,
     hotRef?.current?.hotInstance ?? null,
@@ -120,7 +124,7 @@ function TableGrid({
     <div style={{ height: "100%" }}>
       <HotTable
         ref={hotRef as React.RefObject<HotTableClass>}
-        data={data}
+        data={safeData}
         cells={getCellProps}
         rowHeights={rowHeights}
         columns={columnDefs}
@@ -146,7 +150,6 @@ function TableGrid({
             afterFilter
           )
         }
-        //TODO: Modularize this Element
         contextMenu={{
           items: {
             row_above: {
@@ -246,7 +249,7 @@ function TableGrid({
               sheetName,
               hot,
               colHeaders,
-              data
+              safeData
             );
             if (map) sendPositionMap(map.sheet, map.rows, selectedProject.id);
           }

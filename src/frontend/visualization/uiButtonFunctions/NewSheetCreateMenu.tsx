@@ -49,11 +49,17 @@ const SheetCreateMenu: React.FC<SheetCreateMenuProps> = ({
         }}
         onClick={(e) => e.stopPropagation()} // Menü selbst nicht schließen!
       >
-        {/* Zeile 1 */}
-        <div style={{ marginBottom: "0.7rem" }}>
-          <label style={{ fontWeight: 500, marginRight: "0.5em" }}>
-            new_table_name:
-          </label>
+        {/* Zeile 1: Textfeld */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "120px 1fr",
+            alignItems: "center",
+            gap: "0.5rem",
+            marginBottom: "0.7rem",
+          }}
+        >
+          <label style={{ fontWeight: 500 }}>New table display_name:</label>
           <input
             type="text"
             value={newTableName}
@@ -69,11 +75,17 @@ const SheetCreateMenu: React.FC<SheetCreateMenuProps> = ({
             autoFocus
           />
         </div>
-        {/* Zeile 2 */}
-        <div style={{ marginBottom: "0.7rem" }}>
-          <label style={{ fontWeight: 500, marginRight: "0.5em" }}>
-            base_view_id:
-          </label>
+        {/* Zeile 2: Dropdown */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "120px 1fr",
+            alignItems: "center",
+            gap: "0.5rem",
+            marginBottom: "0.7rem",
+          }}
+        >
+          <label style={{ fontWeight: 500 }}>base_view:</label>
           <select
             value={baseViewId}
             onChange={(e) => {
@@ -101,7 +113,7 @@ const SheetCreateMenu: React.FC<SheetCreateMenuProps> = ({
             ))}
           </select>
         </div>
-        {/* Zeile 3 */}
+        {/* Zeile 3: Buttons */}
         <div
           style={{ display: "flex", gap: "0.7rem", justifyContent: "flex-end" }}
         >

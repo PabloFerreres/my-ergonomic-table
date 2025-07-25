@@ -1,9 +1,5 @@
-import {
-  addEdit,
-  getUnsavedEdits,
-  getNextNegativeRowId,
-} from "../editierung/EditMap";
-import { sendEdits, sendPositionMap } from "../utils/apiSync";
+import { addEdit, getUnsavedEdits } from "../editierung/EditMap";
+import { sendEdits, sendPositionMap, fetchNextInsertedId } from "../utils/apiSync"; // <--- NEU importiert!
 import { buildVisualPositionMap } from "../utils/BuildVisualPositionMap";
 import type Handsontable from "handsontable";
 import type { CellChange, ChangeSource } from "handsontable/common";
@@ -14,15 +10,15 @@ export function useAfterChange(
   colHeaders: string[],
   sheetName: string,
   hotInstance: Handsontable | null,
-  isBlocked: boolean, // ✅ neu
+  isBlocked: boolean,
   projectId: number
 ) {
-  return (changes: CellChange[] | null, source: ChangeSource) => {
+  return async (changes: CellChange[] | null, source: ChangeSource) => {
     if (!changes || source === "loadData") return;
 
     let changed = false;
 
-    changes.forEach(([visualRow, prop, oldValue, newValue]) => {
+    for (const [visualRow, prop, oldValue, newValue] of changes) {
       if (
         oldValue !== newValue &&
         (typeof prop === "string" || typeof prop === "number")
@@ -32,7 +28,8 @@ export function useAfterChange(
         let rowId = row[rowIdIndex];
 
         if (!rowId) {
-          rowId = getNextNegativeRowId();
+          // Immer vom Backend holen!
+          rowId = await fetchNextInsertedId();
           row[rowIdIndex] = rowId;
 
           addEdit({
@@ -44,7 +41,7 @@ export function useAfterChange(
             sheet: sheetName,
           });
 
-          // ✅ automatische PositionsMap senden bei neuer Zeile
+          // PositionsMap nur, wenn nicht blockiert
           if (!isBlocked && hotInstance) {
             const posMap = buildVisualPositionMap(sheetName, hotInstance, colHeaders, data);
             if (posMap) sendPositionMap(posMap.sheet, posMap.rows, projectId);
@@ -64,7 +61,7 @@ export function useAfterChange(
 
         changed = true;
       }
-    });
+    }
 
     if (changed) {
       const unsaved = getUnsavedEdits(sheetName);

@@ -1,4 +1,4 @@
-# backend/create.py
+# backend/loading/create_materialized_tables.py
 
 import psycopg2
 from backend.settings.connection_points import DB_URL, get_views_to_show, DEBUG

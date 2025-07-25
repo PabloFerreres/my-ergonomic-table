@@ -13,10 +13,14 @@ from backend.settings.connection_points import DB_URL, DEBUG, get_views_to_show
 from backend.routes.elektrik_routes import router as elektrik_router
 from backend.elektrik.create_materialized_elektrik import create_materialized_elektrik
 from backend.routes.projects_routes import router as project_router
+from backend.routes.new_sheet import router as new_sheet_router
+from backend.routes.next_inserted_id import router as next_inserted_id
 
 
 
 router = APIRouter()
+router.include_router(next_inserted_id, prefix="/api")
+router.include_router(new_sheet_router, prefix="/api")
 router.include_router(layout_router)
 router.include_router(project_router, prefix="/api")
 router.include_router(sheetnames_router, prefix="/api")
@@ -92,7 +96,6 @@ async def update_position(request: Request, project_id: int = Query(...)):
 async def update_edits(request: Request):
     payload = await request.json()
     edits = payload.get("edits", [])
-    last_used_inserted_id = payload.get("lastUsedInsertedId", None)
 
     if DEBUG:
         print(f"📥 Eingehende Edits: {len(edits)}")
@@ -226,16 +229,6 @@ async def update_edits(request: Request):
 
         updated_count += 1
 
-    if last_used_inserted_id is not None:
-        await conn.execute("""
-        INSERT INTO inserted_id_meta (id, last_id)
-        VALUES (1, $1)
-        ON CONFLICT (id) DO UPDATE SET last_id = EXCLUDED.last_id
-    """, last_used_inserted_id)
-
-        if DEBUG:
-            print(f"📌 lastUsedInsertedId aktualisiert: {last_used_inserted_id}")
-
     await conn.close()
     if DEBUG:
         print(f"✅ Edits gespeichert: {updated_count} Änderungen")
@@ -244,6 +237,7 @@ async def update_edits(request: Request):
         "count": updated_count,
         "log": f"✅ Edits gespeichert: {updated_count} Änderung(en)"
     }
+
 
 @router.post("/api/rematerializeAll")
 async def rematerialize_all(project_id):

@@ -13,10 +13,11 @@ import SquareSearch from "./uiSquares/SquareSearch";
 import { setInitialInsertedId } from "../utils/insertIdManager";
 import { ConsolePanel } from "./uiSquares/ConsolePanel";
 import { subscribeToConsole, unsubscribeFromConsole } from "../utils/uiConsole";
-import SheetCreateMenu from "./uiButtonFunctions/SheetCreateMenu";
+import SheetCreateMenu from "./uiButtonFunctions/NewSheetCreateMenu";
 import WelcomeScreen from "./WelcomeScreen";
 import { clearEdits } from "../editierung/EditMap";
-import type { Project } from "./SesionParameters"; // ← ggf. Pfad anpassen!
+import type { Project } from "./SesionParameters";
+import { createSheetApiCall } from "../utils/apiSync";
 
 import config from "../../../config.json";
 const API_PREFIX = config.BACKEND_URL;
@@ -362,8 +363,35 @@ function App() {
           <SheetCreateMenu
             open={showSheetMenu}
             baseViews={baseViews}
-            onCreate={(newTableName, baseViewId) => {
+            onCreate={async (newTableName, baseViewId) => {
               setShowSheetMenu(false);
+              if (!selectedProject?.id) {
+                alert("Kein Projekt gewählt!");
+                return;
+              }
+              // API Call nutzen!
+              const result = await createSheetApiCall({
+                display_name: newTableName,
+                base_view_id: baseViewId,
+                project_id: selectedProject.id,
+              });
+              if (result.success) {
+                // **NEU: last_id setzen für neue Insertions**
+                if (result.last_id !== undefined) {
+                  setInitialInsertedId(result.last_id);
+                }
+                // Sheet-Liste vom Server aktualisieren (sauber)
+                fetch(
+                  `${API_PREFIX}/api/sheetnames?project_id=${selectedProject.id}`
+                )
+                  .then((res) => res.json())
+                  .then((names) => {
+                    setSheetNames(names);
+                    setActiveSheet(names.at(-1) ?? null);
+                  });
+              } else {
+                alert(result.error || "Sheet konnte nicht erstellt werden");
+              }
             }}
             onClose={() => setShowSheetMenu(false)}
           />

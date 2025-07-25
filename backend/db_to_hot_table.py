@@ -28,7 +28,7 @@ async def fetch_table_as_hotarray(
     await conn.close()
 
     if not rows:
-        return [], []
+        return columns, []
     headers = list(rows[0].keys())
     data = [[row[header] if row[header] is not None else "" for header in headers] for row in rows]
 
