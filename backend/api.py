@@ -15,10 +15,11 @@ from backend.elektrik.create_materialized_elektrik import create_materialized_el
 from backend.routes.projects_routes import router as project_router
 from backend.routes.new_sheet import router as new_sheet_router
 from backend.routes.next_inserted_id import router as next_inserted_id
-
+from backend.routes.stair_hierarchy_routes import router as stair_router
 
 
 router = APIRouter()
+router.include_router(stair_router, prefix="/api")
 router.include_router(next_inserted_id, prefix="/api")
 router.include_router(new_sheet_router, prefix="/api")
 router.include_router(layout_router)

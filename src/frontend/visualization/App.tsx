@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, createRef } from "react";
+import { Rnd } from "react-rnd";
 import { HotTableClass } from "@handsontable/react";
 import TableGrid from "./TableGrid";
 import Zoom from "./uiButtonFunctions/Zoom";
@@ -18,6 +19,7 @@ import WelcomeScreen from "./WelcomeScreen";
 import { clearEdits } from "../editierung/EditMap";
 import type { Project } from "./SesionParameters";
 import { createSheetApiCall } from "../utils/apiSync";
+import StairHierarchyEditor from "../sheets/StairHierarchyEditor";
 
 import config from "../../../config.json";
 const API_PREFIX = config.BACKEND_URL;
@@ -44,6 +46,7 @@ function App() {
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
   const [logs, setLogs] = useState<{ text: string; time: string }[]>([]);
   const [isFilterActive, setIsFilterActive] = useState(false);
+  const [showHierarchy, setShowHierarchy] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{
     row: number;
     col: number;
@@ -251,6 +254,48 @@ function App() {
             🔄 Alle Tabellen aktualisieren
           </button>
         </div>
+        <button
+          onClick={() => setShowHierarchy(true)}
+          style={{
+            padding: "0.4rem 0.8rem",
+            background: "#444",
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontWeight: "bold",
+          }}
+        >
+          🧱 Hierarchie öffnen
+        </button>
+
+        {/* Einbauorte aktualisieren */}
+        <button
+          onClick={async () => {
+            try {
+              const res = await fetch(
+                `${API_PREFIX}/api/rematerialize_einbauorte?project_id=${selectedProject?.id}`,
+                { method: "POST" }
+              );
+              const data = await res.json();
+              alert(`✅ ${data.count} Einbauorte aktualisiert`);
+            } catch (e) {
+              alert("❌ Fehler beim Einbauorte-Refresh: " + e);
+            }
+          }}
+          style={{
+            padding: "0.4rem 0.8rem",
+            background: "#444",
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontWeight: "bold",
+            marginLeft: "0.5rem",
+          }}
+        >
+          🔄 Materialized Einbauorte aktualisieren
+        </button>
 
         <div
           style={{
@@ -369,14 +414,12 @@ function App() {
                 alert("Kein Projekt gewählt!");
                 return;
               }
-              // API Call nutzen!
               const result = await createSheetApiCall({
                 display_name: newTableName,
                 base_view_id: baseViewId,
                 project_id: selectedProject.id,
               });
               if (result.success) {
-                // **NEU: last_id setzen für neue Insertions**
                 if (result.last_id !== undefined) {
                   setInitialInsertedId(result.last_id);
                 }
@@ -385,9 +428,24 @@ function App() {
                   `${API_PREFIX}/api/sheetnames?project_id=${selectedProject.id}`
                 )
                   .then((res) => res.json())
-                  .then((names) => {
+                  .then(async (names) => {
                     setSheetNames(names);
-                    setActiveSheet(names.at(-1) ?? null);
+                    const newSheetName = names.at(-1) ?? null;
+                    setActiveSheet(newSheetName);
+
+                    // **NEU: Daten des neuen Sheets laden**
+                    if (newSheetName) {
+                      const tableRes = await fetch(
+                        `${API_PREFIX}/api/tabledata?table=${newSheetName}&limit=700&project_id=${selectedProject.id}`
+                      );
+                      const { headers, data } = await tableRes.json();
+                      triggerLayoutCalculation(headers, data, (layout) => {
+                        setSheets((prev) => ({
+                          ...prev,
+                          [newSheetName]: { headers, data, layout },
+                        }));
+                      });
+                    }
                   });
               } else {
                 alert(result.error || "Sheet konnte nicht erstellt werden");
@@ -500,6 +558,51 @@ function App() {
           )}
         </Zoom>
       </div>
+      {showHierarchy && selectedProject && (
+        <Rnd
+          default={{
+            x: window.innerWidth - 650,
+            y: 100,
+            width: 600,
+            height: 500,
+          }}
+          bounds="window"
+          minWidth={400}
+          minHeight={300}
+          dragHandleClassName="hierarchy-drag-handle"
+          style={{
+            zIndex: 999,
+            background: "#1c1c1c",
+            border: "1px solid #666",
+            borderRadius: "8px",
+            color: "#fff",
+            padding: "1rem",
+            overflow: "auto",
+          }}
+        >
+          <div
+            className="hierarchy-drag-handle"
+            style={{ cursor: "move", marginBottom: "0.5rem" }}
+          >
+            <strong>🧱 Hierarchie</strong>
+            <button
+              onClick={() => setShowHierarchy(false)}
+              style={{
+                float: "right",
+                color: "#fff",
+                background: "none",
+                border: "none",
+              }}
+            >
+              ✖
+            </button>
+          </div>
+          <StairHierarchyEditor
+            projectId={selectedProject.id}
+            apiPrefix={API_PREFIX}
+          />
+        </Rnd>
+      )}
     </div>
   );
 }
