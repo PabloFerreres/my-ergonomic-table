@@ -14,10 +14,10 @@ async def fetch_tree(conn, project_id: int, parent_id=None, sort_nums=None, name
     result = []
 
     for r in rows:
-        new_sort = sort_nums + [r["sort_order"]]  # <-- echte Position aus DB
+        new_sort = sort_nums + [r["sort_order"]]
         new_names = names + [r["name"]]
 
-        # Kinder holen
+        # Kinder?
         children = await conn.fetch("""
             SELECT id FROM stair_element_einbauorte
             WHERE parent_id = $1 AND project_id = $2
@@ -25,7 +25,10 @@ async def fetch_tree(conn, project_id: int, parent_id=None, sort_nums=None, name
         """, r["id"], project_id)
 
         if not children:  # Leaf
-            full_name = ".".join(str(x) for x in new_sort) + " " + " ".join(new_names)
+            pos = ".".join(str(x) for x in new_sort)
+            name_path = " ".join(new_names)
+            # ⬇️ ID zwischen Position und Name
+            full_name = f"{pos} [{r['id']}] {name_path}"
             result.append({
                 "id": r["id"],
                 "project_id": project_id,
@@ -38,6 +41,7 @@ async def fetch_tree(conn, project_id: int, parent_id=None, sort_nums=None, name
             )
 
     return result
+
 
 
 async def rematerialize_project_einbauorte(conn, project_id: int) -> int:
