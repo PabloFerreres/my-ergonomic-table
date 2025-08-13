@@ -19,7 +19,7 @@ import WelcomeScreen from "./WelcomeScreen";
 import { clearEdits } from "../editierung/EditMap";
 import type { Project } from "./SesionParameters";
 import { createSheetApiCall } from "../utils/apiSync";
-import StairHierarchyEditor from "../sheets/StairHierarchyEditor";
+import StairHierarchyEditor from "../windows/StairHierarchyEditor";
 
 import config from "../../../config.json";
 const API_PREFIX = config.BACKEND_URL;
@@ -486,7 +486,7 @@ function App() {
             <>
               <div
                 style={{
-                  height: "80.5vh",
+                  height: "78vh",
                   width: "100%",
                   overflow: "hidden",
                   position: "relative",
@@ -512,7 +512,7 @@ function App() {
                       key={name}
                       style={{
                         display: name === activeSheet ? "block" : "none",
-                        height: "80.5vh",
+                        height: "78vh",
                         width: "100%",
                         overflow: "hidden",
                       }}
@@ -521,7 +521,7 @@ function App() {
                         style={{
                           transform: `scale(${zoom})`,
                           transformOrigin: "top left",
-                          height: `${80.5 / zoom}vh`,
+                          height: `${78 / zoom}vh`,
                           width: `${100 / zoom}%`,
                           overflow: "hidden",
                         }}
@@ -563,7 +563,7 @@ function App() {
           default={{
             x: window.innerWidth - 650,
             y: 100,
-            width: 600,
+            width: 475,
             height: 500,
           }}
           bounds="window"
@@ -577,30 +577,50 @@ function App() {
             borderRadius: "8px",
             color: "#fff",
             padding: "1rem",
-            overflow: "auto",
+            overflow: "hidden", // ⬅️ wichtig: kein Scroll am Rnd selbst
+            display: "flex",
+            flexDirection: "column",
           }}
         >
+          {/* Wrapper spaltet: oben Drag-Header, unten Editor füllt Rest */}
           <div
-            className="hierarchy-drag-handle"
-            style={{ cursor: "move", marginBottom: "0.5rem" }}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              minHeight: 0,
+            }}
           >
-            <strong>🧱 Hierarchie</strong>
-            <button
-              onClick={() => setShowHierarchy(false)}
+            <div
+              className="hierarchy-drag-handle"
               style={{
-                float: "right",
-                color: "#fff",
-                background: "none",
-                border: "none",
+                cursor: "move",
+                marginBottom: "0.5rem",
+                flex: "0 0 auto",
               }}
             >
-              ✖
-            </button>
+              <strong>🧱 Hierarchie</strong>
+              <button
+                onClick={() => setShowHierarchy(false)}
+                style={{
+                  float: "right",
+                  color: "#fff",
+                  background: "none",
+                  border: "none",
+                }}
+              >
+                ✖
+              </button>
+            </div>
+
+            {/* Editor bekommt den kompletten Rest, eigener Innen-Scroll */}
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+              <StairHierarchyEditor
+                projectId={selectedProject.id}
+                apiPrefix={API_PREFIX}
+              />
+            </div>
           </div>
-          <StairHierarchyEditor
-            projectId={selectedProject.id}
-            apiPrefix={API_PREFIX}
-          />
         </Rnd>
       )}
     </div>
