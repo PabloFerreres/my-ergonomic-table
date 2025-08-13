@@ -137,6 +137,44 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
                 ELSE NULL
             END AS "{materialized_col}"
         """
+        # Sonderfall: "einbauort" – ID → Label (full_name mit [id]) aus materialized_einbauorte
+        if layout_col == "einbauort":
+            # Alles als TEXT behandeln; '' bleibt NULL → kein Fehler
+            to_txt_layout   = f"NULLIF(TRIM(({layout_expr})::text), '')"
+            to_txt_inserted = f"NULLIF(TRIM(({inserted_expr})::text), '')"
+            to_txt_coalesce = f"NULLIF(TRIM(({coalesce_inserted_ai})::text), '')"
+
+            id_text_expr = f"""
+                CASE
+                    WHEN (pd.data->>'project_article_id')::int > 0 THEN {to_txt_layout}
+                    WHEN (pd.data->>'project_article_id')::int < 0 THEN 
+                        CASE
+                            WHEN ins.article_id IS NOT NULL THEN {to_txt_coalesce}
+                            ELSE {to_txt_inserted}
+                        END
+                    ELSE NULL
+                END
+            """
+            expr = f"""
+                (
+                    SELECT me.full_name
+                    FROM materialized_einbauorte me
+                    WHERE me.project_id = {project_id}
+                      AND me.id::text = {id_text_expr}
+                ) AS "{materialized_col}"
+            """
+        else:
+            expr = f"""
+                CASE
+                    WHEN (pd.data->>'project_article_id')::int > 0 THEN ({layout_expr})::text
+                    WHEN (pd.data->>'project_article_id')::int < 0 THEN 
+                        CASE
+                            WHEN ins.article_id IS NOT NULL THEN {coalesce_inserted_ai}::text
+                            ELSE {inserted_expr}::text
+                        END
+                    ELSE NULL
+                END AS "{materialized_col}"
+            """
         col_exprs.append(expr.strip())
     col_exprs_sql = ",\n    ".join(col_exprs)
     if DEBUG:

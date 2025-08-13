@@ -77,6 +77,7 @@ def create_materialized_elektrik(project_id:int):
     # 5. Erstelle die COALESCE-Spalten-Ausdrücke nur mit vorhandenen Spalten
     col_exprs = []
     col_exprs.append("main.project_article_id AS project_article_id")
+
     for layout_col, materialized_col in layout_name_map.items():
         if layout_col == "project_article_id":
             continue
@@ -94,10 +95,42 @@ def create_materialized_elektrik(project_id:int):
         if not sources:
             continue  # keine Quelle
 
+        # Gesamtwert (Text) aus allen Quellen
         layout_expr = f"COALESCE({', '.join(sources)})"
-        expr = f"{layout_expr} AS \"{materialized_col}\""
+
+        if layout_col == "einbauort":
+            # robust: '', '123', '... [123] ...' werden unterstützt
+            # raw_txt: getrimmter Textwert
+            raw_txt = f"NULLIF(TRIM(({layout_expr})::text), '')"
+            # id_txt: nur Ziffern; entweder kompletter Text ist Zahl ODER Ziffern aus "[123]" extrahieren
+            id_txt = f"""
+                CASE
+                WHEN {raw_txt} ~ '^[0-9]+$' THEN {raw_txt}
+                WHEN {raw_txt} ~ '\\[[0-9]+\\]' THEN regexp_replace({raw_txt}, '.*\\[([0-9]+)\\].*', '\\1')
+                ELSE NULL
+                END
+            """.strip()
+
+            # Lookup in materialized_einbauorte für dieses Projekt
+            expr = f"""
+                COALESCE(
+                (
+                    SELECT me.full_name
+                    FROM materialized_einbauorte me
+                    WHERE me.project_id = {project_id}
+                    AND me.id::text = ({id_txt})
+                    LIMIT 1
+                ),
+                {raw_txt}
+                ) AS "{materialized_col}"
+            """.strip()
+        else:
+            expr = f"{layout_expr} AS \"{materialized_col}\""
+
         col_exprs.append(expr)
+
     col_exprs_sql = ",\n    ".join(col_exprs)
+
 
     # 6. Drop und CREATE TABLE nur mit den relevanten IDs und E/ES Filter
     cursor.execute(f'DROP TABLE IF EXISTS "{table_name}";')

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Body
 from typing import List, Union
 from backend.layout.layout_optimizer import optimize_table_layout
 
-router = APIRouter(prefix="/api")
+router = APIRouter()
 
 @router.post("/layout/estimate")
 def estimate_layout(

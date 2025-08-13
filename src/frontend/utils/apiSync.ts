@@ -5,6 +5,18 @@ import config from '../../../config.json'; // Pfad ggf. anpassen!
 
 const API_PREFIX = config.BACKEND_URL;
 
+
+export async function fetchDropdownOptions(
+  projectId: number,
+  baseViewId: number
+): Promise<Record<string, string[]>> {
+  const res = await fetch(
+    `/api/dropdownOptions?project_id=${projectId}&base_view_id=${baseViewId}`
+  );
+  if (!res.ok) return {};
+  return res.json();
+}
+
 export async function sendEdits(sheet: string, edits: EditEntry[], project_id: number) {
   try {
     const payload = {

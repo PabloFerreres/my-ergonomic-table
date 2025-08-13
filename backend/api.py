@@ -16,28 +16,30 @@ from backend.routes.projects_routes import router as project_router
 from backend.routes.new_sheet import router as new_sheet_router
 from backend.routes.next_inserted_id import router as next_inserted_id
 from backend.routes.stair_hierarchy_routes import router as stair_router
+from backend.routes.dropdown_contents import router as dropdown_router
 
 
-router = APIRouter()
-router.include_router(stair_router, prefix="/api")
-router.include_router(next_inserted_id, prefix="/api")
-router.include_router(new_sheet_router, prefix="/api")
+router = APIRouter(prefix="/api")
+router.include_router(dropdown_router)
+router.include_router(stair_router)
+router.include_router(next_inserted_id)
+router.include_router(new_sheet_router)
 router.include_router(layout_router)
-router.include_router(project_router, prefix="/api")
-router.include_router(sheetnames_router, prefix="/api")
-router.include_router(baseviews_router, prefix="/api")
-router.include_router(elektrik_router, prefix="/api")
+router.include_router(project_router)
+router.include_router(sheetnames_router)
+router.include_router(baseviews_router)
+router.include_router(elektrik_router)
 
 HEADER_MAP = json.loads(Path("backend/utils/header_name_map.json").read_text(encoding="utf-8"))
 
-@router.post("/api/updateDraft/{draft_id}")
+@router.post("/updateDraft/{draft_id}")
 async def update_draft(draft_id: str, request: Request, project_id):
     payload = await request.json()
     conn = await asyncpg.connect(DB_URL)
 
     await conn.execute("""
         INSERT INTO meta_datas (id, name, data, updated_at)
-        VALUES ($1::uuid, $2, $3::jsonb, now())
+        VALUES ($1::uuid,2, $3::jsonb, now())
         ON CONFLICT (id)
         DO UPDATE SET name = EXCLUDED.name, data = EXCLUDED.data, updated_at = now()
     """, draft_id, "payload-test", json.dumps(payload))
@@ -68,7 +70,7 @@ async def update_draft(draft_id: str, request: Request, project_id):
     await conn.close()
     return {"status": "saved", "id": draft_id, "sheets": len(payload.get("positions", []))}
 
-@router.post("/api/updatePosition")
+@router.post("/updatePosition")
 async def update_position(request: Request, project_id: int = Query(...)):
     payload = await request.json()
     conn = await asyncpg.connect(DB_URL)
@@ -93,7 +95,7 @@ async def update_position(request: Request, project_id: int = Query(...)):
     await conn.close()
     return {"status": "positions_saved", "sheets": len(payload)}
 
-@router.post("/api/updateEdits")
+@router.post("/updateEdits")
 async def update_edits(request: Request):
     payload = await request.json()
     edits = payload.get("edits", [])
@@ -240,7 +242,7 @@ async def update_edits(request: Request):
     }
 
 
-@router.post("/api/rematerializeAll")
+@router.post("/rematerializeAll")
 async def rematerialize_all(project_id):
     views_to_show= get_views_to_show(project_id)
     if DEBUG:
@@ -253,7 +255,7 @@ async def rematerialize_all(project_id):
     return {"status": "all_rematerialized", "log": log}
 
 
-@router.get("/api/last_insert_id")
+@router.get("/last_insert_id")
 async def get_last_insert_id(request: Request):
     pool: asyncpg.Pool = request.app.state.db
     async with pool.acquire() as conn:
@@ -265,7 +267,7 @@ async def get_last_insert_id(request: Request):
 
     
 
-@router.post("/api/importOrUpdateArticles")
+@router.post("/importOrUpdateArticles")
 async def import_or_update_articles(request: Request):
     # Client sendet nur ausgewählte ROW-Indizes (Grid-Positionen, 0-basiert)
     data = await request.json()

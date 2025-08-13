@@ -3,22 +3,28 @@ import { GetColumnTraits } from "../Formating/columnsForm/ColumnTraits";
 import { WrappedTraitsRenderer } from "../Formating/columnsForm/WrappedTraitsRenderer";
 import { traitColors } from "../Formating/columnsForm/TraitColorsHeaders";
 
-export function buildColumnDefs(colHeaders: string[]) {
-  return colHeaders.map((header, colIndex) => {
+export function buildColumnDefs(
+  colHeaders: string[]
+): Handsontable.ColumnSettings[] {
+  return colHeaders.map<Handsontable.ColumnSettings>((header, colIndex) => {
     const traits = GetColumnTraits(header);
     const cellClasses = traits.traits.filter(
       (trait) => !trait.startsWith("header-")
     );
-    return {
+
+    const base: Handsontable.ColumnSettings = {
       data: colIndex,
-      editor: traits.type === "numeric" ? "numeric" : "text", // wichtig!
-      type: traits.type, // gibt "numeric" durch
+      editor: traits.type === "numeric" ? "numeric" : "text",
+      type: traits.type,
       renderer: WrappedTraitsRenderer,
       wordWrap: true,
       className: ["htWrap", ...cellClasses].join(" "),
       filter: true,
       readOnly: false,
+      allowInvalid: true,
     };
+
+    return base;
   });
 }
 
@@ -42,7 +48,6 @@ export function afterGetColHeader(
     TH.style.color = "#000";
   }
 
-  // ✅ Container vorbereiten
   TH.style.position = "relative";
   TH.style.fontWeight = "bold";
   TH.style.fontSize = "14px";
@@ -60,14 +65,10 @@ export function afterGetColHeader(
     wrapper.removeChild(button);
     TH.appendChild(button);
   }
-
-  if (wrapper) {
-    wrapper.style.position = "static";
-  }
+  if (wrapper) wrapper.style.position = "static";
 
   const headerLabel = TH.querySelector(".colHeader") as HTMLElement;
   if (headerLabel) {
-    // ✅ Jetzt nur absolute Position vorbereiten — Rest macht CSS
     headerLabel.style.position = "absolute";
     headerLabel.style.bottom = "4px";
     headerLabel.style.left = "-12px";

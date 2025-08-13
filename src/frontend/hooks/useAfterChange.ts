@@ -4,6 +4,16 @@ import { buildVisualPositionMap } from "../utils/BuildVisualPositionMap";
 import type Handsontable from "handsontable";
 import type { CellChange, ChangeSource } from "handsontable/common";
 
+
+
+// Einbauort: ID aus Label "… [123] …" extrahieren
+const idFromEinbauortLabel = (v: unknown): number | "" => {
+  if (v == null || v === "") return "";
+  if (typeof v === "number") return v;
+  const m = String(v).match(/\[(\d)\]/);
+  return m ? Number(m[1]) : "";
+};
+
 export function useAfterChange(
   data: (string | number)[][],
   rowIdIndex: number,
@@ -50,12 +60,23 @@ export function useAfterChange(
 
         const colName = typeof prop === "number" ? colHeaders[prop] : String(prop);
 
+
+        // 🔁 Einbauort-Sonderfall: Label → ID für old/new
+        let oV: string | number = oldValue as any;
+        let nV: string | number = newValue as any;
+        if (colName === "Einbauort") {
+          oV = idFromEinbauortLabel(oV);
+          nV = idFromEinbauortLabel(nV);
+          // wenn keine ID parsebar → Änderung ignorieren (sollte bei strict:true nicht vorkommen)
+          if (oV === "" && nV === "") continue;
+        }
+
         addEdit({
           rowId,
           col: prop,
           colName,
-          oldValue,
-          newValue,
+          oldValue: oV,
+          newValue: nV,
           sheet: sheetName,
         });
 

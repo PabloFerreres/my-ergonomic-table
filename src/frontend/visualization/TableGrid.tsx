@@ -5,10 +5,10 @@ registerAllModules();
 
 import "./TableGrid.css";
 import {
-  buildColumnDefs,
   afterGetColHeader,
   handleAfterFilter,
 } from "./uiTableGrid/TableGridConsts";
+import { useDropdownColumns, useDropdownOptions } from "../hooks/useDropdowns";
 import { useCellProperties } from "../hooks/useCellProperties";
 import { useAfterChange } from "../hooks/useAfterChange";
 import { useAfterRowMove } from "../hooks/useAfterRowMove";
@@ -67,6 +67,17 @@ function TableGrid({
   const rowIdIndex = colHeaders.indexOf("project_article_id");
   const kommentarIdx = colHeaders.indexOf("Kommentar");
 
+  // Dropdown-Inhalte laden (aus /api/dropdownOptions) und Columns damit anreichern
+  const { dropdowns /*, loading, error, reload*/ } = useDropdownOptions(
+    selectedProject.id,
+    colHeaders
+  );
+  const columnDefsRaw = useDropdownColumns(colHeaders, dropdowns);
+  console.debug(
+    "HOT columns",
+    columnDefsRaw.map((c) => c.type)
+  );
+
   const baseCellProps = useCellProperties(safeData, rowIdIndex, sheetName);
 
   const getCellProps = (row: number, col: number) => {
@@ -81,7 +92,7 @@ function TableGrid({
     return base;
   };
 
-  const columnDefs = buildColumnDefs(colHeaders).map((def, index) => {
+  const columnDefs = columnDefsRaw.map((def, index) => {
     const header = colHeaders[index];
     return {
       ...def,
