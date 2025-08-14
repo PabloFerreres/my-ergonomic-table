@@ -1,16 +1,14 @@
 import { addEdit, getUnsavedEdits } from "../editierung/EditMap";
-import { sendEdits, sendPositionMap, fetchNextInsertedId } from "../utils/apiSync"; // <--- NEU importiert!
+import { sendEdits, sendPositionMap, fetchNextInsertedId } from "../utils/apiSync";
 import { buildVisualPositionMap } from "../utils/BuildVisualPositionMap";
 import type Handsontable from "handsontable";
 import type { CellChange, ChangeSource } from "handsontable/common";
 
-
-
-// Einbauort: ID aus Label "… [123] …" extrahieren
+// ✅ FIX: beliebig viele Ziffern aus "[123]" ziehen
 const idFromEinbauortLabel = (v: unknown): number | "" => {
   if (v == null || v === "") return "";
   if (typeof v === "number") return v;
-  const m = String(v).match(/\[(\d)\]/);
+  const m = String(v).match(/\[(\d+)\]/);   // <-- \d+ statt \d
   return m ? Number(m[1]) : "";
 };
 
@@ -24,6 +22,7 @@ export function useAfterChange(
   projectId: number
 ) {
   return async (changes: CellChange[] | null, source: ChangeSource) => {
+    // ✅ Nur loadData ignorieren; Dropdown/Autocomplete etc. zählen als Edit
     if (!changes || source === "loadData") return;
 
     let changed = false;
@@ -38,7 +37,7 @@ export function useAfterChange(
         let rowId = row[rowIdIndex];
 
         if (!rowId) {
-          // Immer vom Backend holen!
+          // neue Zeile → ID vom Backend holen & positionsmap schicken
           rowId = await fetchNextInsertedId();
           row[rowIdIndex] = rowId;
 
@@ -51,24 +50,24 @@ export function useAfterChange(
             sheet: sheetName,
           });
 
-          // PositionsMap nur, wenn nicht blockiert
           if (!isBlocked && hotInstance) {
             const posMap = buildVisualPositionMap(sheetName, hotInstance, colHeaders, data);
             if (posMap) sendPositionMap(posMap.sheet, posMap.rows, projectId);
           }
         }
 
-        const colName = typeof prop === "number" ? colHeaders[prop] : String(prop);
+        const colName =
+          typeof prop === "number" ? colHeaders[prop] : String(prop);
 
-
-        // 🔁 Einbauort-Sonderfall: Label → ID für old/new
+        // ✅ Einbauort: Label → ID normalisieren (für zuverlässigen Diff)
         let oV: string | number = oldValue as any;
         let nV: string | number = newValue as any;
         if (colName === "Einbauort") {
-          oV = idFromEinbauortLabel(oV);
-          nV = idFromEinbauortLabel(nV);
-          // wenn keine ID parsebar → Änderung ignorieren (sollte bei strict:true nicht vorkommen)
-          if (oV === "" && nV === "") continue;
+          const oId = idFromEinbauortLabel(oV);
+          const nId = idFromEinbauortLabel(nV);
+          if (oId === "" && nId === "") continue; // nichts parsebar
+          oV = oId === "" ? "" : String(oId);
+          nV = nId === "" ? "" : String(nId);
         }
 
         addEdit({

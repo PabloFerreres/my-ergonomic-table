@@ -2,6 +2,8 @@ import psycopg2
 import json
 from pathlib import Path
 from backend.settings.connection_points import DB_URL, DEBUG
+from backend.elektrik.get_active_data import get_active_project_articles
+
 
 def get_elektrik_article_ids(cursor, project_id):
     cursor.execute("""
@@ -21,6 +23,10 @@ def get_project_name(cursor, project_id):
     return row[0].lower()
 
 def create_materialized_elektrik(project_id:int):
+
+    get_active_project_articles(project_id)
+
+
     conn = psycopg2.connect(DB_URL)
     cursor = conn.cursor()
     base_view_id = 2  # Elektrik-Layout!
