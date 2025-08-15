@@ -31,3 +31,5 @@ __pycache__/
 
 config.json
 config2.json
+*storybook.log
+storybook-static

@@ -15,13 +15,18 @@ type Props = {
 export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [newName, setNewName] = useState("");
-  const [selectedParentId, setSelectedParentId] = useState<number | null>(null);
+
+  // Auswahl (ersetzt frühere per-Row-Buttons)
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   // Rename state
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
 
-  // UI styles (compact)
+  // Drag state
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+
+  // UI styles (kompakt, minimal angepasst)
   const UI = {
     root: {
       display: "flex",
@@ -31,17 +36,24 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
       color: "#fff",
     } as React.CSSProperties,
     header: {
-      padding: "0rem",
+      padding: "0rem 1rem",
       borderBottom: "1px solid #333",
+      display: "flex",
+      gap: "0.5rem",
+      alignItems: "center",
+      position: "sticky",
+      top: 0,
+      background: "transparent",
+      zIndex: 1,
     } as React.CSSProperties,
     scroll: {
       flex: 1,
       minHeight: 0,
       overflow: "auto",
-      padding: "0rem",
+      padding: "0rem 0.5rem",
     } as React.CSSProperties,
     footer: {
-      padding: "0rem 1rem",
+      padding: "0.5rem 1rem",
       borderTop: "2px solid #333",
       display: "flex",
       gap: "0.5rem",
@@ -55,6 +67,14 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
       borderRadius: "4px",
       cursor: "pointer",
     } as React.CSSProperties,
+    btnDisabled: {
+      padding: "0.3rem 0.6rem",
+      background: "#333",
+      color: "#888",
+      border: "1px solid #555",
+      borderRadius: "4px",
+      cursor: "not-allowed",
+    } as React.CSSProperties,
     inlineInput: {
       padding: "0.1rem 0.3rem",
       fontSize: "0.95rem",
@@ -63,9 +83,25 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
       cursor: "text",
       userSelect: "text",
     } as React.CSSProperties,
+    selectBtn: {
+      padding: "0.1rem 0.35rem",
+      background: "#555",
+      color: "#fff",
+      border: "1px solid #777",
+      borderRadius: "4px",
+      cursor: "grab",
+      marginRight: "0.4rem",
+    } as React.CSSProperties,
+    li: (isSelected: boolean) =>
+      ({
+        padding: "0.15rem 0.25rem",
+        borderRadius: "4px",
+        background: isSelected ? "rgba(100, 150, 255, 0.15)" : "transparent",
+      } as React.CSSProperties),
+    num: { opacity: 0.9, marginRight: "0.5rem" } as React.CSSProperties,
   };
 
-  // initial load
+  // ---------- Initial Load ----------
   useEffect(() => {
     fetch(`${apiPrefix}/api/stairhierarchy?project_id=${projectId}`)
       .then((r) => r.json())
@@ -79,7 +115,7 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
     setTree(data);
   };
 
-  // -------- Helpers --------
+  // ---------- Helpers ----------
   const findParentId = (
     nodes: TreeNode[],
     targetId: number,
@@ -139,7 +175,7 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
     });
   };
 
-  // -------- CRUD / actions --------
+  // ---------- CRUD / Actions ----------
   const handleInsert = async () => {
     if (!newName.trim()) return;
 
@@ -148,13 +184,12 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: newName.trim(),
-        parent_id: selectedParentId,
-        project_id: selectedParentId === null ? projectId : null,
+        parent_id: selectedId, // Auswahl = Elternknoten
+        project_id: selectedId === null ? projectId : null,
       }),
     });
     if (res.ok) {
       setNewName("");
-      // keep selectedParentId
       await reloadTree();
     }
   };
@@ -162,7 +197,6 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
   const handleDelete = async (id: number) => {
     if (!window.confirm("Eintrag wirklich löschen?")) return;
 
-    // capture UI order before delete
     const parentId = findParentId(tree, id);
     const siblingsAfterDelete = collectSiblingsInUiOrder(tree, parentId).filter(
       (n) => n.id !== id
@@ -175,7 +209,7 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
     if (res.ok) {
       await sendReorder(parentId, orderedIds);
       await reloadTree();
-      if (selectedParentId === id) setSelectedParentId(null);
+      if (selectedId === id) setSelectedId(null);
     }
   };
 
@@ -219,7 +253,52 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
     setEditingId(null);
   };
 
-  // -------- Tree render with numbering --------
+  // ---------- Drag & Drop (gleicher Parent) ----------
+  const onDragStart = (e: React.DragEvent, nodeId: number) => {
+    setDraggingId(nodeId);
+    e.dataTransfer.setData("text/plain", String(nodeId));
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const onDragOver = (e: React.DragEvent, targetId: number) => {
+    if (draggingId == null) return;
+    const dragParent = findParentId(tree, draggingId);
+    const targetParent = findParentId(tree, targetId);
+    if (dragParent === targetParent) {
+      e.preventDefault(); // allow drop
+      e.dataTransfer.dropEffect = "move";
+    }
+  };
+
+  const onDrop = async (_e: React.DragEvent, targetId: number) => {
+    if (draggingId == null || draggingId === targetId) return;
+    const parentId = findParentId(tree, draggingId);
+    const targetParent = findParentId(tree, targetId);
+    if (parentId !== targetParent) {
+      setDraggingId(null);
+      return; // nur innerhalb gleicher Ebene
+    }
+
+    const siblings = collectSiblingsInUiOrder(tree, parentId);
+    const filtered = siblings.filter((s) => s.id !== draggingId);
+    const targetIdx = filtered.findIndex((s) => s.id === targetId);
+    const insertIdx = Math.max(0, targetIdx);
+
+    const before = filtered.slice(0, insertIdx);
+    const after = filtered.slice(insertIdx);
+    const reordered = [...before, { id: draggingId } as TreeNode, ...after];
+
+    await sendReorder(
+      parentId,
+      reordered.map((n) => n.id)
+    );
+    await reloadTree();
+    setDraggingId(null);
+  };
+
+  const clearSelection = () => setSelectedId(null);
+
+  // ---------- Tree render with numbering ----------
   const renderTree = (nodes: TreeNode[], prefix = "", level = 0) => {
     if (!Array.isArray(nodes)) return null;
 
@@ -232,33 +311,32 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
         {sorted.map((node, idx) => {
           const num = prefix ? `${prefix}.${idx + 1}` : `${idx + 1}`;
           const isEditing = editingId === node.id;
+          const isSelected = selectedId === node.id;
 
           return (
-            <li key={node.id}>
-              <button onClick={() => setSelectedParentId(node.id)}>+</button>{" "}
+            <li key={node.id} style={UI.li(isSelected)}>
+              {/* Linker Button: selektiert & dient als Drag-Handle */}
               <button
-                onClick={() => moveNode(node.id, -1)}
-                style={{ marginLeft: "0.2rem" }}
-              >
-                ⬆
-              </button>
-              <button
-                onClick={() => moveNode(node.id, 1)}
-                style={{ marginLeft: "0.2rem" }}
-              >
-                ⬇
-              </button>
-              <button
-                onClick={() => handleDelete(node.id)}
+                draggable
+                onDragStart={(e) => onDragStart(e, node.id)}
+                onDragOver={(e) => onDragOver(e, node.id)}
+                onDrop={(e) => onDrop(e, node.id)}
+                onClick={() =>
+                  setSelectedId((prev) => (prev === node.id ? null : node.id))
+                }
+                title="Selektieren (Klick) • Verschieben (Drag & Drop)"
+                aria-pressed={isSelected}
                 style={{
-                  color: "black",
-                  marginLeft: "0.5rem",
-                  marginRight: "0.5rem",
+                  ...UI.selectBtn,
+                  outline: isSelected ? "2px solid #7aa2ff" : "none",
+                  cursor: "grab",
                 }}
               >
-                -
+                ◧
               </button>
-              <span style={{ opacity: 0.9, marginRight: "0.5rem" }}>{num}</span>
+
+              <span style={UI.num}>{num}</span>
+
               {isEditing ? (
                 <input
                   autoFocus
@@ -282,6 +360,7 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
                   {node.name}
                 </span>
               )}
+
               {node.children &&
                 node.children.length > 0 &&
                 renderTree(node.children, num, level + 1)}
@@ -292,22 +371,55 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
     );
   };
 
-  const selectedParentName = findNodeNameById(tree, selectedParentId);
+  const selectedName = findNodeNameById(tree, selectedId);
 
   return (
     <div style={UI.root}>
-      {/* Header (sticky) */}
+      {/* Header mit globalen Aktionen */}
       <div style={UI.header}>
-        <h1>Stair Hierarchy Editor</h1>
-        <button onClick={() => setSelectedParentId(null)} style={UI.btn}>
-          🆕 Neuer Haupteintrag
+        <h1 style={{ marginRight: "auto" }}>Stair Hierarchy Editor</h1>
+
+        <button
+          onClick={clearSelection}
+          style={selectedId == null ? UI.btnDisabled : UI.btn}
+          disabled={selectedId == null}
+          title="Auswahl zurücksetzen"
+        >
+          Clear
+        </button>
+
+        <button
+          onClick={() => selectedId != null && moveNode(selectedId, -1)}
+          style={selectedId == null ? UI.btnDisabled : UI.btn}
+          disabled={selectedId == null}
+          title="Ausgewählten Eintrag nach oben"
+        >
+          ⬆ Move Up
+        </button>
+
+        <button
+          onClick={() => selectedId != null && moveNode(selectedId, 1)}
+          style={selectedId == null ? UI.btnDisabled : UI.btn}
+          disabled={selectedId == null}
+          title="Ausgewählten Eintrag nach unten"
+        >
+          ⬇ Move Down
+        </button>
+
+        <button
+          onClick={() => selectedId != null && handleDelete(selectedId)}
+          style={selectedId == null ? UI.btnDisabled : UI.btn}
+          disabled={selectedId == null}
+          title="Ausgewählten Eintrag löschen"
+        >
+          🗑 Delete
         </button>
       </div>
 
-      {/* Only the tree scrolls */}
+      {/* Tree */}
       <div style={UI.scroll}>{renderTree(tree)}</div>
 
-      {/* Footer (sticky) */}
+      {/* Footer: Hinzufügen nutzt aktuelle Auswahl als Parent */}
       <div style={UI.footer}>
         <input
           type="text"
@@ -319,17 +431,24 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
               handleInsert();
             }
           }}
-          placeholder="Neues Element"
+          placeholder={
+            selectedId == null
+              ? "Neuer Haupteintrag"
+              : `Neues Kind von: ${selectedName ?? `ID ${selectedId}`}`
+          }
           style={{ flex: 0 }}
         />
-        <button onClick={handleInsert} style={UI.btn}>
+        <button
+          onClick={handleInsert}
+          style={UI.btn}
+          title="Eintrag hinzufügen"
+        >
           Hinzufügen
         </button>
 
-        {selectedParentId !== null && (
+        {selectedId !== null && (
           <span>
-            → als Kind von{" "}
-            <strong>{selectedParentName ?? `ID ${selectedParentId}`}</strong>
+            → als Kind von <strong>{selectedName ?? `ID ${selectedId}`}</strong>
           </span>
         )}
       </div>
