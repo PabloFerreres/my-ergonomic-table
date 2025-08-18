@@ -36,7 +36,6 @@ function App() {
     };
   };
 
-  // Project-Objekt statt String!
   const [selectedProject, setSelectedProject] = useState<Project | null>(
     ENABLE_WELCOME_SCREEN ? null : { id: 1, name: "Default" }
   );
@@ -95,7 +94,6 @@ function App() {
   }, [sheetNames]);
 
   useEffect(() => {
-    // Sheets + DB nur nach Projektwahl laden!
     if (!selectedProject) return;
 
     fetch(`${API_PREFIX}/api/last_insert_id?project_id=${selectedProject.id}`)
@@ -171,6 +169,10 @@ function App() {
     setIsFilterActive(false);
   };
 
+  // --- Elektrik-Block-Flag (robust) ---
+  const isElektrikActive =
+    activeSheet?.toLowerCase().includes("elektrik") ?? false;
+
   // WelcomeScreen anzeigen, falls aktiviert und kein Projekt gewählt
   if (ENABLE_WELCOME_SCREEN && !selectedProject) {
     return <WelcomeScreen onSelect={setSelectedProject} />;
@@ -202,7 +204,6 @@ function App() {
       <div style={{ padding: "1rem", flexShrink: 0, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
           <h3 style={{ margin: "0 0 0.25rem 0" }}>My-Ergonomic-Table</h3>
-          {/* Aktuelles Projekt anzeigen */}
           {selectedProject && (
             <span style={{ fontWeight: 600, color: "#fff", fontSize: "1em" }}>
               Projekt: {selectedProject.name}
@@ -358,6 +359,7 @@ function App() {
             dataLength={sheets[activeSheet].data.length}
             onMoveUp={moveRowsUp}
             onMoveDown={moveRowsDown}
+            blocked={isElektrikActive}
           />
           <SquareSearch
             ref={searchBarRef}
@@ -577,12 +579,11 @@ function App() {
             borderRadius: "8px",
             color: "#fff",
             padding: "1rem",
-            overflow: "hidden", // ⬅️ wichtig: kein Scroll am Rnd selbst
+            overflow: "hidden",
             display: "flex",
             flexDirection: "column",
           }}
         >
-          {/* Wrapper spaltet: oben Drag-Header, unten Editor füllt Rest */}
           <div
             style={{
               display: "flex",
@@ -613,7 +614,6 @@ function App() {
               </button>
             </div>
 
-            {/* Editor bekommt den kompletten Rest, eigener Innen-Scroll */}
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
               <StairHierarchyEditor
                 projectId={selectedProject.id}
