@@ -26,7 +26,6 @@ def create_materialized_elektrik(project_id:int):
 
     get_active_project_articles(project_id)
 
-
     conn = psycopg2.connect(DB_URL)
     cursor = conn.cursor()
     base_view_id = 2  # Elektrik-Layout!
@@ -137,6 +136,26 @@ def create_materialized_elektrik(project_id:int):
 
     col_exprs_sql = ",\n    ".join(col_exprs)
 
+    # ---- Minimal addition: reuse the same resolution for ORDER BY on full_name ----
+    einbauort_raw = """NULLIF(TRIM((COALESCE(ins."einbauort", dpa."einbauort", pa."einbauort"))::text), '')"""
+    einbauort_id_txt = f"""
+        CASE
+            WHEN {einbauort_raw} ~ '^[0-9]+$' THEN {einbauort_raw}
+            WHEN {einbauort_raw} ~ '\\[[0-9]+\\]' THEN regexp_replace({einbauort_raw}, '.*\\[([0-9]+)\\].*', '\\1')
+            ELSE NULL
+        END
+    """.strip()
+    einbauort_full_expr = f"""
+        COALESCE(
+            (SELECT me.full_name
+             FROM materialized_einbauorte me
+             WHERE me.project_id = {project_id}
+               AND me.id::text = ({einbauort_id_txt})
+             LIMIT 1),
+            {einbauort_raw}
+        )
+    """.strip()
+    # ------------------------------------------------------------------------------
 
     # 6. Drop und CREATE TABLE nur mit den relevanten IDs und E/ES Filter
     cursor.execute(f'DROP TABLE IF EXISTS "{table_name}";')
@@ -158,20 +177,10 @@ def create_materialized_elektrik(project_id:int):
         LEFT JOIN project_articles pa ON pa.id = main.project_article_id
         LEFT JOIN articles a ON pa.article_id = a.id
         ORDER BY
-            -- 1. Prefix bis Bindestrich
-            SPLIT_PART(COALESCE(ins."einbauort", dpa."einbauort", pa."einbauort"), '-', 1),
-            -- 2. Nach-Bindestrich-Zahl, wenn sie eine Zahl ist, sonst NULL
-            CASE
-                WHEN SPLIT_PART(SPLIT_PART(COALESCE(ins."einbauort", dpa."einbauort", pa."einbauort"), ' ', 1), '-', 2) ~ '^[0-9]+(\.[0-9]+)?$'
-                    THEN SPLIT_PART(SPLIT_PART(COALESCE(ins."einbauort", dpa."einbauort", pa."einbauort"), ' ', 1), '-', 2)::float
-                ELSE NULL
-            END,
-            COALESCE(ins."einbauort", dpa."einbauort", pa."einbauort"),
+            {einbauort_full_expr},
             COALESCE(ins."emsr_no", dpa."emsr_no", pa."emsr_no")
-
     '''
 
-    #TODO create a more precise logic for sorting with E-10 after
     if DEBUG:
         print("[ELEKTRIK] CREATE SQL:\n", sql)
     cursor.execute(sql, (ids, ids))
@@ -183,7 +192,5 @@ def create_materialized_elektrik(project_id:int):
 
 if __name__ == "__main__":
     create_materialized_elektrik(1)
-
-
 
 #TODO: create the logic for von_sheet, to set the origin of the data
