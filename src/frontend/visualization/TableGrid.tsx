@@ -67,6 +67,27 @@ function TableGrid({
   const rowIdIndex = colHeaders.indexOf("project_article_id");
   const kommentarIdx = colHeaders.indexOf("Kommentar");
 
+  // Header-Erkennung: Kommentar === "HEADER"
+  const isHeaderRow = (rowIdx: number) =>
+    kommentarIdx !== -1 &&
+    String(safeData[rowIdx]?.[kommentarIdx] ?? "") === "HEADER";
+
+  // Prüfen, ob aktuelle Auswahl mindestens eine Header-Zeile enthält
+  const selectionHasHeader = () => {
+    const hot = hotRef?.current?.hotInstance;
+    if (!hot) return false;
+    const sel = hot.getSelected();
+    if (!sel) return false;
+    for (const [r1, , r2] of sel) {
+      const from = Math.min(r1, r2);
+      const to = Math.max(r1, r2);
+      for (let r = from; r <= to; r++) {
+        if (isHeaderRow(r)) return true;
+      }
+    }
+    return false;
+  };
+
   // Dropdown-Inhalte laden (aus /api/dropdownOptions) und Columns damit anreichern
   const { dropdowns /*, loading, error, reload*/ } = useDropdownOptions(
     selectedProject.id,
@@ -82,6 +103,18 @@ function TableGrid({
 
   const getCellProps = (row: number, col: number) => {
     const base = baseCellProps(row, col);
+
+    // Header-Zeilen komplett sperren
+    if (isHeaderRow(row)) {
+      return {
+        ...base,
+        readOnly: true,
+        editor: false,
+        className:
+          (base.className ? base.className + " " : "") + "het-header-row",
+      };
+    }
+
     if (isRowEntfallen(safeData, row, kommentarIdx)) {
       return {
         ...base,
@@ -128,6 +161,12 @@ function TableGrid({
   );
 
   const handleSelection = (row: number, col: number) => {
+    // Header: keine Selektion zulassen (verhindert Moves/Edits)
+    if (isHeaderRow(row)) {
+      const hot = hotRef?.current?.hotInstance;
+      hot?.deselectCell();
+      return;
+    }
     onSelectionChange?.({ row, col });
   };
 
@@ -153,6 +192,21 @@ function TableGrid({
         stretchH="none"
         licenseKey="non-commercial-and-evaluation"
         afterSelection={handleSelection}
+        // Typ-sicherer Header-Block: Änderungen an Header-Zeilen verwerfen
+        beforeChange={(changes) => {
+          if (!changes) return; // (changes: (CellChange|null)[])
+          for (let i = changes.length - 1; i >= 0; i--) {
+            const change = changes[i];
+            if (!change) continue;
+            const row = change[0] as number; // [row, prop, old, new]
+            if (isHeaderRow(row)) changes.splice(i, 1);
+          }
+        }}
+        // Kein Paste in Header
+        beforePaste={(_data, coords) => {
+          const r0 = coords?.[0]?.startRow;
+          if (r0 != null && isHeaderRow(r0)) return false;
+        }}
         afterGetColHeader={(col, TH) => afterGetColHeader(col, TH, colHeaders)}
         afterFilter={() =>
           handleAfterFilter(
@@ -165,18 +219,18 @@ function TableGrid({
           items: {
             row_above: {
               name: "Insert row above",
-              disabled: () => isBlocked,
+              disabled: () => isBlocked || selectionHasHeader(),
             },
             row_below: {
               name: "Insert row below",
-              disabled: () => isBlocked,
+              disabled: () => isBlocked || selectionHasHeader(),
             },
             insert_5_below: {
               name: "Insert 5 rows below",
-              disabled: () => isBlocked,
+              disabled: () => isBlocked || selectionHasHeader(),
               callback: function () {
                 const hot = hotRef?.current?.hotInstance;
-                if (!hot) return;
+                if (!hot || selectionHasHeader()) return;
 
                 const selected = hot.getSelectedLast();
                 if (!selected) return;
@@ -187,10 +241,10 @@ function TableGrid({
             },
             send_update_articles: {
               name: "Send/Update Articles 📤🐘",
-              disabled: () => isBlocked,
+              disabled: () => isBlocked || selectionHasHeader(),
               callback: async function () {
                 const hot = hotRef?.current?.hotInstance;
-                if (!hot) return;
+                if (!hot || selectionHasHeader()) return;
 
                 const selected = hot.getSelected();
                 if (!selected) return;
@@ -235,7 +289,7 @@ function TableGrid({
             },
             remove_row: {
               name: "Remove row",
-              disabled: () => isBlocked,
+              disabled: () => isBlocked || selectionHasHeader(),
             },
             clear_column: {},
             undo: {},

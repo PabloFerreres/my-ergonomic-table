@@ -130,3 +130,12 @@ button.changeType {
   opacity: 0.55; /* Optional für ausgegraut */
   color: #2c2c2c !important; /* Optional, Farbe anpassen */
 }
+
+
+/* Styling für Header-Zeilen */
+.htCore .het-header-row {
+  font-weight: bold !important;
+  background-color: #9b9b9b !important; /* grauer Hintergrund */
+  color: #000 !important;              /* schwarzer Text */
+  border-top: 3px solid #838383 !important; /* dickere obere Linie */
+}

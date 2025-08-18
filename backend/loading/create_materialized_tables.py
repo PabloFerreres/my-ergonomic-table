@@ -96,7 +96,16 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
 
     # 4. Build column expressions from layout
     col_exprs = []
+    output_cols = []  # Reihenfolge der finalen Output-Spalten
     col_exprs.append("(pd.data->>'project_article_id')::int AS project_article_id")
+    output_cols.append("project_article_id")
+
+    # Wir merken uns, wie die Display-Namen der wichtigen Spalten heißen
+    kommentar_display = layout_name_map.get("kommentar", "Kommentar")
+    einbauort_display = layout_name_map.get("einbauort", "Einbauort")
+
+    # Einbauort-ID-Expr (als Text) für interne Gruppenerkennung (Header-Einfügen)
+    einbauort_id_text_expr = None
 
     for layout_col, materialized_col in layout_name_map.items():
         if layout_col == "project_article_id":
@@ -110,36 +119,24 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
 
         sources = []
         if in_i:
-            sources.append(f'ins.\"{layout_col}\"')
+            sources.append(f'ins."{layout_col}"')
         if in_d:
-            sources.append(f'dpa.\"{layout_col}\"')
+            sources.append(f'dpa."{layout_col}"')
         if in_p:
-            sources.append(f'pa.\"{layout_col}\"')
+            sources.append(f'pa."{layout_col}"')
         if in_a:
-            sources.append(f'a.\"{layout_col}\"')
+            sources.append(f'a."{layout_col}"')
 
         layout_expr = f"COALESCE({', '.join(sources)})" if sources else "NULL"
 
         mapped_inserted_col = HEADER_MAP.get(layout_col, layout_col)
         in_inserted = mapped_inserted_col in colmap["i"]
-        inserted_expr = f'ins.\"{mapped_inserted_col}\"' if in_inserted else "NULL"
-        ai_expr = f'ai.\"{layout_col}\"' if in_ai else "NULL"
+        inserted_expr = f'ins."{mapped_inserted_col}"' if in_inserted else "NULL"
+        ai_expr = f'ai."{layout_col}"' if in_ai else "NULL"
         coalesce_inserted_ai = f"COALESCE({inserted_expr}, {ai_expr})"
 
-        expr = f"""
-            CASE
-                WHEN (pd.data->>'project_article_id')::int > 0 THEN ({layout_expr})::text
-                WHEN (pd.data->>'project_article_id')::int < 0 THEN 
-                    CASE
-                        WHEN ins.article_id IS NOT NULL THEN {coalesce_inserted_ai}::text
-                        ELSE {inserted_expr}::text
-                    END
-                ELSE NULL
-            END AS "{materialized_col}"
-        """
-        # Sonderfall: "einbauort" – ID → Label (full_name mit [id]) aus materialized_einbauorte
         if layout_col == "einbauort":
-            # Alles als TEXT behandeln; '' bleibt NULL → kein Fehler
+            # TEXT-Varianten für ID (als Text) aufbereiten
             to_txt_layout   = f"NULLIF(TRIM(({layout_expr})::text), '')"
             to_txt_inserted = f"NULLIF(TRIM(({inserted_expr})::text), '')"
             to_txt_coalesce = f"NULLIF(TRIM(({coalesce_inserted_ai})::text), '')"
@@ -154,7 +151,12 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
                         END
                     ELSE NULL
                 END
-            """
+            """.strip()
+
+            # Merken für Gruppierung
+            einbauort_id_text_expr = id_text_expr
+
+            # sichtbarer Wert = full_name
             expr = f"""
                 (
                     SELECT me.full_name
@@ -162,7 +164,7 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
                     WHERE me.project_id = {project_id}
                       AND me.id::text = {id_text_expr}
                 ) AS "{materialized_col}"
-            """
+            """.strip()
         else:
             expr = f"""
                 CASE
@@ -174,15 +176,43 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
                         END
                     ELSE NULL
                 END AS "{materialized_col}"
-            """
-        col_exprs.append(expr.strip())
+            """.strip()
+
+        col_exprs.append(expr)
+        output_cols.append(materialized_col)
+
     col_exprs_sql = ",\n    ".join(col_exprs)
     if DEBUG:
         print(f"[DEBUG] Column expressions:\n{col_exprs_sql}")
 
-    # 5. Final SQL
+    # 5. Final SQL mit Header-Zeilen (Kommentar='HEADER' & Einbauort=full_name)
+    #    base_rows liefert Daten + __pos + __eid; danach body und headers.
+    quoted_cols = [f"\"{c}\"" for c in output_cols]
+
+    # Header-Select-Zeile für Alias b
+    header_row_select_parts = []
+    for c in output_cols:
+        if c == "project_article_id":
+            header_row_select_parts.append("NULL::int AS \"project_article_id\"")
+        elif c == kommentar_display:
+            header_row_select_parts.append(f"'HEADER'::text AS \"{c}\"")
+        elif c == einbauort_display:
+            header_row_select_parts.append(f"b.\"{c}\" AS \"{c}\"")
+        else:
+            header_row_select_parts.append(f"NULL::text AS \"{c}\"")
+    header_row_select_sql = ",\n            ".join(header_row_select_parts)
+
+    # gleiche Select-Zeile, aber für Alias hb (headers_base)
+    header_row_select_sql_hb = header_row_select_sql.replace('b."', 'hb."')
+
+    body_row_select_sql = ", ".join([f"b.{qc}" for qc in quoted_cols])
+    eid_sql = einbauort_id_text_expr if einbauort_id_text_expr else "NULL"
+
+    if DEBUG:
+        print(f"[DEBUG] Will inject header rows (Kommentar='HEADER') using __eid derived: {einbauort_id_text_expr is not None}")
+
     print(f"🧱 Creating table: {table_name}")
-    cursor.execute(f'DROP TABLE IF EXISTS "{table_name}";')
+    cursor.execute(f'DROP TABLE IF EXISTS \"{table_name}\";')
     sql = f'''
         CREATE TABLE "{table_name}" AS
         WITH position_data AS (
@@ -190,16 +220,47 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
             FROM position_meta pm,
                  jsonb_array_elements(pm.position_map) AS item(data)
             WHERE pm.sheet_name = '{table_name}'
+        ),
+        base_rows AS (
+            SELECT
+                {col_exprs_sql},
+                (pd.data->>'position')::int AS __pos,
+                {eid_sql} AS __eid
+            FROM position_data pd
+            LEFT JOIN project_articles pa ON pa.id = (pd.data->>'project_article_id')::int
+            LEFT JOIN draft_project_articles dpa ON dpa.project_article_id = pa.id
+            LEFT JOIN articles a ON pa.article_id = a.id
+            LEFT JOIN inserted_rows ins ON ins.project_article_id = (pd.data->>'project_article_id')::int
+            LEFT JOIN articles ai ON ins.article_id = ai.id
+        ),
+        body AS (
+            SELECT
+                {body_row_select_sql},
+                __pos AS order_key
+            FROM base_rows b
+        ),
+        headers_base AS (
+            SELECT
+                b.*,
+                LAG(b.__eid) OVER (ORDER BY b.__pos) AS prev_eid
+            FROM base_rows b
+        ),
+        headers AS (
+            -- Header nur erzeugen, wenn wir eine __eid haben und ein Wechsel vorliegt
+            SELECT
+                {header_row_select_sql_hb},
+                (hb.__pos - 0.5)::numeric AS order_key
+            FROM headers_base hb
+            WHERE
+                hb.__eid IS NOT NULL
+                AND (hb.prev_eid IS NULL OR hb.__eid IS DISTINCT FROM hb.prev_eid)
         )
-        SELECT
-            {col_exprs_sql}
-        FROM position_data pd
-        LEFT JOIN project_articles pa ON pa.id = (pd.data->>'project_article_id')::int
-        LEFT JOIN draft_project_articles dpa ON dpa.project_article_id = pa.id
-        LEFT JOIN articles a ON pa.article_id = a.id
-        LEFT JOIN inserted_rows ins ON ins.project_article_id = (pd.data->>'project_article_id')::int
-        LEFT JOIN articles ai ON ins.article_id = ai.id
-        ORDER BY (pd.data->>'position')::int;
+        SELECT * FROM (
+            SELECT * FROM headers
+            UNION ALL
+            SELECT * FROM body
+        ) u
+        ORDER BY u.order_key;
     '''
     if DEBUG:
         print(f"[DEBUG] Running CREATE SQL:\n{sql}")
