@@ -20,10 +20,10 @@ import { clearEdits } from "../editierung/EditMap";
 import type { Project } from "./SesionParameters";
 import { createSheetApiCall } from "../utils/apiSync";
 import StairHierarchyEditor from "../windows/StairHierarchyEditor";
-
+import { softAktualisierenSheets } from "../../appButtonFunctions/SoftAktualisierenSheets";
 import config from "../../../config.json";
-const API_PREFIX = config.BACKEND_URL;
 
+const API_PREFIX = config.BACKEND_URL;
 const ENABLE_WELCOME_SCREEN = true;
 
 function App() {
@@ -39,7 +39,6 @@ function App() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(
     ENABLE_WELCOME_SCREEN ? null : { id: 1, name: "Default" }
   );
-
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [sheets, setSheets] = useState<Record<string, SheetData>>({});
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
@@ -50,7 +49,6 @@ function App() {
     row: number;
     col: number;
   } | null>(null);
-
   const [showSheetMenu, setShowSheetMenu] = useState(false);
   const [baseViews, setBaseViews] = useState<{ id: number; name: string }[]>(
     []
@@ -201,6 +199,7 @@ function App() {
         position: "relative",
       }}
     >
+      {/* --- Header + Buttons --- */}
       <div style={{ padding: "1rem", flexShrink: 0, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
           <h3 style={{ margin: "0 0 0.25rem 0" }}>My-Ergonomic-Table</h3>
@@ -222,58 +221,16 @@ function App() {
             title="Alle geladenen Sheets neu laden"
             onClick={async () => {
               try {
-                // 0) Vorab: altes Mapping neutralisieren (verhindert den Jump)
-                sheetNames.forEach((name) => {
-                  const hot = hotRefs.current[name]?.current?.hotInstance;
-                  if (!hot) return;
-                  const rc = hot.countRows();
-                  if (rc > 0) {
-                    const seq = Array.from({ length: rc }, (_, i) => i);
-                    hot.rowIndexMapper?.setIndexesSequence?.(seq);
-                  }
+                if (!selectedProject) return;
+                await softAktualisierenSheets({
+                  sheetNames,
+                  apiPrefix: API_PREFIX,
+                  projectId: selectedProject.id,
+                  triggerLayoutCalculation,
+                  setSheets,
+                  hotRefs,
+                  clearEdits,
                 });
-
-                const t = Date.now(); // Cache-Buster
-
-                type Loaded = {
-                  name: string;
-                  headers: string[];
-                  data: (string | number)[][];
-                  layout: SheetData["layout"];
-                };
-
-                const results: Loaded[] = await Promise.all(
-                  sheetNames.map(async (name) => {
-                    const url =
-                      `${API_PREFIX}/api/tabledata?table=${encodeURIComponent(
-                        name
-                      )}` +
-                      `&limit=700&project_id=${selectedProject?.id}&_=${t}`;
-                    const res = await fetch(url, {
-                      cache: "no-store",
-                      headers: {
-                        "Cache-Control": "no-cache",
-                        Pragma: "no-cache",
-                      },
-                    });
-                    const { headers, data } = await res.json();
-                    return new Promise<Loaded>((resolve) =>
-                      triggerLayoutCalculation(headers, data, (layout) =>
-                        resolve({ name, headers, data, layout })
-                      )
-                    );
-                  })
-                );
-
-                const loadedSheets: Record<string, SheetData> = {};
-                results.forEach(({ name, headers, data, layout }) => {
-                  loadedSheets[name] = { headers, data, layout };
-                });
-
-                // 1) Neue Daten setzen → erscheinen sofort in Server-Order, ohne Sprung
-                setSheets(loadedSheets);
-
-                clearEdits();
               } catch (err) {
                 alert("Fehler beim Aktualisieren der Tabellen: " + err);
               }
@@ -282,6 +239,7 @@ function App() {
             🔄 Alle Tabellen aktualisieren
           </button>
         </div>
+
         <button
           onClick={() => setShowHierarchy(true)}
           style={{
@@ -325,6 +283,7 @@ function App() {
           🔄 Materialized Einbauorte aktualisieren
         </button>
 
+        {/* Weitere Buttons + Filterstatus */}
         <div
           style={{
             display: "flex",
@@ -338,9 +297,7 @@ function App() {
               try {
                 const res = await fetch(
                   `${API_PREFIX}/api/elektrik_update?project_id=${selectedProject?.id}`,
-                  {
-                    method: "POST",
-                  }
+                  { method: "POST" }
                 );
                 const data = await res.json();
                 alert("Elektrik-Liste wurde aktualisiert!\nIDs: " + data.count);
@@ -409,6 +366,7 @@ function App() {
           </div>
         </div>
 
+        {/* Sheet Tabs */}
         <div
           style={{
             display: "flex",
@@ -417,7 +375,6 @@ function App() {
             position: "relative",
           }}
         >
-          {/* Plus-Button ganz links */}
           <button
             style={{
               padding: "0.4rem 0.8rem",
@@ -452,7 +409,6 @@ function App() {
                 if (result.last_id !== undefined) {
                   setInitialInsertedId(result.last_id);
                 }
-                // Sheet-Liste vom Server aktualisieren (sauber)
                 fetch(
                   `${API_PREFIX}/api/sheetnames?project_id=${selectedProject.id}`
                 )
@@ -461,8 +417,6 @@ function App() {
                     setSheetNames(names);
                     const newSheetName = names.at(-1) ?? null;
                     setActiveSheet(newSheetName);
-
-                    // **NEU: Daten des neuen Sheets laden**
                     if (newSheetName) {
                       const tableRes = await fetch(
                         `${API_PREFIX}/api/tabledata?table=${newSheetName}&limit=700&project_id=${selectedProject.id}`
@@ -510,6 +464,7 @@ function App() {
           })}
         </div>
 
+        {/* --- Main Grid --- */}
         <Zoom>
           {(zoom, controls) => (
             <>
@@ -587,6 +542,8 @@ function App() {
           )}
         </Zoom>
       </div>
+
+      {/* --- Hierarchy Rnd Window --- */}
       {showHierarchy && selectedProject && (
         <Rnd
           default={{
@@ -640,7 +597,6 @@ function App() {
                 ✖
               </button>
             </div>
-
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
               <StairHierarchyEditor
                 projectId={selectedProject.id}
