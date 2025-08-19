@@ -57,10 +57,7 @@ export const addEdit = (
 
   if (existingIndex !== -1) {
     const originalValue = editMap[sheet][existingIndex].originalValue;
-    if (newVal === originalValue) {
-      editMap[sheet].splice(existingIndex, 1);
-      return;
-    }
+
     editMap[sheet][existingIndex] = {
       ...entry,
       oldValue: oldVal,

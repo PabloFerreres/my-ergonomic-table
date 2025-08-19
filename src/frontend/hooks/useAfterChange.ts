@@ -4,11 +4,11 @@ import { buildVisualPositionMap } from "../utils/BuildVisualPositionMap";
 import type Handsontable from "handsontable";
 import type { CellChange, ChangeSource } from "handsontable/common";
 
-// ✅ FIX: beliebig viele Ziffern aus "[123]" ziehen
+// ✅ FIX: beliebig viele Ziffern aus "[123]" ziehen (Normalisierung beibehalten)
 const idFromEinbauortLabel = (v: unknown): number | "" => {
   if (v == null || v === "") return "";
   if (typeof v === "number") return v;
-  const m = String(v).match(/\[(\d+)\]/);   // <-- \d+ statt \d
+  const m = String(v).match(/\[(\d+)\]/);   // \d+ = beliebig viele Ziffern
   return m ? Number(m[1]) : "";
 };
 
@@ -22,7 +22,7 @@ export function useAfterChange(
   projectId: number
 ) {
   return async (changes: CellChange[] | null, source: ChangeSource) => {
-    // ✅ Nur loadData ignorieren; Dropdown/Autocomplete etc. zählen als Edit
+    // ✅ Nur loadData ignorieren; alles andere (auch Undo/Redo) wird gesendet
     if (!changes || source === "loadData") return;
 
     let changed = false;
@@ -37,7 +37,7 @@ export function useAfterChange(
         let rowId = row[rowIdIndex];
 
         if (!rowId) {
-          // neue Zeile → ID vom Backend holen & positionsmap schicken
+          // Neue Zeile → ID vom Backend holen & PositionMap schicken
           rowId = await fetchNextInsertedId();
           row[rowIdIndex] = rowId;
 
@@ -56,20 +56,25 @@ export function useAfterChange(
           }
         }
 
-        const colName =
-          typeof prop === "number" ? colHeaders[prop] : String(prop);
+        const colName = typeof prop === "number" ? colHeaders[prop] : String(prop);
 
-        // ✅ Einbauort: Label → ID normalisieren (für zuverlässigen Diff)
+        // 🔒 Sicherheit: direkte Änderung an der ID-Spalte nicht senden
+        if (colName === "project_article_id") continue;
+
+        // ✅ Normalisierung behalten: Einbauort-Label → ID herausziehen
         let oV: string | number = oldValue as any;
         let nV: string | number = newValue as any;
         if (colName === "Einbauort") {
           const oId = idFromEinbauortLabel(oV);
           const nId = idFromEinbauortLabel(nV);
-          if (oId === "" && nId === "") continue; // nichts parsebar
+          if (oId === "" && nId === "") continue; // nichts parsebar → nichts senden
           oV = oId === "" ? "" : String(oId);
           nV = nId === "" ? "" : String(nId);
         }
 
+        // 🚫 KEINE "Original"-Logik mehr:
+        // Wir legen immer einen Edit an, sobald oldValue !== newValue
+        // (Nach der optionalen Normalisierung oben.)
         addEdit({
           rowId,
           col: prop,
