@@ -222,28 +222,55 @@ function App() {
             title="Alle geladenen Sheets neu laden"
             onClick={async () => {
               try {
-                const results = await Promise.all(
+                // 0) Vorab: altes Mapping neutralisieren (verhindert den Jump)
+                sheetNames.forEach((name) => {
+                  const hot = hotRefs.current[name]?.current?.hotInstance;
+                  if (!hot) return;
+                  const rc = hot.countRows();
+                  if (rc > 0) {
+                    const seq = Array.from({ length: rc }, (_, i) => i);
+                    hot.rowIndexMapper?.setIndexesSequence?.(seq);
+                  }
+                });
+
+                const t = Date.now(); // Cache-Buster
+
+                type Loaded = {
+                  name: string;
+                  headers: string[];
+                  data: (string | number)[][];
+                  layout: SheetData["layout"];
+                };
+
+                const results: Loaded[] = await Promise.all(
                   sheetNames.map(async (name) => {
-                    const res = await fetch(
-                      `${API_PREFIX}/api/tabledata?table=${name}&limit=700&project_id=${selectedProject?.id}`
-                    );
+                    const url =
+                      `${API_PREFIX}/api/tabledata?table=${encodeURIComponent(
+                        name
+                      )}` +
+                      `&limit=700&project_id=${selectedProject?.id}&_=${t}`;
+                    const res = await fetch(url, {
+                      cache: "no-store",
+                      headers: {
+                        "Cache-Control": "no-cache",
+                        Pragma: "no-cache",
+                      },
+                    });
                     const { headers, data } = await res.json();
-                    return new Promise<{
-                      name: string;
-                      headers: string[];
-                      data: (string | number)[][];
-                      layout: SheetData["layout"];
-                    }>((resolve) =>
+                    return new Promise<Loaded>((resolve) =>
                       triggerLayoutCalculation(headers, data, (layout) =>
                         resolve({ name, headers, data, layout })
                       )
                     );
                   })
                 );
+
                 const loadedSheets: Record<string, SheetData> = {};
                 results.forEach(({ name, headers, data, layout }) => {
                   loadedSheets[name] = { headers, data, layout };
                 });
+
+                // 1) Neue Daten setzen → erscheinen sofort in Server-Order, ohne Sprung
                 setSheets(loadedSheets);
 
                 clearEdits();
