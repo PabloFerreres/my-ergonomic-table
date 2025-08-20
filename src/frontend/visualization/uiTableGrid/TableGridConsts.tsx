@@ -78,26 +78,3 @@ export function afterGetColHeader(
     headerLabel.style.textAlign = "left";
   }
 }
-
-export function handleAfterFilter(
-  hotInstance: Handsontable.Core | null,
-  _colHeaders: string[],
-  afterFilter?: (isActive: boolean) => void
-) {
-  if (!hotInstance || !afterFilter) return;
-
-  const filtersPlugin = hotInstance.getPlugin("filters");
-  const conditions =
-    filtersPlugin.conditionCollection?.exportAllConditions?.() ?? [];
-  const isActive = Array.isArray(conditions) && conditions.length > 0;
-
-  const visibleRows = hotInstance.countVisibleRows();
-
-  if (isActive && visibleRows === 0) {
-    alert(
-      "Achtung: Kein Ergebnis durch die Filter! Es werden keine Zeilen angezeigt."
-    );
-  }
-
-  afterFilter(isActive);
-}
