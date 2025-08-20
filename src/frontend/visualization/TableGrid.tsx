@@ -1,24 +1,20 @@
 import { HotTable, HotTableClass } from "@handsontable/react";
+import Handsontable from "handsontable";
 import "handsontable/dist/handsontable.full.min.css";
 import { registerAllModules } from "handsontable/registry";
 registerAllModules();
 
 import "./TableGrid.css";
-import {
-  afterGetColHeader,
-  handleAfterFilter,
-} from "./uiTableGrid/TableGridConsts";
+import { afterGetColHeader } from "./uiTableGrid/TableGridConsts";
 import { useDropdownColumns, useDropdownOptions } from "../hooks/useDropdowns";
 import { useCellProperties } from "../hooks/useCellProperties";
 import { useAfterChange } from "../hooks/useAfterChange";
 import { useAfterRowMove } from "../hooks/useAfterRowMove";
 import { useAfterUndo } from "../hooks/useAfterUndo";
-import Handsontable from "handsontable";
 import { buildVisualPositionMap } from "../utils/BuildVisualPositionMap";
 import { sendPositionMap } from "../utils/apiSync";
 import { uiConsole } from "../utils/uiConsole";
 import type { Project } from "./SesionParameters";
-import { computeHotStatus } from "./uiTableGrid/hotStatus";
 
 import config from "../../../config.json";
 const API_PREFIX = config.BACKEND_URL;
@@ -29,7 +25,6 @@ interface TableGridProps {
   colWidths?: (number | undefined)[];
   rowHeights?: number | number[];
   hotRef?: React.RefObject<HotTableClass | null>;
-  afterFilter?: (isActive: boolean) => void;
   sheetName: string;
   isBlocked?: boolean;
   onSelectionChange?: (cell: { row: number; col: number }) => void;
@@ -55,12 +50,10 @@ function TableGrid({
   colWidths,
   rowHeights,
   hotRef,
-  afterFilter,
   sheetName,
   isBlocked = false,
   onSelectionChange,
   selectedProject,
-  onStatusChange,
 }: TableGridProps) {
   // Workaround: Wenn data leer, aber colHeaders da → Dummy-Zeile anzeigen
   const safeData =
@@ -177,13 +170,6 @@ function TableGrid({
     onSelectionChange?.({ row: physRow, col: visualCol });
   };
 
-  // NEU: einheitlich Status emittieren
-  const emitStatus = () => {
-    const hot = hotRef?.current?.hotInstance ?? null;
-    const s = computeHotStatus(hot);
-    onStatusChange?.(s);
-  };
-
   return (
     <div style={{ height: "100%" }}>
       <HotTable
@@ -227,35 +213,6 @@ function TableGrid({
           if (physRow != null && isHeaderRow(physRow)) return false;
         }}
         afterGetColHeader={(col, TH) => afterGetColHeader(col, TH, colHeaders)}
-        afterFilter={() => {
-          const hot = hotRef?.current?.hotInstance ?? null;
-          if (!hot) return;
-
-          // bestehende Utility-Logik nutzen
-          handleAfterFilter(hot, colHeaders, afterFilter);
-
-          // 🔒 Menü schließen mit Delay
-          setTimeout(() => {
-            const dm: any = hot.getPlugin("dropdownMenu");
-            if (dm?.close) dm.close();
-            else if (dm?.menu?.close) dm.menu.close();
-          }, 0);
-
-          // Status nachziehen
-          Promise.resolve().then(() => emitStatus());
-        }}
-        afterDropdownMenuHide={() => {
-          emitStatus();
-        }}
-        afterColumnSort={() => {
-          emitStatus(); // sofortiger Sort-Status
-        }}
-        afterInit={() => {
-          emitStatus(); // initialer Status
-        }}
-        afterLoadData={() => {
-          emitStatus(); // Status nach Datenwechsel
-        }}
         contextMenu={{
           items: {
             row_above: {
@@ -335,7 +292,6 @@ function TableGrid({
               name: "Remove row",
               disabled: () => isBlocked || selectionHasHeader(),
             },
-            clear_column: {},
             undo: {},
             redo: {},
             alignment: {},

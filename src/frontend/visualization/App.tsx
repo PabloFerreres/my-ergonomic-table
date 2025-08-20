@@ -80,6 +80,10 @@ function App() {
   }, [showSheetMenu, selectedProject]);
 
   useEffect(() => {
+    setGridStatus({ isFiltered: false, isSorted: false });
+  }, [activeSheet]);
+
+  useEffect(() => {
     const handler = (entry: { text: string; time: string }) => {
       setLogs((prev) => [...prev, entry]);
     };
@@ -517,9 +521,6 @@ function App() {
                             (h) => sheet.layout.columnWidths[h] ?? undefined
                           )}
                           // optional: synchronisiere alten afterFilter-Kanal in den neuen Status
-                          afterFilter={(b) =>
-                            setGridStatus((s) => ({ ...s, isFiltered: b }))
-                          }
                           sheetName={name}
                           isBlocked={isBlocked}
                           selectedProject={selectedProject!}
