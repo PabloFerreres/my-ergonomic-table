@@ -18,6 +18,7 @@ import { buildVisualPositionMap } from "../utils/BuildVisualPositionMap";
 import { sendPositionMap } from "../utils/apiSync";
 import { uiConsole } from "../utils/uiConsole";
 import type { Project } from "./SesionParameters";
+import { computeHotStatus } from "./uiTableGrid/hotStatus";
 
 import config from "../../../config.json";
 const API_PREFIX = config.BACKEND_URL;
@@ -33,6 +34,8 @@ interface TableGridProps {
   isBlocked?: boolean;
   onSelectionChange?: (cell: { row: number; col: number }) => void;
   selectedProject: Project;
+  /** NEU: sofortiger Status-Callback für Filter/Sort */
+  onStatusChange?: (s: { isFiltered: boolean; isSorted: boolean }) => void;
 }
 
 // Hilfsfunktion: Ist Kommentar-Spalte vorhanden & enthält sie "entfallen"?
@@ -57,6 +60,7 @@ function TableGrid({
   isBlocked = false,
   onSelectionChange,
   selectedProject,
+  onStatusChange,
 }: TableGridProps) {
   // Workaround: Wenn data leer, aber colHeaders da → Dummy-Zeile anzeigen
   const safeData =
@@ -170,6 +174,13 @@ function TableGrid({
     onSelectionChange?.({ row, col });
   };
 
+  // NEU: einheitlich Status emittieren
+  const emitStatus = () => {
+    const hot = hotRef?.current?.hotInstance ?? null;
+    const s = computeHotStatus(hot);
+    onStatusChange?.(s);
+  };
+
   return (
     <div style={{ height: "100%" }}>
       <HotTable
@@ -208,13 +219,35 @@ function TableGrid({
           if (r0 != null && isHeaderRow(r0)) return false;
         }}
         afterGetColHeader={(col, TH) => afterGetColHeader(col, TH, colHeaders)}
-        afterFilter={() =>
-          handleAfterFilter(
-            hotRef?.current?.hotInstance ?? null,
-            colHeaders,
-            afterFilter
-          )
-        }
+        afterFilter={() => {
+          const hot = hotRef?.current?.hotInstance ?? null;
+          if (!hot) return;
+
+          // bestehende Utility-Logik nutzen
+          handleAfterFilter(hot, colHeaders, afterFilter);
+
+          // 🔒 Menü schließen mit Delay
+          setTimeout(() => {
+            const dm: any = hot.getPlugin("dropdownMenu");
+            if (dm?.close) dm.close();
+            else if (dm?.menu?.close) dm.menu.close();
+          }, 0);
+
+          // Status nachziehen
+          Promise.resolve().then(() => emitStatus());
+        }}
+        afterDropdownMenuHide={() => {
+          emitStatus();
+        }}
+        afterColumnSort={() => {
+          emitStatus(); // sofortiger Sort-Status
+        }}
+        afterInit={() => {
+          emitStatus(); // initialer Status
+        }}
+        afterLoadData={() => {
+          emitStatus(); // Status nach Datenwechsel
+        }}
         contextMenu={{
           items: {
             row_above: {

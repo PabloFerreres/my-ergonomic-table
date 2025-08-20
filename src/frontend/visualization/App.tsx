@@ -43,7 +43,6 @@ function App() {
   const [sheets, setSheets] = useState<Record<string, SheetData>>({});
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
   const [logs, setLogs] = useState<{ text: string; time: string }[]>([]);
-  const [isFilterActive, setIsFilterActive] = useState(false);
   const [showHierarchy, setShowHierarchy] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{
     row: number;
@@ -53,6 +52,11 @@ function App() {
   const [baseViews, setBaseViews] = useState<{ id: number; name: string }[]>(
     []
   );
+  // NEU: zentrale Quelle für Filter/Sort
+  const [gridStatus, setGridStatus] = useState({
+    isFiltered: false,
+    isSorted: false,
+  });
 
   const hotRefs = useRef<Record<string, React.RefObject<HotTableClass>>>({});
 
@@ -164,14 +168,16 @@ function App() {
       filtersPlugin.removeConditions(idx);
     });
     filtersPlugin.filter();
-    setIsFilterActive(false);
+    // sofort UI-State
+    setGridStatus((s) => ({ ...s, isFiltered: false }));
   };
 
   // --- Elektrik-Block-Flag (robust) ---
   const isElektrikActive =
     activeSheet?.toLowerCase().includes("elektrik") ?? false;
+  const isBlocked = gridStatus.isFiltered || gridStatus.isSorted;
 
-  // WelcomeScreen anzeigen, falls aktiviert und kein Projekt gewählt
+  // WelcomeScreen
   if (ENABLE_WELCOME_SCREEN && !selectedProject) {
     return <WelcomeScreen onSelect={setSelectedProject} />;
   }
@@ -335,9 +341,11 @@ function App() {
           </button>
 
           <FilterStatus
-            isFilterActive={isFilterActive}
+            key={`fs-${gridStatus.isFiltered ? 1 : 0}`}
+            isFilterActive={gridStatus.isFiltered}
             onResetFilters={resetFilters}
           />
+
           <SquareMover
             selectedCell={selectedCell}
             dataLength={sheets[activeSheet].data.length}
@@ -480,17 +488,6 @@ function App() {
                   const sheet = sheets[name];
                   if (!sheet) return null;
 
-                  const hot = hotRefs.current[name]?.current?.hotInstance;
-                  const filters =
-                    hot?.getPlugin("filters")?.exportConditions?.() ?? [];
-                  const isFiltered = (
-                    filters as { column: number; conditions: unknown[] }[]
-                  ).some((c) => c.conditions && c.conditions.length > 0);
-                  const sort =
-                    hot?.getPlugin("columnSorting")?.getSortConfig() ?? [];
-                  const isSorted = Array.isArray(sort) && sort.length > 0;
-                  const isBlocked = isFiltered || isSorted;
-
                   return (
                     <div
                       key={name}
@@ -519,10 +516,17 @@ function App() {
                           colWidths={sheet.headers.map(
                             (h) => sheet.layout.columnWidths[h] ?? undefined
                           )}
-                          afterFilter={setIsFilterActive}
+                          // optional: synchronisiere alten afterFilter-Kanal in den neuen Status
+                          afterFilter={(b) =>
+                            setGridStatus((s) => ({ ...s, isFiltered: b }))
+                          }
                           sheetName={name}
                           isBlocked={isBlocked}
                           selectedProject={selectedProject!}
+                          // nur AKTIVES Sheet darf Status emittieren
+                          onStatusChange={
+                            name === activeSheet ? setGridStatus : undefined
+                          }
                         />
                       </div>
                     </div>
