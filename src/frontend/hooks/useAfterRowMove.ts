@@ -8,7 +8,8 @@ export function useAfterRowMove(
   rowIdIndex: number,
   sheetName: string,
   hot: Handsontable | null,
-  headers: string[]
+  headers: string[],
+  projectId: number
 ) {
   return (
     movedRows: number[],
@@ -44,6 +45,6 @@ export function useAfterRowMove(
 
     // 2. Build + send visual position map
     const map = buildVisualPositionMap(sheetName, hot, headers, data);
-    if (map) sendPositionMap(map.sheet, map.rows);
+    if (map) sendPositionMap(map.sheet, map.rows, projectId);
   };
 }

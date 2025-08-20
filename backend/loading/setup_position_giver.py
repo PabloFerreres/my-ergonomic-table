@@ -1,6 +1,5 @@
 import psycopg2
-
-DB_URL = "postgresql://myuser:1999@localhost:5432/one_project_db_milestone"
+from backend.settings.connection_points import DB_URL
 
 def assign_positions(project_id: int, view_id: int):
     query = """

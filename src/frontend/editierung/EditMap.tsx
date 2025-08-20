@@ -50,16 +50,14 @@ export const addEdit = (
   const newVal = normalize(entry.newValue);
   const oldVal = normalize(entry.oldValue);
 
+  // ✅ robust gegen number vs. string bei 'col'
   const existingIndex = editMap[sheet].findIndex(
-    (e) => e.rowId === entry.rowId && e.col === entry.col
+    (e) => e.rowId === entry.rowId && String(e.col) === String(entry.col)
   );
 
   if (existingIndex !== -1) {
     const originalValue = editMap[sheet][existingIndex].originalValue;
-    if (newVal === originalValue) {
-      editMap[sheet].splice(existingIndex, 1);
-      return;
-    }
+
     editMap[sheet][existingIndex] = {
       ...entry,
       oldValue: oldVal,
@@ -155,3 +153,9 @@ export const getVisualRowOrder = (
   sheet: string
 ): { rowId: string | number; position: number }[] =>
   editMap._visualOrder?.[sheet] ?? [];
+
+export const clearRowOps = (sheet: string) => {
+  if (editMap._rowMoves) delete editMap._rowMoves[sheet];
+  if (editMap._rowDeletes) delete editMap._rowDeletes[sheet];
+  if (editMap._visualOrder) delete editMap._visualOrder[sheet];
+};

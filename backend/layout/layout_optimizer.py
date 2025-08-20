@@ -8,7 +8,6 @@ from backend.layout.layout_estimation import (
 from typing import List, Dict, Union
 from backend.debug_config import DEBUG_FLAGS
 
-
 def optimize_table_layout(
     headers: List[str],
     data: List[List[Union[str, int]]],
@@ -19,13 +18,20 @@ def optimize_table_layout(
     Returns column widths and row heights.
     """
 
+    # === FIX: Robust gegen leere Tabellen ===
+    if not headers or not data:
+        if DEBUG_FLAGS.get("layout_optimizer"):
+            print("🟡 Leere Tabelle oder keine Daten – gebe leeres Layout zurück")
+        return {
+            "columnWidths": {header: 60 for header in headers},  # Default Breite für Sichtbarkeit
+            "rowHeights": {}
+        }
+
     # Step 1: Estimate row heights
     row_heights: Dict[int, int] = {}
-    # inside optimize_table_layout
     for i, row in enumerate(data):
         height = estimate_row_height_for_cells(row, headers)
         row_heights[i] = min(height, max_row_height)
-
 
     # Step 2: Estimate cell widths (based on vertical space of each row)
     cell_widths_by_col: Dict[int, List[int]] = {i: [] for i in range(len(headers))}
@@ -42,7 +48,6 @@ def optimize_table_layout(
         header_width = estimate_rotated_header_width(header)
         column_widths[header] = max(max_cell_width, header_width)
 
-
         if DEBUG_FLAGS.get("layout_optimizer"):
             if header.strip() == "Kommentar":
                 print(f"🔍 Debugging 'Kommentar' column:")
@@ -58,14 +63,15 @@ def optimize_table_layout(
         "rowHeights": row_heights
     }
 
-
 # Optional: test runner
 if __name__ == "__main__":
- from typing import List, Union
+    from typing import List, Union
 
-headers = ["Name", "Beschreibung", "Notizen"]
-data: List[List[Union[str, int]]] = [  # 👈 expliziter Typ
-    ["Karton", "Große Verpackung für Produkte", "Lager 1"],
-    ["Flasche", "Kunststoff, 1 Liter", ""],
-    ["Box", "Aufbewahrungseinheit mit Fächern", "Wird selten verwendet"]
-]
+    headers = ["Name", "Beschreibung", "Notizen"]
+    data: List[List[Union[str, int]]] = [
+        ["Karton", "Große Verpackung für Produkte", "Lager 1"],
+        ["Flasche", "Kunststoff, 1 Liter", ""],
+        ["Box", "Aufbewahrungseinheit mit Fächern", "Wird selten verwendet"]
+    ]
+
+    print(optimize_table_layout(headers, data))

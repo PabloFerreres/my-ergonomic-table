@@ -1,30 +1,33 @@
-// src/frontend/visualization/uiTableGrid/TableGridConsts.tsx
 import Handsontable from "handsontable";
 import { GetColumnTraits } from "../Formating/columnsForm/ColumnTraits";
 import { WrappedTraitsRenderer } from "../Formating/columnsForm/WrappedTraitsRenderer";
 import { traitColors } from "../Formating/columnsForm/TraitColorsHeaders";
 
-// Builds column definitions based on traits
-export function buildColumnDefs(colHeaders: string[]) {
-  return colHeaders.map((header, colIndex) => {
+export function buildColumnDefs(
+  colHeaders: string[]
+): Handsontable.ColumnSettings[] {
+  return colHeaders.map<Handsontable.ColumnSettings>((header, colIndex) => {
     const traits = GetColumnTraits(header);
     const cellClasses = traits.traits.filter(
       (trait) => !trait.startsWith("header-")
     );
-    return {
+
+    const base: Handsontable.ColumnSettings = {
       data: colIndex,
-      editor: "text",
+      editor: traits.type === "numeric" ? "numeric" : "text",
       type: traits.type,
       renderer: WrappedTraitsRenderer,
       wordWrap: true,
-      customClass: cellClasses.join(" "),
+      className: ["htWrap", ...cellClasses].join(" "),
       filter: true,
+      readOnly: false,
+      allowInvalid: true,
     };
+
+    return base;
   });
 }
 
-// Styles table header cells based on trait colors
-// Styles table header cells based on trait colors
 export function afterGetColHeader(
   col: number,
   TH: HTMLTableCellElement,
@@ -45,49 +48,33 @@ export function afterGetColHeader(
     TH.style.color = "#000";
   }
 
-  // 🧱 Stabiler Header: feste Höhe, keine dynamischen Padding-Sprünge
+  TH.style.position = "relative";
   TH.style.fontWeight = "bold";
   TH.style.fontSize = "14px";
-  TH.style.height = "60px";
-  TH.style.lineHeight = "40px";
-  TH.style.padding = "0 5px";
-  TH.style.overflow = "hidden";
-  TH.style.whiteSpace = "nowrap";
-  TH.style.position = "relative";
+  TH.style.height = "100px";
+  TH.style.lineHeight = "1";
+  TH.style.overflow = "visible";
+  TH.style.paddingRight = "32px";
+  TH.style.paddingTop = "0px";
+  TH.style.paddingBottom = "0px";
 
-  // 🔽 Filter-Dropdown korrekt sichtbar platzieren
-  const dropdown = TH.querySelector(".htFiltersMenu") as HTMLElement;
-  if (dropdown) {
-    dropdown.style.position = "absolute";
-    dropdown.style.top = "2px";
-    dropdown.style.right = "4px";
-    dropdown.style.zIndex = "999";
-    dropdown.style.pointerEvents = "auto";
-    dropdown.style.display = "block";
+  const wrapper = TH.querySelector("div") as HTMLElement;
+  const button = TH.querySelector("button.changeType") as HTMLElement;
+
+  if (wrapper && button && wrapper.contains(button)) {
+    wrapper.removeChild(button);
+    TH.appendChild(button);
   }
-}
+  if (wrapper) wrapper.style.position = "static";
 
-// Handles afterFilter: uses getActiveColumns() instead of isFilterActive()
-export function handleAfterFilter(
-  hotInstance: Handsontable.Core | null,
-  colHeaders: string[],
-  afterFilter?: (isActive: boolean) => void
-) {
-  if (!hotInstance || !afterFilter) return;
-
-  const filtersPlugin = hotInstance.getPlugin("filters");
-
-  const conditions =
-    filtersPlugin.conditionCollection?.exportAllConditions?.() ?? [];
-  const isActive = Array.isArray(conditions) && conditions.length > 0;
-
-  const visibleRows = hotInstance.countVisibleRows();
-
-  if (isActive && visibleRows === 0) {
-    alert(
-      "Achtung: Kein Ergebnis durch die Filter! Es werden keine Zeilen angezeigt."
-    );
+  const headerLabel = TH.querySelector(".colHeader") as HTMLElement;
+  if (headerLabel) {
+    headerLabel.style.position = "absolute";
+    headerLabel.style.bottom = "4px";
+    headerLabel.style.left = "-12px";
+    headerLabel.style.transform = "rotate(-30deg)";
+    headerLabel.style.transformOrigin = "left bottom";
+    headerLabel.style.whiteSpace = "normal";
+    headerLabel.style.textAlign = "left";
   }
-
-  afterFilter(isActive);
 }

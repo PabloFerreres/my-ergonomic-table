@@ -1,0 +1,4 @@
+{
+  "DB_URL": "postgresql://myuser:1999@localhost:5432/mini_project_milestone",
+  "BACKEND_URL": "http://localhost:8000"
+}

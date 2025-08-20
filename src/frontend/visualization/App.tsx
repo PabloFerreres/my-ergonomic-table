@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, createRef } from "react";
+import { Rnd } from "react-rnd";
 import { HotTableClass } from "@handsontable/react";
 import TableGrid from "./TableGrid";
 import Zoom from "./uiButtonFunctions/Zoom";
@@ -10,8 +11,20 @@ import { useSearchFunctions } from "./uiButtonFunctions/useSearchFunctions";
 import "./App.css";
 import SquareMover from "./uiSquares/SquareMover";
 import SquareSearch from "./uiSquares/SquareSearch";
-import { getEdits } from "../editierung/EditMap";
 import { setInitialInsertedId } from "../utils/insertIdManager";
+import { ConsolePanel } from "./uiSquares/ConsolePanel";
+import { subscribeToConsole, unsubscribeFromConsole } from "../utils/uiConsole";
+import SheetCreateMenu from "./uiButtonFunctions/NewSheetCreateMenu";
+import WelcomeScreen from "./WelcomeScreen";
+import { clearEdits } from "../editierung/EditMap";
+import type { Project } from "./SesionParameters";
+import { createSheetApiCall } from "../utils/apiSync";
+import StairHierarchyEditor from "../windows/StairHierarchyEditor";
+import { softAktualisierenSheets } from "../../appButtonFunctions/SoftAktualisierenSheets";
+import config from "../../../config.json";
+
+const API_PREFIX = config.BACKEND_URL;
+const ENABLE_WELCOME_SCREEN = true;
 
 function App() {
   type SheetData = {
@@ -23,25 +36,29 @@ function App() {
     };
   };
 
+  const [selectedProject, setSelectedProject] = useState<Project | null>(
+    ENABLE_WELCOME_SCREEN ? null : { id: 1, name: "Default" }
+  );
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [sheets, setSheets] = useState<Record<string, SheetData>>({});
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
-
-  const hotRefs = useRef<Record<string, React.RefObject<HotTableClass>>>({});
-
+  const [logs, setLogs] = useState<{ text: string; time: string }[]>([]);
+  const [showHierarchy, setShowHierarchy] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{
     row: number;
     col: number;
   } | null>(null);
-  const [isFilterActive, setIsFilterActive] = useState(false);
+  const [showSheetMenu, setShowSheetMenu] = useState(false);
+  const [baseViews, setBaseViews] = useState<{ id: number; name: string }[]>(
+    []
+  );
+  // NEU: zentrale Quelle für Filter/Sort
+  const [gridStatus, setGridStatus] = useState({
+    isFiltered: false,
+    isSorted: false,
+  });
 
-  useEffect(() => {
-    const refs: Record<string, React.RefObject<HotTableClass>> = {};
-    sheetNames.forEach((name) => {
-      refs[name] = hotRefs.current[name] || createRef<HotTableClass>();
-    });
-    hotRefs.current = refs;
-  }, [sheetNames]);
+  const hotRefs = useRef<Record<string, React.RefObject<HotTableClass>>>({});
 
   const { moveRowsUp, moveRowsDown } = useRowMoverLogic(
     hotRefs.current[activeSheet ?? ""]?.current?.hotInstance ?? null
@@ -52,8 +69,40 @@ function App() {
   const searchBarRef = useRef<SearchBarHandle>(null);
 
   useEffect(() => {
-    // 🔽 Lade initialen last_insert_id von der DB
-    fetch("http://localhost:8000/api/last_insert_id?project_id=1")
+    if (showSheetMenu) {
+      fetch(
+        `${API_PREFIX}/api/baseviews?project_id=${selectedProject?.id ?? 1}`
+      )
+        .then((res) => res.json())
+        .then(setBaseViews)
+        .catch(() => setBaseViews([]));
+    }
+  }, [showSheetMenu, selectedProject]);
+
+  useEffect(() => {
+    setGridStatus({ isFiltered: false, isSorted: false });
+  }, [activeSheet]);
+
+  useEffect(() => {
+    const handler = (entry: { text: string; time: string }) => {
+      setLogs((prev) => [...prev, entry]);
+    };
+    subscribeToConsole(handler);
+    return () => unsubscribeFromConsole(handler);
+  }, []);
+
+  useEffect(() => {
+    const refs: Record<string, React.RefObject<HotTableClass>> = {};
+    sheetNames.forEach((name) => {
+      refs[name] = hotRefs.current[name] || createRef<HotTableClass>();
+    });
+    hotRefs.current = refs;
+  }, [sheetNames]);
+
+  useEffect(() => {
+    if (!selectedProject) return;
+
+    fetch(`${API_PREFIX}/api/last_insert_id?project_id=${selectedProject.id}`)
       .then((res) => res.json())
       .then((data) => {
         console.log("📥 Loaded last_insert_id from DB:", data.lastId);
@@ -62,8 +111,7 @@ function App() {
       })
       .catch((err) => console.error("❌ Failed to fetch last_insert_id:", err));
 
-    // 🔽 Lade Sheets wie bisher
-    fetch("http://localhost:8000/api/sheetnames")
+    fetch(`${API_PREFIX}/api/sheetnames?project_id=${selectedProject.id}`)
       .then((res) => res.json())
       .then((names: string[]) => {
         setSheetNames(names);
@@ -71,7 +119,9 @@ function App() {
 
         return Promise.all(
           names.map((name) =>
-            fetch(`http://localhost:8000/api/tabledata?table=${name}&limit=700`)
+            fetch(
+              `${API_PREFIX}/api/tabledata?table=${name}&limit=700&project_id=${selectedProject.id}`
+            )
               .then((res) => res.json())
               .then(
                 ({ headers, data }) =>
@@ -97,7 +147,7 @@ function App() {
         setSheets(loadedSheets);
       })
       .catch((err) => console.error("Failed to load sheets", err));
-  }, []);
+  }, [selectedProject]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -122,8 +172,19 @@ function App() {
       filtersPlugin.removeConditions(idx);
     });
     filtersPlugin.filter();
-    setIsFilterActive(false);
+    // sofort UI-State
+    setGridStatus((s) => ({ ...s, isFiltered: false }));
   };
+
+  // --- Elektrik-Block-Flag (robust) ---
+  const isElektrikActive =
+    activeSheet?.toLowerCase().includes("elektrik") ?? false;
+  const isBlocked = gridStatus.isFiltered || gridStatus.isSorted;
+
+  // WelcomeScreen
+  if (ENABLE_WELCOME_SCREEN && !selectedProject) {
+    return <WelcomeScreen onSelect={setSelectedProject} />;
+  }
 
   if (!activeSheet || !sheets[activeSheet]) {
     return (
@@ -148,9 +209,91 @@ function App() {
         position: "relative",
       }}
     >
+      {/* --- Header + Buttons --- */}
       <div style={{ padding: "1rem", flexShrink: 0, overflow: "hidden" }}>
-        <h3 style={{ margin: "0 0 0.25rem 0" }}>My-Ergonomic-Table</h3>
+        <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
+          <h3 style={{ margin: "0 0 0.25rem 0" }}>My-Ergonomic-Table</h3>
+          {selectedProject && (
+            <span style={{ fontWeight: 600, color: "#fff", fontSize: "1em" }}>
+              Projekt: {selectedProject.name}
+            </span>
+          )}
+          <button
+            style={{
+              padding: "0.4rem 0.8rem",
+              background: "#2170c4",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+            title="Alle geladenen Sheets neu laden"
+            onClick={async () => {
+              try {
+                if (!selectedProject) return;
+                await softAktualisierenSheets({
+                  sheetNames,
+                  apiPrefix: API_PREFIX,
+                  projectId: selectedProject.id,
+                  triggerLayoutCalculation,
+                  setSheets,
+                  hotRefs,
+                  clearEdits,
+                });
+              } catch (err) {
+                alert("Fehler beim Aktualisieren der Tabellen: " + err);
+              }
+            }}
+          >
+            🔄 Alle Tabellen aktualisieren
+          </button>
+        </div>
 
+        <button
+          onClick={() => setShowHierarchy(true)}
+          style={{
+            padding: "0.4rem 0.8rem",
+            background: "#444",
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontWeight: "bold",
+          }}
+        >
+          🧱 Hierarchie öffnen
+        </button>
+
+        {/* Einbauorte aktualisieren */}
+        <button
+          onClick={async () => {
+            try {
+              const res = await fetch(
+                `${API_PREFIX}/api/rematerialize_einbauorte?project_id=${selectedProject?.id}`,
+                { method: "POST" }
+              );
+              const data = await res.json();
+              alert(`✅ ${data.count} Einbauorte aktualisiert`);
+            } catch (e) {
+              alert("❌ Fehler beim Einbauorte-Refresh: " + e);
+            }
+          }}
+          style={{
+            padding: "0.4rem 0.8rem",
+            background: "#444",
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontWeight: "bold",
+            marginLeft: "0.5rem",
+          }}
+        >
+          🔄 Materialized Einbauorte aktualisieren
+        </button>
+
+        {/* Weitere Buttons + Filterstatus */}
         <div
           style={{
             display: "flex",
@@ -159,24 +302,42 @@ function App() {
             marginBottom: "0.5rem",
           }}
         >
-          <button onClick={() => console.log("editMap:", getEdits())}>
-            Log EditMap
+          <button
+            onClick={async () => {
+              try {
+                const res = await fetch(
+                  `${API_PREFIX}/api/elektrik_update?project_id=${selectedProject?.id}`,
+                  { method: "POST" }
+                );
+                const data = await res.json();
+                alert("Elektrik-Liste wurde aktualisiert!\nIDs: " + data.count);
+              } catch (e) {
+                alert("Fehler beim Elektrik-Update: " + e);
+              }
+            }}
+          >
+            Elektrik-Liste aktualisieren
           </button>
 
           <button
             onClick={async () => {
               try {
                 const res = await fetch(
-                  `http://localhost:8000/api/rematerializeAll`,
-                  {
-                    method: "POST",
-                  }
+                  `${API_PREFIX}/api/rematerializeAll?project_id=${selectedProject?.id}`,
+                  { method: "POST" }
                 );
                 if (!res.ok) throw new Error(`Server error ${res.status}`);
                 const result = await res.json();
-                console.log("🔁 All rematerialized:", result);
+                console.log("🔁 + ⚡️ All rematerialized:", result);
+                if (result.log) {
+                  const now = new Date().toLocaleTimeString();
+                  setLogs((prev) => [...prev, { text: result.log, time: now }]);
+                }
               } catch (err) {
-                console.error("❌ Rematerialize all failed:", err);
+                const errorMsg = "❌ Rematerialize all failed: " + String(err);
+                console.error(errorMsg);
+                const now = new Date().toLocaleTimeString();
+                setLogs((prev) => [...prev, { text: errorMsg, time: now }]);
               }
             }}
           >
@@ -184,14 +345,17 @@ function App() {
           </button>
 
           <FilterStatus
-            isFilterActive={isFilterActive}
+            key={`fs-${gridStatus.isFiltered ? 1 : 0}`}
+            isFilterActive={gridStatus.isFiltered}
             onResetFilters={resetFilters}
           />
+
           <SquareMover
             selectedCell={selectedCell}
             dataLength={sheets[activeSheet].data.length}
             onMoveUp={moveRowsUp}
             onMoveDown={moveRowsDown}
+            blocked={isElektrikActive}
           />
           <SquareSearch
             ref={searchBarRef}
@@ -201,52 +365,124 @@ function App() {
             matchIndex={matchIndex}
             matchCount={matchCount}
           />
-          <button
-            onClick={() => {
-              triggerLayoutCalculation(
-                sheets[activeSheet].headers,
-                sheets[activeSheet].data,
-                (layout) => {
-                  setSheets((prev) => ({
-                    ...prev,
-                    [activeSheet]: {
-                      ...prev[activeSheet],
-                      layout,
-                    },
-                  }));
-                }
-              );
+
+          <div
+            style={{
+              position: "absolute",
+              top: "1rem",
+              right: "1rem",
+              zIndex: 10,
             }}
           >
-            🔁 Recalculate Layout
+            <ConsolePanel logs={logs} />
+          </div>
+        </div>
+
+        {/* Sheet Tabs */}
+        <div
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            marginBottom: "4px",
+            position: "relative",
+          }}
+        >
+          <button
+            style={{
+              padding: "0.4rem 0.8rem",
+              background: "#222",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+            title="Neues Sheet anlegen"
+            onClick={() => setShowSheetMenu(true)}
+          >
+            +
           </button>
+
+          <SheetCreateMenu
+            open={showSheetMenu}
+            baseViews={baseViews}
+            onCreate={async (newTableName, baseViewId) => {
+              setShowSheetMenu(false);
+              if (!selectedProject?.id) {
+                alert("Kein Projekt gewählt!");
+                return;
+              }
+              const result = await createSheetApiCall({
+                display_name: newTableName,
+                base_view_id: baseViewId,
+                project_id: selectedProject.id,
+              });
+              if (result.success) {
+                if (result.last_id !== undefined) {
+                  setInitialInsertedId(result.last_id);
+                }
+                fetch(
+                  `${API_PREFIX}/api/sheetnames?project_id=${selectedProject.id}`
+                )
+                  .then((res) => res.json())
+                  .then(async (names) => {
+                    setSheetNames(names);
+                    const newSheetName = names.at(-1) ?? null;
+                    setActiveSheet(newSheetName);
+                    if (newSheetName) {
+                      const tableRes = await fetch(
+                        `${API_PREFIX}/api/tabledata?table=${newSheetName}&limit=700&project_id=${selectedProject.id}`
+                      );
+                      const { headers, data } = await tableRes.json();
+                      triggerLayoutCalculation(headers, data, (layout) => {
+                        setSheets((prev) => ({
+                          ...prev,
+                          [newSheetName]: { headers, data, layout },
+                        }));
+                      });
+                    }
+                  });
+              } else {
+                alert(result.error || "Sheet konnte nicht erstellt werden");
+              }
+            }}
+            onClose={() => setShowSheetMenu(false)}
+          />
+
+          {sheetNames.map((name) => {
+            let cleanName = name;
+            if (name.startsWith("materialized_")) {
+              cleanName = name.slice("materialized_".length);
+            }
+            if (cleanName.includes("_")) {
+              cleanName = cleanName.substring(0, cleanName.lastIndexOf("_"));
+            }
+            return (
+              <button
+                key={name}
+                onClick={() => setActiveSheet(name)}
+                style={{
+                  padding: "0.4rem 0.8rem",
+                  background: activeSheet === name ? "#555" : "#222",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                {cleanName}
+              </button>
+            );
+          })}
         </div>
 
-        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "4px" }}>
-          {sheetNames.map((name) => (
-            <button
-              key={name}
-              onClick={() => setActiveSheet(name)}
-              style={{
-                padding: "0.4rem 0.8rem",
-                background: activeSheet === name ? "#555" : "#222",
-                color: "#fff",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-              }}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
-
+        {/* --- Main Grid --- */}
         <Zoom>
           {(zoom, controls) => (
             <>
               <div
                 style={{
-                  height: "78.5vh",
+                  height: "78vh",
                   width: "100%",
                   overflow: "hidden",
                   position: "relative",
@@ -256,23 +492,12 @@ function App() {
                   const sheet = sheets[name];
                   if (!sheet) return null;
 
-                  const hot = hotRefs.current[name]?.current?.hotInstance;
-                  const filters =
-                    hot?.getPlugin("filters")?.exportConditions?.() ?? [];
-                  const isFiltered = (
-                    filters as { column: number; conditions: unknown[] }[]
-                  ).some((c) => c.conditions && c.conditions.length > 0);
-                  const sort =
-                    hot?.getPlugin("columnSorting")?.getSortConfig() ?? [];
-                  const isSorted = Array.isArray(sort) && sort.length > 0;
-                  const isBlocked = isFiltered || isSorted;
-
                   return (
                     <div
                       key={name}
                       style={{
                         display: name === activeSheet ? "block" : "none",
-                        height: "78.5vh",
+                        height: "78vh",
                         width: "100%",
                         overflow: "hidden",
                       }}
@@ -281,25 +506,28 @@ function App() {
                         style={{
                           transform: `scale(${zoom})`,
                           transformOrigin: "top left",
-                          height: `${78.5 / zoom}vh`,
+                          height: `${78 / zoom}vh`,
                           width: `${100 / zoom}%`,
                           overflow: "hidden",
                         }}
                       >
                         <TableGrid
+                          onSelectionChange={setSelectedCell}
                           data={sheet.data}
                           colHeaders={sheet.headers}
                           hotRef={hotRefs.current[name]}
-                          afterSelection={(row, col) =>
-                            setSelectedCell({ row, col })
-                          }
                           rowHeights={Object.values(sheet.layout.rowHeights)}
                           colWidths={sheet.headers.map(
                             (h) => sheet.layout.columnWidths[h] ?? undefined
                           )}
-                          afterFilter={setIsFilterActive}
+                          // optional: synchronisiere alten afterFilter-Kanal in den neuen Status
                           sheetName={name}
                           isBlocked={isBlocked}
+                          selectedProject={selectedProject!}
+                          // nur AKTIVES Sheet darf Status emittieren
+                          onStatusChange={
+                            name === activeSheet ? setGridStatus : undefined
+                          }
                         />
                       </div>
                     </div>
@@ -319,6 +547,70 @@ function App() {
           )}
         </Zoom>
       </div>
+
+      {/* --- Hierarchy Rnd Window --- */}
+      {showHierarchy && selectedProject && (
+        <Rnd
+          default={{
+            x: window.innerWidth - 650,
+            y: 100,
+            width: 475,
+            height: 500,
+          }}
+          bounds="window"
+          minWidth={400}
+          minHeight={300}
+          dragHandleClassName="hierarchy-drag-handle"
+          style={{
+            zIndex: 999,
+            background: "#1c1c1c",
+            border: "1px solid #666",
+            borderRadius: "8px",
+            color: "#fff",
+            padding: "1rem",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              minHeight: 0,
+            }}
+          >
+            <div
+              className="hierarchy-drag-handle"
+              style={{
+                cursor: "move",
+                marginBottom: "0.5rem",
+                flex: "0 0 auto",
+              }}
+            >
+              <strong>🧱 Hierarchie</strong>
+              <button
+                onClick={() => setShowHierarchy(false)}
+                style={{
+                  float: "right",
+                  color: "#fff",
+                  background: "none",
+                  border: "none",
+                }}
+              >
+                ✖
+              </button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+              <StairHierarchyEditor
+                projectId={selectedProject.id}
+                apiPrefix={API_PREFIX}
+              />
+            </div>
+          </div>
+        </Rnd>
+      )}
     </div>
   );
 }

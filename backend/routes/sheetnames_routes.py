@@ -1,16 +1,30 @@
-# backend/routes/sheetnames_routes.py
-
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 import sqlalchemy
+from backend.settings.connection_points import DB_URL
 
 router = APIRouter()
 
-DB_URL = "postgresql://myuser:1999@localhost:5432/one_project_db_milestone"
-
 @router.get("/sheetnames")
-async def get_sheet_names():
+async def get_sheet_names(project_id: int= Query(...)):
     engine = sqlalchemy.create_engine(DB_URL)
     inspector = sqlalchemy.inspect(engine)
     all_tables = inspector.get_table_names()
-    materialized_tables = [name for name in all_tables if name.startswith("materialized_")]
+
+    # 1. Hole den Suffix für dieses Projekt (projects.project_materialized_name)
+    with engine.connect() as conn:
+        result = conn.execute(
+            sqlalchemy.text("SELECT project_materialized_name FROM projects WHERE id = :id"),
+            {"id": project_id}
+        )
+        row = result.fetchone()
+        if not row or row[0] is None:
+            return []
+        project_name = row[0]
+
+    # 2. Filter: materialized_*_{project_name}
+    materialized_tables = [
+        name for name in all_tables
+        if name.startswith("materialized_") and name.endswith(f"_{project_name}")
+    ]
+
     return materialized_tables

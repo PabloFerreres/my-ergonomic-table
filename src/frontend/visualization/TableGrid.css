@@ -1,17 +1,41 @@
-/* 🔻 Make the dropdown filter icon bigger and shift it down */
-button.changeType {
-  transform: translateY(6px);
-  position: absolute !important;
-  top: auto !important;
-  bottom: -12px !important;
-  right: 0px !important;
-
-  width: 40px !important;     /* double width */
-  height: 20px !important;    /* double height */
-  padding: 0px !important;
-  font-size: 15px !important; /* if any icon is font-based */
-  background-size: 24px 24px !important; /* scale background icon */
+.ht_clone_top .htCore thead th {
+  overflow: visible !important;
 }
+
+.ht_clone_top .htCore thead th .colHeader {
+  position: absolute !important;
+  bottom: 20px !important;  /* feiner Abstand */
+  left: 25px !important;    /* feiner Offset nach rechts */
+  transform: rotate(-30deg);
+  transform-origin: left bottom;
+  white-space: normal;
+  text-align: left;
+  max-width: 110px;               /* statischer Wrap-Punkt */
+  word-break: break-word;        /* bricht im Wort, falls nötig */
+  white-space: normal;
+}
+
+button.changeType {
+  position: absolute !important;
+  right: 4px !important;
+  bottom: 0px !important;
+  top: auto !important;
+  left: auto !important;
+
+  width: 40px !important;
+  height: 20px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+
+  font-size: 15px !important;
+  background-size: 24px 24px !important;
+
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+  display: block !important;
+}
+
+
 
 
 /* 🔲 Make the multi-select checkbox list the focus */
@@ -51,12 +75,67 @@ button.changeType {
   width: 100% !important;
 }
 
+.htMenu.htContextMenu {
+  min-width: 300px !important; /* Container */
+  width: 300px !important;
+}
+
+.htMenu.htContextMenu .ht_master .htCore td {
+  font-size: 16px !important;
+  padding: 7px 0px !important; /* nur etwas */
+}
+
+.htMenu.htContextMenu .ht_master .htCore td span {
+  display: inline-block;
+  padding-right: 20px; /* rechter Abstand im Inhalt */
+}
+
+.row-new {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.3),
+    rgba(255, 255, 255, 0.3) 2px,
+    transparent 2px,
+    transparent 6px
+  );
+  background-size: 8px 8px;
+  background-color: #fff1e0 !important;
+}
+
+
 .unsaved-edit {
   background-color: #fff200 !important; /* Baugelb */
   color: black !important;
 }
 
+.red-inline {
+  color: red;
+  font-weight: normal;
+}
 
-.htDropdownMenu.handsontable {
-  transform: translateX(30px); /* nach rechts schieben */
+.ht_clone_top .htCore thead th {
+  vertical-align: bottom !important;
+}
+
+.ht_clone_top .htCore thead th .colHeader {
+  display: inline-block;
+  transform: rotate(-45deg);
+  transform-origin: left bottom;
+  white-space: normal;
+  text-align: left;
+}
+
+.row-entfallen {
+  text-decoration: line-through double !important;
+  opacity: 0.55; /* Optional für ausgegraut */
+  color: #2c2c2c !important; /* Optional, Farbe anpassen */
+}
+
+
+/* Styling für Header-Zeilen */
+.htCore .het-header-row {
+  font-weight: bold !important;
+  background-color: #9b9b9b !important; /* grauer Hintergrund */
+  color: #000 !important;              /* schwarzer Text */
+  border-top: 3px solid #838383 !important; /* dickere obere Linie */
 }
