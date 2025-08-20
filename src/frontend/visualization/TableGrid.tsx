@@ -165,12 +165,7 @@ function TableGrid({
   );
 
   const handleSelection = (row: number, col: number) => {
-    // Header: keine Selektion zulassen (verhindert Moves/Edits)
-    if (isHeaderRow(row)) {
-      const hot = hotRef?.current?.hotInstance;
-      hot?.deselectCell();
-      return;
-    }
+    // Nur melden; Blockaden regeln wir über readOnly/beforeChange/ContextMenu
     onSelectionChange?.({ row, col });
   };
 
