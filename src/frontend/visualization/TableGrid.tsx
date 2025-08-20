@@ -105,11 +105,12 @@ function TableGrid({
 
   const baseCellProps = useCellProperties(safeData, rowIdIndex, sheetName);
 
-  const getCellProps = (row: number, col: number) => {
-    const base = baseCellProps(row, col);
+  const getCellProps = (visualRow: number, visualCol: number) => {
+    const hot = hotRef?.current?.hotInstance;
+    const physRow = hot?.toPhysicalRow?.(visualRow) ?? visualRow;
+    const base = baseCellProps(physRow, visualCol);
 
-    // Header-Zeilen komplett sperren
-    if (isHeaderRow(row)) {
+    if (isHeaderRow(physRow)) {
       return {
         ...base,
         readOnly: true,
@@ -119,13 +120,14 @@ function TableGrid({
       };
     }
 
-    if (isRowEntfallen(safeData, row, kommentarIdx)) {
+    if (isRowEntfallen(safeData, physRow, kommentarIdx)) {
       return {
         ...base,
         className:
           (base.className ? base.className + " " : "") + "row-entfallen",
       };
     }
+
     return base;
   };
 
@@ -164,14 +166,15 @@ function TableGrid({
     selectedProject.id
   );
 
-  const handleSelection = (row: number, col: number) => {
-    // Header: keine Selektion zulassen (verhindert Moves/Edits)
-    if (isHeaderRow(row)) {
-      const hot = hotRef?.current?.hotInstance;
+  const handleSelection = (visualRow: number, visualCol: number) => {
+    const hot = hotRef?.current?.hotInstance;
+    const physRow = hot?.toPhysicalRow?.(visualRow) ?? visualRow;
+
+    if (isHeaderRow(physRow)) {
       hot?.deselectCell();
       return;
     }
-    onSelectionChange?.({ row, col });
+    onSelectionChange?.({ row: physRow, col: visualCol });
   };
 
   // NEU: einheitlich Status emittieren
@@ -205,18 +208,23 @@ function TableGrid({
         afterSelection={handleSelection}
         // Typ-sicherer Header-Block: Änderungen an Header-Zeilen verwerfen
         beforeChange={(changes) => {
-          if (!changes) return; // (changes: (CellChange|null)[])
+          const hot = hotRef?.current?.hotInstance;
+          if (!changes || !hot) return;
+
           for (let i = changes.length - 1; i >= 0; i--) {
             const change = changes[i];
             if (!change) continue;
-            const row = change[0] as number; // [row, prop, old, new]
-            if (isHeaderRow(row)) changes.splice(i, 1);
+            const visualRow = change[0] as number;
+            const physRow = hot.toPhysicalRow?.(visualRow) ?? visualRow;
+            if (isHeaderRow(physRow)) changes.splice(i, 1);
           }
         }}
         // Kein Paste in Header
         beforePaste={(_data, coords) => {
+          const hot = hotRef?.current?.hotInstance;
           const r0 = coords?.[0]?.startRow;
-          if (r0 != null && isHeaderRow(r0)) return false;
+          const physRow = hot?.toPhysicalRow?.(r0) ?? r0;
+          if (physRow != null && isHeaderRow(physRow)) return false;
         }}
         afterGetColHeader={(col, TH) => afterGetColHeader(col, TH, colHeaders)}
         afterFilter={() => {
@@ -283,10 +291,13 @@ function TableGrid({
                 if (!selected) return;
 
                 const rows = new Set<number>();
-                selected.forEach(([startRow, , endRow]) => {
-                  const from = Math.min(startRow, endRow);
-                  const to = Math.max(startRow, endRow);
-                  for (let r = from; r <= to; r++) rows.add(r);
+                selected.forEach(([startVisualRow, , endVisualRow]) => {
+                  const from = Math.min(startVisualRow, endVisualRow);
+                  const to = Math.max(startVisualRow, endVisualRow);
+                  for (let visualRow = from; visualRow <= to; visualRow++) {
+                    const physRow = hot.toPhysicalRow?.(visualRow) ?? visualRow;
+                    rows.add(physRow);
+                  }
                 });
 
                 const selection = Array.from(rows);
