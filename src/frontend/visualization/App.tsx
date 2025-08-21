@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, createRef } from "react";
 import { Rnd } from "react-rnd";
 import { HotTableClass } from "@handsontable/react";
+import type { HotStatus } from "./uiTableGrid/hotStatus";
 import TableGrid from "./TableGrid";
 import Zoom from "./uiButtonFunctions/Zoom";
 import { triggerLayoutCalculation } from "./uiButtonFunctions/TriggerLayoutCalculation";
@@ -52,11 +53,22 @@ function App() {
   const [baseViews, setBaseViews] = useState<{ id: number; name: string }[]>(
     []
   );
-  // NEU: zentrale Quelle für Filter/Sort
-  const [gridStatus, setGridStatus] = useState({
-    isFiltered: false,
-    isSorted: false,
-  });
+  // Per-Sheet-Status für Filter/Sort
+  const [gridStatusBySheet, setGridStatusBySheet] = useState<
+    Record<string, HotStatus>
+  >({});
+
+  const getStatus = (sheet?: string | null): HotStatus =>
+    gridStatusBySheet[sheet ?? ""] ?? { isFiltered: false, isSorted: false };
+
+  const updateStatus = (sheet: string, patch: Partial<HotStatus>) =>
+    setGridStatusBySheet((prev) => ({
+      ...prev,
+      [sheet]: {
+        ...(prev[sheet] ?? { isFiltered: false, isSorted: false }),
+        ...patch,
+      },
+    }));
 
   const hotRefs = useRef<Record<string, React.RefObject<HotTableClass>>>({});
 
@@ -168,14 +180,15 @@ function App() {
       filtersPlugin.removeConditions(idx);
     });
     filtersPlugin.filter();
-    // sofort UI-State
-    setGridStatus((s) => ({ ...s, isFiltered: false }));
+    // sofort UI-State nur für aktives Sheet
+    updateStatus(activeSheet, { isFiltered: false });
   };
 
   // --- Elektrik-Block-Flag (robust) ---
   const isElektrikActive =
     activeSheet?.toLowerCase().includes("elektrik") ?? false;
-  const isBlocked = gridStatus.isFiltered || gridStatus.isSorted;
+  const currentStatus = getStatus(activeSheet);
+  const isBlocked = currentStatus.isFiltered || currentStatus.isSorted;
 
   // WelcomeScreen
   if (ENABLE_WELCOME_SCREEN && !selectedProject) {
@@ -341,8 +354,8 @@ function App() {
           </button>
 
           <FilterStatus
-            key={`fs-${gridStatus.isFiltered ? 1 : 0}`}
-            isFilterActive={gridStatus.isFiltered}
+            key={`fs-${currentStatus.isFiltered ? 1 : 0}`}
+            isFilterActive={currentStatus.isFiltered}
             onResetFilters={resetFilters}
           />
 
@@ -516,16 +529,15 @@ function App() {
                           colWidths={sheet.headers.map(
                             (h) => sheet.layout.columnWidths[h] ?? undefined
                           )}
-                          // optional: synchronisiere alten afterFilter-Kanal in den neuen Status
-                          afterFilter={(b) =>
-                            setGridStatus((s) => ({ ...s, isFiltered: b }))
-                          }
                           sheetName={name}
                           isBlocked={isBlocked}
                           selectedProject={selectedProject!}
-                          // nur AKTIVES Sheet darf Status emittieren
-                          onStatusChange={
-                            name === activeSheet ? setGridStatus : undefined
+                          // Status für dieses Sheet aktualisieren
+                          onStatusChange={(s) =>
+                            setGridStatusBySheet((prev) => ({
+                              ...prev,
+                              [name]: s,
+                            }))
                           }
                         />
                       </div>

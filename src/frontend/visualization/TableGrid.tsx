@@ -4,10 +4,7 @@ import { registerAllModules } from "handsontable/registry";
 registerAllModules();
 
 import "./TableGrid.css";
-import {
-  afterGetColHeader,
-  handleAfterFilter,
-} from "./uiTableGrid/TableGridConsts";
+import { afterGetColHeader } from "./uiTableGrid/TableGridConsts";
 import { useDropdownColumns, useDropdownOptions } from "../hooks/useDropdowns";
 import { useCellProperties } from "../hooks/useCellProperties";
 import { useAfterChange } from "../hooks/useAfterChange";
@@ -29,7 +26,6 @@ interface TableGridProps {
   colWidths?: (number | undefined)[];
   rowHeights?: number | number[];
   hotRef?: React.RefObject<HotTableClass | null>;
-  afterFilter?: (isActive: boolean) => void;
   sheetName: string;
   isBlocked?: boolean;
   onSelectionChange?: (cell: { row: number; col: number }) => void;
@@ -55,7 +51,6 @@ function TableGrid({
   colWidths,
   rowHeights,
   hotRef,
-  afterFilter,
   sheetName,
   isBlocked = false,
   onSelectionChange,
@@ -217,25 +212,20 @@ function TableGrid({
         afterFilter={() => {
           const hot = hotRef?.current?.hotInstance ?? null;
           if (!hot) return;
-
-          // bestehende Utility-Logik nutzen
-          handleAfterFilter(hot, colHeaders, afterFilter);
-
-          // 🔒 Menü schließen mit Delay
+          // Menü schließen, nachdem HOT fertig ist
           setTimeout(() => {
             const dm: any = hot.getPlugin("dropdownMenu");
             if (dm?.close) dm.close();
             else if (dm?.menu?.close) dm.menu.close();
           }, 0);
-
-          // Status nachziehen
-          Promise.resolve().then(() => emitStatus());
+          // Status aus HOT lesen (nächster Tick, nach Commit)
+          emitStatus();
         }}
         afterDropdownMenuHide={() => {
           emitStatus();
         }}
         afterColumnSort={() => {
-          emitStatus(); // sofortiger Sort-Status
+          emitStatus();
         }}
         afterInit={() => {
           emitStatus(); // initialer Status
