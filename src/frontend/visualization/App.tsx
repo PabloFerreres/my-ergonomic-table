@@ -23,6 +23,7 @@ import { createSheetApiCall } from "../utils/apiSync";
 import StairHierarchyEditor from "../windows/StairHierarchyEditor";
 import { softAktualisierenSheets } from "../../appButtonFunctions/SoftAktualisierenSheets";
 import config from "../../../config.json";
+import ExportExcelButton from "../../appButtonFunctions/ExportExcelButton";
 
 const API_PREFIX = config.BACKEND_URL;
 const ENABLE_WELCOME_SCREEN = true;
@@ -311,22 +312,14 @@ function App() {
             marginBottom: "0.5rem",
           }}
         >
-          <button
-            onClick={async () => {
-              try {
-                const res = await fetch(
-                  `${API_PREFIX}/api/elektrik_update?project_id=${selectedProject?.id}`,
-                  { method: "POST" }
-                );
-                const data = await res.json();
-                alert("Elektrik-Liste wurde aktualisiert!\nIDs: " + data.count);
-              } catch (e) {
-                alert("Fehler beim Elektrik-Update: " + e);
-              }
-            }}
-          >
-            Elektrik-Liste aktualisieren
-          </button>
+          {selectedProject && activeSheet && (
+            <ExportExcelButton
+              apiPrefix={API_PREFIX}
+              projectId={selectedProject.id}
+              activeSheet={activeSheet}
+              hotRefs={hotRefs}
+            />
+          )}
 
           <button
             onClick={async () => {

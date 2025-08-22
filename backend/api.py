@@ -17,6 +17,7 @@ from backend.routes.new_sheet import router as new_sheet_router
 from backend.routes.next_inserted_id import router as next_inserted_id
 from backend.routes.stair_hierarchy_routes import router as stair_router
 from backend.routes.dropdown_contents import router as dropdown_router
+from backend.routes.export_excel import router as export_excel_router
 
 
 router = APIRouter(prefix="/api")
@@ -29,6 +30,7 @@ router.include_router(project_router)
 router.include_router(sheetnames_router)
 router.include_router(baseviews_router)
 router.include_router(elektrik_router)
+router.include_router(export_excel_router)
 
 HEADER_MAP = json.loads(Path("backend/utils/header_name_map.json").read_text(encoding="utf-8"))
 

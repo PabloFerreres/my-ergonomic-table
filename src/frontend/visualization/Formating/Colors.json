@@ -1,0 +1,38 @@
+{
+  "black": "#000000",
+  "white": "#ffffff",
+
+  "text": "#111827",
+  "mutedText": "#4b5563",
+
+  "bg": "#f9fafb",
+  "panelBg": "#ffffff",
+  "border": "#e5e7eb",
+
+  "gridHeaderBg": "#0f172a",
+  "gridHeaderFg": "#ffffff",
+  "headerRowBg": "#e5e7eb",
+
+  "accent": "#3b82f6",
+  "accentSoft": "#93c5fd",
+
+  "ok": "#10b981",
+  "okSoft": "#bbf7d0",
+
+  "warning": "#f59e0b",
+  "warningSoft": "#fde68a",
+
+  "danger": "#ef4444",
+  "dangerSoft": "#fca5a5",
+
+  "info": "#3b82f6",
+  "infoSoft": "#93c5fd",
+
+  "statusPlanned": "#dbeafe",
+  "statusOrdered": "#fde68a",
+  "statusInstalled": "#bbf7d0",
+  "statusTested": "#fca5a5",
+
+  "focusRing": "#3b82f6",
+  "selection": "#96C7FF"
+}

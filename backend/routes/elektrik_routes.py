@@ -9,8 +9,6 @@ async def trigger_elektrik_update(project_id):
     return {"status": "ok", "count": len(ids) if ids else 0}
 
 
-router = APIRouter()
-
 @router.post("/materialize_elektrik")
 async def materialize_elektrik_api(project_id):
     # Funktion macht alles synchron, daher kein async nötig

@@ -103,5 +103,17 @@
     "headers": [
       "REVISION"
     ]
+  },
+
+  "grid-header-rows": {
+    "color": "#E5E7EB",
+    "headers": [],
+    "used_for": ["HEADER rows (Einbauort-Gruppen) Hintergrund"]
+  },
+  "grid-inbetween-red": {
+    "color": "#FF0000",
+    "headers": [],
+    "used_for": ["In-between '**' Markierung / Trennhinweis"]
   }
+
 }

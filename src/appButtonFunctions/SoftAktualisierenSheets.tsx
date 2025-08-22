@@ -6,7 +6,6 @@ import type {
   SetStateAction,
 } from "react";
 
-// gleiche Struktur wie in App
 type SheetData = {
   headers: string[];
   data: (string | number)[][];
@@ -30,13 +29,9 @@ type Params = {
   clearEdits: () => void;
 };
 
-/**
- * Soft-Reload aller Sheets:
- * - rowIndexMapper vorab neutralisieren (kein Flicker)
- * - Materialized mit Cache-Buster laden
- * - Layout berechnen & setzen
- * - Edits leeren
- */
+// in-flight Requests steuern
+let inFlight: AbortController | null = null;
+
 export async function softAktualisierenSheets({
   sheetNames,
   apiPrefix,
@@ -46,15 +41,31 @@ export async function softAktualisierenSheets({
   hotRefs,
   clearEdits,
 }: Params) {
-  // 0) altes manualRowMove-Mapping neutralisieren (verhindert "Sprung")
+  console.time("softAktualisierenSheets");
+
+  // vorherige Läufe abbrechen (kein leerer catch nötig)
+  inFlight?.abort();
+  inFlight = new AbortController();
+
+  // 0) manualRowMove-Mapping neutralisieren
   sheetNames.forEach((name) => {
     const hot = hotRefs.current[name]?.current?.hotInstance;
     if (!hot) return;
-    const rc = hot.countRows();
-    if (rc > 0) {
-      const seq = Array.from({ length: rc }, (_, i) => i);
-      hot.rowIndexMapper?.setIndexesSequence?.(seq);
+
+    try {
+      hot.suspendRender?.();
+
+      const rc = hot.countRows();
+      if (rc > 0) {
+        const seq = Array.from({ length: rc }, (_, i) => i);
+        hot.rowIndexMapper?.setIndexesSequence?.(seq);
+      }
+    } finally {
+      hot?.resumeRender?.();
     }
+
+    // optional: Undo-Stack leeren
+    hot.getPlugin("undoRedo")?.clear?.();
   });
 
   const t = Date.now(); // Cache-Buster
@@ -66,30 +77,44 @@ export async function softAktualisierenSheets({
     layout: SheetData["layout"];
   };
 
-  const results: Loaded[] = await Promise.all(
-    sheetNames.map(async (name) => {
-      const url =
-        `${apiPrefix}/api/tabledata?table=${encodeURIComponent(name)}` +
-        `&limit=700&project_id=${projectId}&_=${t}`;
-      const res = await fetch(url, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status} for ${name}`);
-      const { headers, data } = await res.json();
-      return new Promise<Loaded>((resolve) =>
-        triggerLayoutCalculation(headers, data, (layout) =>
-          resolve({ name, headers, data, layout })
-        )
-      );
-    })
-  );
+  try {
+    const results: Loaded[] = await Promise.all(
+      sheetNames.map(async (name) => {
+        const url =
+          `${apiPrefix}/api/tabledata?table=${encodeURIComponent(name)}` +
+          `&limit=700&project_id=${projectId}&_=${t}`;
+        const res = await fetch(url, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+          signal: inFlight!.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status} for ${name}`);
+        const { headers, data } = await res.json();
+        return new Promise<Loaded>((resolve) =>
+          triggerLayoutCalculation(headers, data, (layout) =>
+            resolve({ name, headers, data, layout })
+          )
+        );
+      })
+    );
 
-  const loaded: Record<string, SheetData> = {};
-  results.forEach(({ name, headers, data, layout }) => {
-    loaded[name] = { headers, data, layout };
-  });
+    const loaded: Record<string, SheetData> = {};
+    results.forEach(({ name, headers, data, layout }) => {
+      loaded[name] = { headers, data, layout };
+    });
 
-  setSheets(loaded);
-  clearEdits();
+    setSheets(loaded);
+    clearEdits();
+  } catch (err: unknown) {
+    // eslint: no-explicit-any -> unknown + Narrowing
+    if ((err as { name?: string }).name === "AbortError") {
+      console.info("softAktualisierenSheets: aborted");
+      return;
+    }
+    console.error("softAktualisierenSheets error:", err);
+    throw err;
+  } finally {
+    inFlight = null;
+    console.timeEnd("softAktualisierenSheets");
+  }
 }

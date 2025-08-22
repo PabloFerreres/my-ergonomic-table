@@ -1,0 +1,217 @@
+# backend/export/excel_export.py
+from io import BytesIO
+from pathlib import Path
+from typing import Optional, Any, Tuple, Dict, List
+import json
+import xlsxwriter  # pip install xlsxwriter
+
+# Fester Pfad: <repo>/src/frontend/visualization/Formating/columnsForm/ColumnStyleMap.json
+REPO_ROOT = Path(__file__).resolve().parents[2]
+STYLE_PATH = REPO_ROOT / "src" / "frontend" / "visualization" / "Formating" / "columnsForm" / "ColumnStyleMap.json"
+if not STYLE_PATH.exists():
+    raise FileNotFoundError(f"ColumnStyleMap.json not found at {STYLE_PATH}")
+
+def _norm_hex(s: Optional[str]) -> Optional[str]:
+    if not s:
+        return None
+    s = s.strip().upper()
+    if not s.startswith("#"):
+        return None
+    if len(s) == 4:  # #RGB
+        r, g, b = s[1], s[2], s[3]
+        return f"#{r}{r}{g}{g}{b}{b}"
+    if len(s) == 7:  # #RRGGBB
+        return s
+    return None
+
+def _rel_luma(hex6: str) -> float:
+    if not (hex6 and hex6.startswith("#") and len(hex6) == 7):
+        return 1.0
+    r = int(hex6[1:3], 16)
+    g = int(hex6[3:5], 16)
+    b = int(hex6[5:7], 16)
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
+
+def _load_style_map() -> Tuple[Dict[str, str], str, str]:
+    m = json.loads(STYLE_PATH.read_text(encoding="utf-8"))
+    header_color_by_name: Dict[str, str] = {}
+    for k, v in m.items():
+        if k.startswith("header-") and isinstance(v, dict) and "headers" in v:
+            color = _norm_hex(v.get("color"))
+            if color is None:
+                continue
+            for h in v.get("headers") or []:
+                header_color_by_name[str(h)] = color
+    header_rows_bg = _norm_hex((m.get("grid-header-rows") or {}).get("color")) or "#E5E7EB"
+    inbetween_red  = _norm_hex((m.get("grid-inbetween-red") or {}).get("color")) or "#FF0000"
+    return header_color_by_name, header_rows_bg, inbetween_red
+
+# ---- Format-Factory mit mehr Optionen (align, font_size, rotation, wrap) ----
+def _fmt(
+    wb,
+    cache: Dict[tuple, Any],
+    *,
+    bg: Optional[str] = None,
+    fg: Optional[str] = None,
+    bold: bool = False,
+    align: Optional[str] = None,
+    font_size: Optional[int] = None,
+    rotation: Optional[int] = None,    # 0..180 (xlsxwriter)
+    text_wrap: Optional[bool] = None,
+):
+    key = (bg, fg, bold, align, font_size, rotation, text_wrap)
+    if key in cache:
+        return cache[key]
+    spec: Dict[str, Any] = {}
+    if bg is not None:
+        spec["bg_color"] = bg
+    if fg is not None:
+        spec["font_color"] = fg
+    if bold:
+        spec["bold"] = True
+    if align is not None:
+        spec["align"] = align
+    spec["valign"] = "vcenter"
+    if font_size is not None:
+        spec["font_size"] = font_size
+    if rotation is not None:
+        spec["rotation"] = rotation
+    if text_wrap is not None:
+        spec["text_wrap"] = text_wrap
+    fmt = wb.add_format(spec)
+    cache[key] = fmt
+    return fmt
+
+def _len_cell(v: Any) -> int:
+    if v is None:
+        return 0
+    s = str(v)
+    if not s:
+        return 0
+    return max(len(line) for line in s.splitlines())
+
+def _autosize_from_values_only(headers: List[Any], data: List[List[Any]]) -> List[float]:
+    """
+    Excel-Spaltenbreiten (Zeichenbreite) anhand der **Daten** (Header ignoriert).
+    Padding, min/max Grenzen.
+    """
+    n_cols = len(headers)
+    maxlens = [0.0] * n_cols
+
+    for row in data:
+        for c in range(n_cols):
+            val = row[c] if c < len(row) else ""
+            maxlens[c] = max(maxlens[c], float(_len_cell(val)))
+
+    widths = []
+    for L in maxlens:
+        w = L + 2.0  # Padding
+        if w < 6.0:
+            w = 6.0
+        if w > 80.0:
+            w = 80.0
+        widths.append(w)
+    return widths
+
+def build_excel(payload: dict) -> bytes:
+    """
+    payload = {
+      "filename": "Projekt_123.xlsx",
+      "sheets": [
+        { "name": "Elektrik", "headers": [...], "data": [[...],...],
+          "layout": {"columnWidths": {...}, "rowHeights": {...}}
+        }
+      ]
+    }
+    """
+    header_color_by_name, header_rows_bg, inbetween_red = _load_style_map()
+
+    mem = BytesIO()
+    wb = xlsxwriter.Workbook(mem, {"in_memory": True})
+    cache: Dict[tuple, Any] = {}
+
+    for sheet in payload.get("sheets", []):
+        name    = str(sheet.get("name", "Sheet"))[:31]
+        headers = list(sheet.get("headers") or [])
+        data    = list(sheet.get("data") or [])
+        layout  = sheet.get("layout") or {}
+
+        ws = wb.add_worksheet(name)
+
+        # Default: ALLES linksbündig (für normale Zellen)
+        default_left = _fmt(wb, cache, align="left")
+
+        # 1) Spaltenbreiten NUR aus den Werten bestimmen
+        widths = _autosize_from_values_only(headers, data)
+        for c, w in enumerate(widths):
+            ws.set_column(c, c, w, default_left)
+
+        # 2) Header: vertikal drehen, wenn Headertext nicht in die **Wert-basierten** Breite passt
+        rotate_flags: List[bool] = []
+        for c, h in enumerate(headers):
+            hdr_len = _len_cell(h)
+            rotate = hdr_len > (widths[c] - 1.5)  # kleiner Puffer
+            rotate_flags.append(rotate)
+
+        # Headerhöhe: Basis 24pt; wenn irgendein Header rotiert → 56pt
+        header_height_pt = 84 if any(rotate_flags) else 24
+        ws.set_row(0, header_height_pt)
+
+        # 3) Headerzellen schreiben (Farbe, Fett, Größe; ggf. Rotation 90°)
+        for c, h in enumerate(headers):
+            bg = header_color_by_name.get(str(h))
+            if rotate_flags[c]:
+                # vertikal, mittig (links macht hier wenig Sinn)
+                if bg:
+                    fg = "#000000" if _rel_luma(bg) > 0.6 else "#FFFFFF"
+                    fmt = _fmt(wb, cache, bg=bg, fg=fg, bold=True, align="center", font_size=12, rotation=90)
+                else:
+                    fmt = _fmt(wb, cache, bold=True, align="center", font_size=12, rotation=90)
+            else:
+                # normal, links, größerer Font
+                if bg:
+                    fg = "#000000" if _rel_luma(bg) > 0.6 else "#FFFFFF"
+                    fmt = _fmt(wb, cache, bg=bg, fg=fg, bold=True, align="left", font_size=14)
+                else:
+                    fmt = _fmt(wb, cache, bold=True, align="left", font_size=14)
+            ws.write(0, c, h, fmt)
+
+        # Freeze + Autofilter
+        ws.freeze_panes(1, 0)
+        if headers:
+            ws.autofilter(0, 0, 0, len(headers) - 1)
+
+        # 4) Daten (HEADER-Zeilen fett + bg, Inbetween '**' rot)
+        kommentar_idx = next((i for i, hh in enumerate(headers) if str(hh).lower() == "kommentar"), -1)
+        fmt_header_row = _fmt(wb, cache, bg=header_rows_bg, fg="#000000", bold=True, align="left")
+        fmt_inbetween  = _fmt(wb, cache, fg=inbetween_red, align="left")
+
+        for r, row in enumerate(data, start=1):
+            is_header_row = False
+            if kommentar_idx >= 0 and kommentar_idx < len(row):
+                v = row[kommentar_idx]
+                is_header_row = (isinstance(v, str) and v.strip().upper() == "HEADER")
+
+            for c, val in enumerate(row):
+                cell_fmt = fmt_header_row if is_header_row else None
+
+                # Inbetween "**" rot
+                if isinstance(val, str) and ("**" in val) and not is_header_row:
+                    if cell_fmt is fmt_header_row:
+                        cell_fmt = _fmt(wb, cache, bg=header_rows_bg, fg=inbetween_red, bold=True, align="left")
+                    else:
+                        cell_fmt = fmt_inbetween
+
+                ws.write(r, c, val, cell_fmt)
+
+        # 5) Zeilenhöhen (px → pt ~ px*0.75) aus Layout weiter anwenden
+        rowh = (layout.get("rowHeights") or {})
+        for rr, hpx in rowh.items():
+            try:
+                rr_int = int(rr)
+                ws.set_row(rr_int + 1, float(hpx) * 0.75)
+            except Exception:
+                pass
+
+    wb.close()
+    return mem.getvalue()
