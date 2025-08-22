@@ -135,6 +135,6 @@ button.changeType {
 /* Styling für Header-Zeilen */
 .htCore .het-header-row {
   font-weight: bold !important;
-  background-color: #D3D3D3 !important; /* grauer Hintergrund */
+  background-color: #a0a0a0 !important; /* grauer Hintergrund */
   color: #2e2e2e !important;              /* schwarzer Text */
 }

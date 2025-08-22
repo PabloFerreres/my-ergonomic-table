@@ -224,15 +224,6 @@ function TableGrid({
         afterDropdownMenuHide={() => {
           emitStatus();
         }}
-        afterColumnSort={() => {
-          emitStatus();
-        }}
-        afterInit={() => {
-          emitStatus(); // initialer Status
-        }}
-        afterLoadData={() => {
-          emitStatus(); // Status nach Datenwechsel
-        }}
         contextMenu={{
           items: {
             row_above: {

@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import { useCallback } from "react";
 import type { MutableRefObject, RefObject } from "react";
 import type { HotTableClass } from "@handsontable/react";
 import { exportExcel } from "./ExportExcel";
