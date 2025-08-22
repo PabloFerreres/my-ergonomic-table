@@ -5,11 +5,16 @@ from typing import Optional, Any, Tuple, Dict, List
 import json
 import xlsxwriter  # pip install xlsxwriter
 
-# Fester Pfad: <repo>/src/frontend/visualization/Formating/columnsForm/ColumnStyleMap.json
+# Pfad zur Color-Map
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STYLE_PATH = REPO_ROOT / "src" / "frontend" / "visualization" / "Formating" / "columnsForm" / "ColumnStyleMap.json"
 if not STYLE_PATH.exists():
     raise FileNotFoundError(f"ColumnStyleMap.json not found at {STYLE_PATH}")
+
+# Höhen/Styling
+HEADER_HEIGHT_PT = 28               # normale Headerhöhe
+HEADER_HEIGHT_ROTATED_PT = 84       # Headerhöhe bei rotierten Überschriften
+DATA_ROW_HEIGHT_PT = 18             # einheitliche Datenzeilenhöhe
 
 def _norm_hex(s: Optional[str]) -> Optional[str]:
     if not s:
@@ -46,7 +51,6 @@ def _load_style_map() -> Tuple[Dict[str, str], str, str]:
     inbetween_red  = _norm_hex((m.get("grid-inbetween-red") or {}).get("color")) or "#FF0000"
     return header_color_by_name, header_rows_bg, inbetween_red
 
-# ---- Format-Factory mit mehr Optionen (align, font_size, rotation, wrap) ----
 def _fmt(
     wb,
     cache: Dict[tuple, Any],
@@ -56,7 +60,7 @@ def _fmt(
     bold: bool = False,
     align: Optional[str] = None,
     font_size: Optional[int] = None,
-    rotation: Optional[int] = None,    # 0..180 (xlsxwriter)
+    rotation: Optional[int] = None,    # 0..180
     text_wrap: Optional[bool] = None,
 ):
     key = (bg, fg, bold, align, font_size, rotation, text_wrap)
@@ -91,25 +95,18 @@ def _len_cell(v: Any) -> int:
     return max(len(line) for line in s.splitlines())
 
 def _autosize_from_values_only(headers: List[Any], data: List[List[Any]]) -> List[float]:
-    """
-    Excel-Spaltenbreiten (Zeichenbreite) anhand der **Daten** (Header ignoriert).
-    Padding, min/max Grenzen.
-    """
+    """Zeichenbreiten nur aus den Werten, min/max + Padding."""
     n_cols = len(headers)
     maxlens = [0.0] * n_cols
-
     for row in data:
         for c in range(n_cols):
             val = row[c] if c < len(row) else ""
             maxlens[c] = max(maxlens[c], float(_len_cell(val)))
-
     widths = []
     for L in maxlens:
         w = L + 2.0  # Padding
-        if w < 6.0:
-            w = 6.0
-        if w > 80.0:
-            w = 80.0
+        if w < 6.0: w = 6.0
+        if w > 80.0: w = 80.0
         widths.append(w)
     return widths
 
@@ -134,41 +131,39 @@ def build_excel(payload: dict) -> bytes:
         name    = str(sheet.get("name", "Sheet"))[:31]
         headers = list(sheet.get("headers") or [])
         data    = list(sheet.get("data") or [])
-        layout  = sheet.get("layout") or {}
+        # layout wird NICHT mehr für Zeilenhöhen genutzt
 
         ws = wb.add_worksheet(name)
 
-        # Default: ALLES linksbündig (für normale Zellen)
+        # Default-Zellformat: linksbündig für alle Werte
         default_left = _fmt(wb, cache, align="left")
 
-        # 1) Spaltenbreiten NUR aus den Werten bestimmen
+        # 1) Spaltenbreiten nur aus Werten
         widths = _autosize_from_values_only(headers, data)
         for c, w in enumerate(widths):
             ws.set_column(c, c, w, default_left)
 
-        # 2) Header: vertikal drehen, wenn Headertext nicht in die **Wert-basierten** Breite passt
+        # 2) Header-Rotation, wenn Header länger als Wertbreite
         rotate_flags: List[bool] = []
         for c, h in enumerate(headers):
             hdr_len = _len_cell(h)
-            rotate = hdr_len > (widths[c] - 1.5)  # kleiner Puffer
-            rotate_flags.append(rotate)
+            rotate_flags.append(hdr_len > (widths[c] - 1.5))
 
-        # Headerhöhe: Basis 24pt; wenn irgendein Header rotiert → 56pt
-        header_height_pt = 84 if any(rotate_flags) else 24
+        # 3) Zeilenhöhen: einheitliche Datenhöhe; Headerhöhe abhängig von Rotation
+        ws.set_default_row(DATA_ROW_HEIGHT_PT)  # alle Datenzeilen gleich hoch
+        header_height_pt = HEADER_HEIGHT_ROTATED_PT if any(rotate_flags) else HEADER_HEIGHT_PT
         ws.set_row(0, header_height_pt)
 
-        # 3) Headerzellen schreiben (Farbe, Fett, Größe; ggf. Rotation 90°)
+        # 4) Header schreiben (Farben, Größe, Rotation)
         for c, h in enumerate(headers):
             bg = header_color_by_name.get(str(h))
             if rotate_flags[c]:
-                # vertikal, mittig (links macht hier wenig Sinn)
                 if bg:
                     fg = "#000000" if _rel_luma(bg) > 0.6 else "#FFFFFF"
                     fmt = _fmt(wb, cache, bg=bg, fg=fg, bold=True, align="center", font_size=12, rotation=90)
                 else:
                     fmt = _fmt(wb, cache, bold=True, align="center", font_size=12, rotation=90)
             else:
-                # normal, links, größerer Font
                 if bg:
                     fg = "#000000" if _rel_luma(bg) > 0.6 else "#FFFFFF"
                     fmt = _fmt(wb, cache, bg=bg, fg=fg, bold=True, align="left", font_size=14)
@@ -181,7 +176,7 @@ def build_excel(payload: dict) -> bytes:
         if headers:
             ws.autofilter(0, 0, 0, len(headers) - 1)
 
-        # 4) Daten (HEADER-Zeilen fett + bg, Inbetween '**' rot)
+        # 5) Daten schreiben (+ HEADER-Zeilen/“**” Logik)
         kommentar_idx = next((i for i, hh in enumerate(headers) if str(hh).lower() == "kommentar"), -1)
         fmt_header_row = _fmt(wb, cache, bg=header_rows_bg, fg="#000000", bold=True, align="left")
         fmt_inbetween  = _fmt(wb, cache, fg=inbetween_red, align="left")
@@ -194,24 +189,12 @@ def build_excel(payload: dict) -> bytes:
 
             for c, val in enumerate(row):
                 cell_fmt = fmt_header_row if is_header_row else None
-
-                # Inbetween "**" rot
                 if isinstance(val, str) and ("**" in val) and not is_header_row:
                     if cell_fmt is fmt_header_row:
                         cell_fmt = _fmt(wb, cache, bg=header_rows_bg, fg=inbetween_red, bold=True, align="left")
                     else:
                         cell_fmt = fmt_inbetween
-
                 ws.write(r, c, val, cell_fmt)
-
-        # 5) Zeilenhöhen (px → pt ~ px*0.75) aus Layout weiter anwenden
-        rowh = (layout.get("rowHeights") or {})
-        for rr, hpx in rowh.items():
-            try:
-                rr_int = int(rr)
-                ws.set_row(rr_int + 1, float(hpx) * 0.75)
-            except Exception:
-                pass
 
     wb.close()
     return mem.getvalue()
