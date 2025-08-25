@@ -1,3 +1,4 @@
+import React, { useMemo, useCallback } from "react";
 import { HotTable, HotTableClass } from "@handsontable/react";
 import "handsontable/dist/handsontable.full.min.css";
 import { registerAllModules } from "handsontable/registry";
@@ -34,17 +35,6 @@ interface TableGridProps {
   onStatusChange?: (s: { isFiltered: boolean; isSorted: boolean }) => void;
 }
 
-// Hilfsfunktion: Ist Kommentar-Spalte vorhanden & enthält sie "entfallen"?
-function isRowEntfallen(
-  data: (string | number)[][],
-  rowIdx: number,
-  kommentarIdx: number
-) {
-  if (kommentarIdx === -1) return false;
-  const val = String(data[rowIdx]?.[kommentarIdx] ?? "").toLowerCase();
-  return val.includes("entfallen");
-}
-
 function TableGrid({
   data,
   colHeaders,
@@ -66,10 +56,28 @@ function TableGrid({
   const rowIdIndex = colHeaders.indexOf("project_article_id");
   const kommentarIdx = colHeaders.indexOf("Kommentar");
 
-  // Header-Erkennung: Kommentar === "HEADER"
-  const isHeaderRow = (rowIdx: number) =>
-    kommentarIdx !== -1 &&
-    String(safeData[rowIdx]?.[kommentarIdx] ?? "") === "HEADER";
+  // Precompute Sets für schnelle O(1)-Checks
+  const headerRows = useMemo(() => {
+    if (kommentarIdx === -1) return new Set<number>();
+    const s = new Set<number>();
+    for (let i = 0; i < safeData.length; i++) {
+      if (String(safeData[i]?.[kommentarIdx] ?? "") === "HEADER") s.add(i);
+    }
+    return s;
+  }, [safeData, kommentarIdx]);
+
+  const entfallenRows = useMemo(() => {
+    if (kommentarIdx === -1) return new Set<number>();
+    const s = new Set<number>();
+    for (let i = 0; i < safeData.length; i++) {
+      const v = safeData[i]?.[kommentarIdx];
+      if (v != null && String(v).toLowerCase().includes("entfallen")) s.add(i);
+    }
+    return s;
+  }, [safeData, kommentarIdx]);
+
+  // Header-Erkennung über Set
+  const isHeaderRow = (rowIdx: number) => headerRows.has(rowIdx);
 
   // Prüfen, ob aktuelle Auswahl mindestens eine Header-Zeile enthält
   const selectionHasHeader = () => {
@@ -100,29 +108,33 @@ function TableGrid({
 
   const baseCellProps = useCellProperties(safeData, rowIdIndex, sheetName);
 
-  const getCellProps = (row: number, col: number) => {
-    const base = baseCellProps(row, col);
+  const getCellProps = useCallback(
+    (row: number, col: number) => {
+      const base = baseCellProps(row, col);
 
-    // Header-Zeilen komplett sperren
-    if (isHeaderRow(row)) {
-      return {
-        ...base,
-        readOnly: true,
-        editor: false,
-        className:
-          (base.className ? base.className + " " : "") + "het-header-row",
-      };
-    }
+      // Header-Zeilen komplett sperren
+      if (headerRows.has(row)) {
+        return {
+          ...base,
+          readOnly: true,
+          editor: false,
+          className:
+            (base.className ? base.className + " " : "") + "het-header-row",
+        } as Handsontable.CellProperties;
+      }
 
-    if (isRowEntfallen(safeData, row, kommentarIdx)) {
-      return {
-        ...base,
-        className:
-          (base.className ? base.className + " " : "") + "row-entfallen",
-      };
-    }
-    return base;
-  };
+      if (entfallenRows.has(row)) {
+        return {
+          ...base,
+          className:
+            (base.className ? base.className + " " : "") + "row-entfallen",
+        } as Handsontable.CellProperties;
+      }
+
+      return base as Handsontable.CellProperties;
+    },
+    [baseCellProps, headerRows, entfallenRows]
+  );
 
   const columnDefs = columnDefsRaw.map((def, index) => {
     const header = colHeaders[index];
