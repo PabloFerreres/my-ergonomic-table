@@ -31,7 +31,6 @@ interface TableGridProps {
   isBlocked?: boolean;
   onSelectionChange?: (cell: { row: number; col: number }) => void;
   selectedProject: Project;
-  /** NEU: sofortiger Status-Callback für Filter/Sort */
   onStatusChange?: (s: { isFiltered: boolean; isSorted: boolean }) => void;
 }
 
@@ -47,16 +46,18 @@ function TableGrid({
   selectedProject,
   onStatusChange,
 }: TableGridProps) {
-  // Workaround: Wenn data leer, aber colHeaders da → Dummy-Zeile anzeigen
-  const safeData =
-    Array.isArray(data) && data.length === 0 && colHeaders.length > 0
-      ? [colHeaders.map(() => "")]
-      : data;
+  // --- FIX 1: safeData stabilisieren (kein re-render noise, satisfies react-hooks/exhaustive-deps)
+  const colCount = colHeaders.length;
+  const safeData = useMemo<(string | number)[][]>(() => {
+    if (Array.isArray(data) && data.length === 0 && colCount > 0) {
+      return [Array(colCount).fill("") as (string | number)[]];
+    }
+    return data;
+  }, [data, colCount]);
 
   const rowIdIndex = colHeaders.indexOf("project_article_id");
   const kommentarIdx = colHeaders.indexOf("Kommentar");
 
-  // Precompute Sets für schnelle O(1)-Checks
   const headerRows = useMemo(() => {
     if (kommentarIdx === -1) return new Set<number>();
     const s = new Set<number>();
@@ -76,10 +77,8 @@ function TableGrid({
     return s;
   }, [safeData, kommentarIdx]);
 
-  // Header-Erkennung über Set
   const isHeaderRow = (rowIdx: number) => headerRows.has(rowIdx);
 
-  // Prüfen, ob aktuelle Auswahl mindestens eine Header-Zeile enthält
   const selectionHasHeader = () => {
     const hot = hotRef?.current?.hotInstance;
     if (!hot) return false;
@@ -95,11 +94,7 @@ function TableGrid({
     return false;
   };
 
-  // Dropdown-Inhalte laden (aus /api/dropdownOptions) und Columns damit anreichern
-  const { dropdowns /*, loading, error, reload*/ } = useDropdownOptions(
-    selectedProject.id,
-    colHeaders
-  );
+  const { dropdowns } = useDropdownOptions(selectedProject.id, colHeaders);
   const columnDefsRaw = useDropdownColumns(colHeaders, dropdowns);
   console.debug(
     "HOT columns",
@@ -112,7 +107,6 @@ function TableGrid({
     (row: number, col: number) => {
       const base = baseCellProps(row, col);
 
-      // Header-Zeilen komplett sperren
       if (headerRows.has(row)) {
         return {
           ...base,
@@ -172,11 +166,9 @@ function TableGrid({
   );
 
   const handleSelection = (row: number, col: number) => {
-    // Nur melden; Blockaden regeln wir über readOnly/beforeChange/ContextMenu
     onSelectionChange?.({ row, col });
   };
 
-  // NEU: einheitlich Status emittieren
   const emitStatus = () => {
     const hot = hotRef?.current?.hotInstance ?? null;
     const s = computeHotStatus(hot);
@@ -205,17 +197,15 @@ function TableGrid({
         stretchH="none"
         licenseKey="non-commercial-and-evaluation"
         afterSelection={handleSelection}
-        // Typ-sicherer Header-Block: Änderungen an Header-Zeilen verwerfen
         beforeChange={(changes) => {
-          if (!changes) return; // (changes: (CellChange|null)[])
+          if (!changes) return;
           for (let i = changes.length - 1; i >= 0; i--) {
             const change = changes[i];
             if (!change) continue;
-            const row = change[0] as number; // [row, prop, old, new]
+            const row = change[0] as number;
             if (isHeaderRow(row)) changes.splice(i, 1);
           }
         }}
-        // Kein Paste in Header
         beforePaste={(_data, coords) => {
           const r0 = coords?.[0]?.startRow;
           if (r0 != null && isHeaderRow(r0)) return false;
@@ -224,13 +214,15 @@ function TableGrid({
         afterFilter={() => {
           const hot = hotRef?.current?.hotInstance ?? null;
           if (!hot) return;
-          // Menü schließen, nachdem HOT fertig ist
           setTimeout(() => {
-            const dm: any = hot.getPlugin("dropdownMenu");
-            if (dm?.close) dm.close();
-            else if (dm?.menu?.close) dm.menu.close();
+            // --- FIX 2: kein 'any' – strukturell typisieren
+            const dm = hot.getPlugin("dropdownMenu") as unknown as {
+              close?: () => void;
+              menu?: { close?: () => void } | null;
+            } | null;
+            dm?.close?.();
+            dm?.menu?.close?.();
           }, 0);
-          // Status aus HOT lesen (nächster Tick, nach Commit)
           emitStatus();
         }}
         afterDropdownMenuHide={() => {
@@ -252,10 +244,8 @@ function TableGrid({
               callback: function () {
                 const hot = hotRef?.current?.hotInstance;
                 if (!hot || selectionHasHeader()) return;
-
                 const selected = hot.getSelectedLast();
                 if (!selected) return;
-
                 const row = selected[0];
                 hot.alter("insert_row_below", row, 5);
               },
