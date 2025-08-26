@@ -3,12 +3,17 @@ import asyncpg
 import asyncio
 import json
 from pathlib import Path
+
+from backend.SSE.event_bus import publish
 from backend.routes.layout_routes import router as layout_router
 from backend.routes.sheetnames_routes import router as sheetnames_router
-from backend.routes.baseviews_routes import router as baseviews_router 
+from backend.routes.baseviews_routes import router as baseviews_router
 from backend.utils.update_draft_articles import apply_edits_to_draft
 from backend.loading.create_materialized_tables import refresh_all_materialized
-from backend.loading.rematerialize_control import debounce_rematerialize
+from backend.loading.rematerialize_control import (
+    schedule_sheet_and_elektrik_rematerialize,
+    schedule_all_rematerialize,   # <-- wichtig
+)
 from backend.settings.connection_points import DB_URL, DEBUG, get_views_to_show
 from backend.routes.elektrik_routes import router as elektrik_router
 from backend.elektrik.create_materialized_elektrik import create_materialized_elektrik
@@ -18,9 +23,10 @@ from backend.routes.next_inserted_id import router as next_inserted_id
 from backend.routes.stair_hierarchy_routes import router as stair_router
 from backend.routes.dropdown_contents import router as dropdown_router
 from backend.routes.export_excel import router as export_excel_router
-
+from backend.routes.event_routes import router as sse_router
 
 router = APIRouter(prefix="/api")
+router.include_router(sse_router)
 router.include_router(dropdown_router)
 router.include_router(stair_router)
 router.include_router(next_inserted_id)
@@ -35,7 +41,7 @@ router.include_router(export_excel_router)
 HEADER_MAP = json.loads(Path("backend/utils/header_name_map.json").read_text(encoding="utf-8"))
 
 @router.post("/updateDraft/{draft_id}")
-async def update_draft(draft_id: str, request: Request, project_id):
+async def update_draft(draft_id: str, request: Request, project_id: int = Query(...)):
     payload = await request.json()
     conn = await asyncpg.connect(DB_URL)
 
@@ -65,49 +71,72 @@ async def update_draft(draft_id: str, request: Request, project_id):
         print(f"✅ DB gespeichert: id={draft_id}, edits={len(payload.get('edits', []))}, positions={len(payload.get('positions', []))}")
 
     # Nur Materialisierung für dynamische Projekt-Views!
-    views_to_show= get_views_to_show(project_id)
+    views_to_show = get_views_to_show(project_id)
     if DEBUG:
         print(f"[DEBUG] Refreshing materialized tables for views: {views_to_show}")
     refresh_all_materialized(project_id)
+
     await conn.close()
     return {"status": "saved", "id": draft_id, "sheets": len(payload.get("positions", []))}
+
 
 @router.post("/updatePosition")
 async def update_position(request: Request, project_id: int = Query(...)):
     payload = await request.json()
     conn = await asyncpg.connect(DB_URL)
 
+    any_elektrik = False
+    normal_sheets: set[str] = set()
+
     for sheet in payload:
         sheet_name = sheet.get("sheet")
         rows = sheet.get("rows", [])
         if not sheet_name:
             continue
+
         await conn.execute("""
             INSERT INTO position_meta (sheet_name, position_map, updated_at)
             VALUES ($1, $2::jsonb, now())
             ON CONFLICT (sheet_name)
             DO UPDATE SET position_map = EXCLUDED.position_map, updated_at = now()
         """, sheet_name, json.dumps(rows))
-        debounce_rematerialize(sheet_name, project_id)
+
+        if str(sheet_name).startswith("materialized_elektrik_"):
+            any_elektrik = True
+        else:
+            normal_sheets.add(sheet_name)
+
         if DEBUG:
             print(f"[DEBUG] Updated position_meta for sheet: {sheet_name}")
 
+    await conn.close()
+
+    # 🔔 genau EIN Remat-Trigger (keine Doppel-Events)
+    if any_elektrik:
+        schedule_all_rematerialize(project_id)  # Elektrik-Änderung ⇒ ALL (+Elektrik) ⇒ 1 Publish
+    else:
+        if len(normal_sheets) == 1:
+            schedule_sheet_and_elektrik_rematerialize(project_id, next(iter(normal_sheets)))
+        elif len(normal_sheets) > 1:
+            schedule_all_rematerialize(project_id)
+
     if DEBUG:
         print(f"✅ PositionMap gespeichert: {len(payload)} sheets")
-    await conn.close()
     return {"status": "positions_saved", "sheets": len(payload)}
 
+
 @router.post("/updateEdits")
-async def update_edits(request: Request):
+async def update_edits(request: Request, project_id: int = Query(...)):
     payload = await request.json()
     edits = payload.get("edits", [])
+    sheet_name = payload.get("sheet")  # kommt vom Frontend (sendEdits)
 
     if DEBUG:
-        print(f"📥 Eingehende Edits: {len(edits)}")
+        print(f"📥 Eingehende Edits: {len(edits)} auf Sheet={sheet_name}")
 
     conn = await asyncpg.connect(DB_URL)
     updated_count = 0
-    edits_by_row = {}
+    edits_by_row: dict[int, dict] = {}
 
     int_fields = {"project_article_id", "position", "article_id"}
 
@@ -138,14 +167,14 @@ async def update_edits(request: Request):
 
         if row_id < 0:
             mapped_updates = {}
-            for col, val in updates.items():
-                mapped_col = HEADER_MAP.get(col, col)
-                if mapped_col in int_fields:
-                    if val == '':
-                        val = None
+            for c, v in updates.items():
+                mc = HEADER_MAP.get(c, c)
+                if mc in int_fields:
+                    if v == '':
+                        v = None
                     else:
-                        val = int(val)
-                mapped_updates[mapped_col] = val
+                        v = int(v)
+                mapped_updates[mc] = v
 
             if row_id in existing_inserted_ids:
                 set_clause = ", ".join([f'"{col}" = ${i+1}' for i, col in enumerate(mapped_updates.keys())])
@@ -159,15 +188,12 @@ async def update_edits(request: Request):
                     print("✏️ UPDATE inserted_rows SQL:", sql)
                     print("✏️ VALUES:", values + [row_id])
                 await conn.execute(sql, *values, row_id)
-
             else:
                 columns = list(mapped_updates.keys())
                 values = list(mapped_updates.values())
-
                 if "project_article_id" not in columns:
                     columns.insert(0, "project_article_id")
                     values.insert(0, row_id)
-
                 placeholders = ", ".join([f"${i+1}" for i in range(len(columns))])
                 sql = f"""
                     INSERT INTO inserted_rows ({', '.join(f'"{c}"' for c in columns)})
@@ -179,20 +205,18 @@ async def update_edits(request: Request):
                 await conn.execute(sql, *values)
 
         else:
-            columns = []
-            values = []
-
-            for col in updates.keys():
-                mapped = HEADER_MAP.get(col)
-                if mapped:
-                    columns.append(mapped)
-                    val = updates[col]
-                    if mapped in int_fields:
-                        if val == '':
-                            val = None
+            columns, values = [], []
+            for c in updates.keys():
+                mc = HEADER_MAP.get(c)
+                if mc:
+                    columns.append(mc)
+                    v = updates[c]
+                    if mc in int_fields:
+                        if v == '':
+                            v = None
                         else:
-                            val = int(val)
-                    values.append(val)
+                            v = int(v)
+                    values.append(v)
 
             if not columns:
                 if DEBUG:
@@ -202,7 +226,6 @@ async def update_edits(request: Request):
             row = await conn.fetchrow(
                 "SELECT 1 FROM draft_project_articles WHERE project_article_id = $1", row_id
             )
-
             if row:
                 set_clause = ", ".join([f"{col} = ${i+1}" for i, col in enumerate(columns)])
                 sql = f"""
@@ -217,11 +240,9 @@ async def update_edits(request: Request):
             else:
                 insert_columns = list(columns)
                 insert_values = values
-
                 if "project_article_id" not in insert_columns:
                     insert_columns.insert(0, "project_article_id")
                     insert_values.insert(0, row_id)
-
                 placeholders = ", ".join([f"${i+1}" for i in range(len(insert_columns))])
                 sql = f"""
                     INSERT INTO draft_project_articles ({', '.join(insert_columns)})
@@ -235,8 +256,16 @@ async def update_edits(request: Request):
         updated_count += 1
 
     await conn.close()
+
+    # 🔔 EIN Remat-Trigger nach den DB-Writes:
+    if sheet_name and str(sheet_name).startswith("materialized_elektrik_"):
+        schedule_all_rematerialize(project_id)  # Elektrik-Edits ⇒ ALL (+Elektrik) ⇒ 1 Publish
+    elif sheet_name:
+        schedule_sheet_and_elektrik_rematerialize(project_id, sheet_name)  # Sheet+Elektrik ⇒ 1 Publish
+
     if DEBUG:
         print(f"✅ Edits gespeichert: {updated_count} Änderungen")
+
     return {
         "status": "ok",
         "count": updated_count,
@@ -245,12 +274,20 @@ async def update_edits(request: Request):
 
 
 @router.post("/rematerializeAll")
-async def rematerialize_all(project_id):
-    views_to_show= get_views_to_show(project_id)
+async def rematerialize_all(project_id: int = Query(...)):
+    views_to_show = get_views_to_show(project_id)
     if DEBUG:
         print(f"[DEBUG] Rematerializing all materialized tables for project views: {views_to_show}")
-    refresh_all_materialized(project_id)
-    create_materialized_elektrik(project_id)
+
+    # parallel in Worker-Threads (blockiert den Event-Loop nicht)
+    await asyncio.gather(
+        asyncio.to_thread(refresh_all_materialized, project_id),
+        asyncio.to_thread(create_materialized_elektrik, project_id),
+    )
+
+    # SSE-Event an alle Clients im Projekt
+    publish(project_id, {"type": "remat_done", "scope": "all", "project_id": project_id})
+
     log = "🔁 + ⚡️ All materialized tables refreshed"
     if DEBUG:
         print(log)
@@ -265,13 +302,10 @@ async def get_last_insert_id(request: Request):
             SELECT last_id FROM inserted_id_meta WHERE id = 1
         """)
         return {"lastId": row["last_id"] if row else -1}
-    
 
-    
 
 @router.post("/importOrUpdateArticles")
 async def import_or_update_articles(request: Request):
-    # Client sendet nur ausgewählte ROW-Indizes (Grid-Positionen, 0-basiert)
     data = await request.json()
     selection = data.get("selection", [])
     if not selection:
@@ -279,46 +313,32 @@ async def import_or_update_articles(request: Request):
 
     conn = await asyncpg.connect(DB_URL)
 
-    # Hole PositionMap aus DB und parse sie sauber!
-    meta = await conn.fetchrow(
-        "SELECT position_map FROM position_meta WHERE id = 429"
-    )
+    meta = await conn.fetchrow("SELECT position_map FROM position_meta WHERE id = 429")
     position_map_raw = meta["position_map"] if meta else "[]"
-    position_map = json.loads(position_map_raw)  # <<< parse als JSON
-
-    # Sortiere PositionMap nach position ASC
+    position_map = json.loads(position_map_raw)
     position_map.sort(key=lambda x: x["position"])
 
-    # Mappe Auswahl: Row-Index (0-basiert) → PositionMap.position (1-basiert)
     ids = [
         entry["project_article_id"]
         for idx, entry in enumerate(position_map)
         if idx in selection
     ]
-
     if not ids:
         await conn.close()
         return {"status": "no_ids"}
 
-    # Hole alle Inserted-Rows-Daten für die IDs
     rows = await conn.fetch(
         "SELECT * FROM inserted_rows WHERE project_article_id = ANY($1::int[])", ids
     )
 
-    # Hole last_import_article_id aus import_article_meta
-    meta = await conn.fetchrow(
-        "SELECT last_import_article_id FROM import_article_meta WHERE id = 1"
-    )
+    meta = await conn.fetchrow("SELECT last_import_article_id FROM import_article_meta WHERE id = 1")
     last_import_id = meta["last_import_article_id"] if meta else -1
 
-    # Hole gültige Spalten + Typen aus articles
-    article_cols_result = await conn.fetch(
-        """
+    article_cols_result = await conn.fetch("""
         SELECT column_name, data_type
         FROM information_schema.columns
         WHERE table_name = 'articles'
-        """
-    )
+    """)
     article_columns = {r["column_name"]: r["data_type"] for r in article_cols_result}
 
     new_id = last_import_id
@@ -341,10 +361,8 @@ async def import_or_update_articles(request: Request):
 
         if not article_id:
             new_id -= 1
-
             cols = []
             vals = []
-
             for k, v in inserted.items():
                 if k in article_columns and k != "id":
                     if v == "":
@@ -357,31 +375,23 @@ async def import_or_update_articles(request: Request):
 
             cols.insert(0, "id")
             vals.insert(0, new_id)
-
             placeholders = [f"${i+1}" for i in range(len(vals))]
-
             sql = f"""
                 INSERT INTO articles ({', '.join(cols)})
                 VALUES ({', '.join(placeholders)})
             """
             await conn.execute(sql, *vals)
-
-            await conn.execute(
-                """
+            await conn.execute("""
                 UPDATE inserted_rows
                 SET article_id = $1
                 WHERE project_article_id = $2
-                """,
-                new_id, project_article_id
-            )
-
+            """, new_id, project_article_id)
             print(f"➕ Inserted new article {new_id}")
             inserted_count += 1
 
         elif article_id < 0:
             cols = []
             vals = []
-
             for k, v in inserted.items():
                 if k in article_columns and k != "id":
                     if v == "":
@@ -400,7 +410,6 @@ async def import_or_update_articles(request: Request):
                 """
                 vals.append(int(article_id))
                 await conn.execute(sql, *vals)
-
                 print(f"✏️ Updated article {article_id}")
                 updated_count += 1
             else:
@@ -410,14 +419,11 @@ async def import_or_update_articles(request: Request):
             print(f"✔️ Skipped: article_id = {article_id}")
             skipped_count += 1
 
-    await conn.execute(
-        """
+    await conn.execute("""
         UPDATE import_article_meta
         SET last_import_article_id = $1
         WHERE id = 1
-        """,
-        new_id
-    )
+    """, new_id)
 
     logs = []
     if inserted_count > 0:
@@ -434,6 +440,3 @@ async def import_or_update_articles(request: Request):
         "new_last_id": new_id,
         "log": logs
     }
-
-
-

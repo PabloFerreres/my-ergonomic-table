@@ -1,10 +1,9 @@
 import type { EditEntry } from "../editierung/EditMap";
 import { getLastUsedInsertedId } from "../editierung/EditMap";
 import { uiConsole } from "../utils/uiConsole";
-import config from '../../../config.json'; // Pfad ggf. anpassen!
+import config from "../../../config.json";
 
 const API_PREFIX = config.BACKEND_URL;
-
 
 export async function fetchDropdownOptions(
   projectId: number,
@@ -17,25 +16,42 @@ export async function fetchDropdownOptions(
   return res.json();
 }
 
-export async function sendEdits(sheet: string, edits: EditEntry[], project_id: number) {
+export async function sendEdits(
+  sheet: string,
+  edits: EditEntry[],
+  project_id: number
+) {
   try {
+    if (!edits || edits.length === 0) {
+      return { status: "ok", count: 0, log: "⚪️ keine Edits" };
+    }
+
     const payload = {
+      sheet, // <<< wichtig für Backend-Entscheidung (SSE/Remat)
       edits,
       lastUsedInsertedId: getLastUsedInsertedId(),
     };
 
-    const res = await fetch(`${API_PREFIX}/api/updateEdits?project_id=${project_id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const res = await fetch(
+      `${API_PREFIX}/api/updateEdits?project_id=${project_id}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    );
 
-    if (!res.ok) throw new Error(`Server error`);
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
     const result = await res.json();
-    const msg = result.log || `✅ Edits gespeichert (${result.count}) für Sheet: ${sheet}`;
+    const msg =
+      result?.log ||
+      `✅ Edits gespeichert (${result?.count ?? edits.length}) für Sheet: ${sheet}`;
     uiConsole(msg);
+    return result;
   } catch (err) {
     console.error("❌ Failed to sync edits:", err);
+    uiConsole("❌ Edits sync fehlgeschlagen");
+    return { status: "error", error: String(err) };
   }
 }
 
@@ -46,20 +62,24 @@ export async function sendPositionMap(
 ) {
   try {
     const payload = [{ sheet, rows }];
-    const res = await fetch(`${API_PREFIX}/api/updatePosition?project_id=${project_id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const res = await fetch(
+      `${API_PREFIX}/api/updatePosition?project_id=${project_id}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    );
     if (!res.ok) throw new Error("Server error");
     console.log("✅ PositionMap sent");
+    return await res.json().catch(() => ({ status: "ok" }));
   } catch (err) {
     console.error("❌ Failed to sync positionMap:", err);
+    return { status: "error", error: String(err) };
   }
 }
 
 // ---- NEU: Sheet anlegen API ----
-
 /**
  * Legt ein neues Sheet an (inkl. Materialized etc.)
  * @returns { success: boolean, view_id?: number, sheet_name?: string, error?: string }
@@ -89,9 +109,6 @@ export async function createSheetApiCall({
     return { success: false, error: String(err) };
   }
 }
-
-
-// utils/apiSync.ts
 
 export async function fetchNextInsertedId() {
   const res = await fetch(`${API_PREFIX}/api/next_inserted_id`);

@@ -22,6 +22,7 @@ import type { Project } from "./SesionParameters";
 import { createSheetApiCall } from "../utils/apiSync";
 import StairHierarchyEditor from "../windows/StairHierarchyEditor";
 import { softAktualisierenSheets } from "../../appButtonFunctions/SoftAktualisierenSheets";
+import { initSSERefresh } from "../utils/sse";
 import config from "../../../config.json";
 import ExportExcelButton from "../../appButtonFunctions/ExportExcelButton";
 
@@ -59,6 +60,8 @@ function App() {
     Record<string, HotStatus>
   >({});
 
+  const projectId = selectedProject?.id ?? undefined;
+
   const getStatus = (sheet?: string | null): HotStatus =>
     gridStatusBySheet[sheet ?? ""] ?? { isFiltered: false, isSorted: false };
 
@@ -91,6 +94,25 @@ function App() {
         .catch(() => setBaseViews([]));
     }
   }, [showSheetMenu, selectedProject]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    const stop = initSSERefresh({
+      projectId,
+      apiPrefix: API_PREFIX,
+      sheetNames,
+      triggerLayoutCalculation, // bleibt im Call
+      setSheets,
+      hotRefs,
+      clearEdits, // bleibt im Call
+    });
+    return stop;
+  }, [
+    projectId,
+    sheetNames,
+    setSheets,
+    hotRefs, // ref-Objekt ist stabil; ok im Array, kann aber auch raus
+  ]);
 
   useEffect(() => {
     const handler = (entry: { text: string; time: string }) => {
