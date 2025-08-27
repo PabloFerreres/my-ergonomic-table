@@ -451,7 +451,9 @@ function App() {
                   .then((res) => res.json())
                   .then(async (names) => {
                     setSheetNames(names);
-                    const newSheetName = names.at(-1) ?? null;
+                    const newSheetName = names.length
+                      ? names[names.length - 1]
+                      : null;
                     setActiveSheet(newSheetName);
                     if (newSheetName) {
                       const tableRes = await fetch(

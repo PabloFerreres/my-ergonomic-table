@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Request, Query
 import asyncpg
-import asyncio
+import asyncio,sqlalchemy
 import json
 from pathlib import Path
+
 
 from backend.SSE.event_bus import publish
 from backend.routes.layout_routes import router as layout_router
@@ -279,11 +280,32 @@ async def rematerialize_all(project_id: int = Query(...)):
     if DEBUG:
         print(f"[DEBUG] Rematerializing all materialized tables for project views: {views_to_show}")
 
-    # parallel in Worker-Threads (blockiert den Event-Loop nicht)
-    await asyncio.gather(
-        asyncio.to_thread(refresh_all_materialized, project_id),
-        asyncio.to_thread(create_materialized_elektrik, project_id),
+    engine = sqlalchemy.create_engine(DB_URL)
+
+    # Suffix holen
+    with engine.connect() as conn:
+        suffix = conn.execute(
+            sqlalchemy.text(
+                "SELECT project_materialized_name FROM projects WHERE id = :id"
+            ),
+            {"id": project_id},
+        ).scalar_one()
+
+    # Existierende materialized_*_{suffix} einsammeln
+    insp = sqlalchemy.inspect(engine)
+    existing = set(
+        t for t in insp.get_table_names(schema="public")
+        if t.startswith("materialized_") and t.endswith(f"_{suffix}")
     )
+
+    # Nur wenn ELEKTRIK bereits existiert, darf der Elektrik-Rebuilder laufen
+    has_elektrik = f"materialized_elektrik_{suffix}" in existing
+
+    # parallel in Worker-Threads (Event-Loop bleibt frei)
+    tasks = [asyncio.to_thread(refresh_all_materialized, project_id)]
+    if has_elektrik:
+        tasks.append(asyncio.to_thread(create_materialized_elektrik, project_id))
+    await asyncio.gather(*tasks)
 
     # SSE-Event an alle Clients im Projekt
     publish(project_id, {"type": "remat_done", "scope": "all", "project_id": project_id})
@@ -291,7 +313,7 @@ async def rematerialize_all(project_id: int = Query(...)):
     log = "🔁 + ⚡️ All materialized tables refreshed"
     if DEBUG:
         print(log)
-    return {"status": "all_rematerialized", "log": log}
+    return {"status": "all_rematerialized", "log": log, "elektrik_refreshed": has_elektrik}
 
 
 @router.get("/last_insert_id")
