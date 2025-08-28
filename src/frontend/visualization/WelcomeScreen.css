@@ -1,0 +1,101 @@
+/* Canvas */
+.wel-root{
+  min-height:100vh;
+  background:#262626;
+  color:#fff;
+  display:flex;
+  flex-direction:column;
+}
+.center{display:flex;align-items:center;justify-content:center}
+
+/* Title (links oben) */
+.wel-title{
+  margin:72px 0 24px 74px;
+  font-size:28px;
+  font-weight:600;
+}
+
+/* Karte mittig */
+.wel-card{
+  width:min(695px,92vw);
+  margin:0 auto 32px;
+  background:#3B3B3B;
+  border-radius:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);
+  overflow:hidden;
+}
+
+/* Hero-Bild aus public */
+.wel-hero{
+  width:100%;
+  aspect-ratio:695/391;
+  background:url("/1234.png") center/cover no-repeat;
+}
+
+/* Body: links Liste, rechts Aktionen (wie im Figma-Frame) */
+.wel-body{
+  padding:24px 28px 28px;
+  display:grid;
+  grid-template-columns: 260px 1fr; /* links schmaler Bereich (~schwarzes Quadrat) */
+  gap:24px;
+  align-items:start;
+}
+
+/* Linke Seite */
+.wel-label{color:#cfd6dc;font-size:13px;margin-bottom:8px}
+.wel-projects{
+  height:255px;
+  background:#262626;
+  border:1px solid #d9d9d9;
+  border-radius:8px;
+  overflow:auto;
+  padding:4px;
+}
+.wel-item{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:6px; padding:8px; border-radius:6px; cursor:pointer;
+}
+.wel-item:hover{background:#2e2e2e}
+.wel-item.is-active{background:#2f4a63}
+.wel-name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px}
+.wel-row{display:flex; gap:8px; flex-wrap:wrap}
+.wel-err{color:#ff8a8a; font-size:12px; margin-top:8px}
+
+/* Rechte Seite (Buttons / Erstellen) */
+.wel-actions{display:flex; flex-direction:column; gap:10px; align-items:flex-start}
+.wel-create{display:flex; flex-direction:column; gap:8px; width:220px}
+.wel-create-row{display:flex; gap:8px}
+
+/* Controls */
+.wel-btn{appearance:none; border:none; border-radius:8px; padding:10px 14px; font-weight:600; cursor:pointer}
+.wel-btn--primary{background:#67BCF0; color:#fff}
+.wel-btn--muted{background:#444; color:#fff}
+.wel-btn--danger{background:#b00020; color:#fff}
+.wel-btn--xs{padding:4px 8px; font-size:11px}
+.wel-btn--sm{padding:6px 10px; font-size:12px}
+.wel-btn[disabled]{opacity:.6; cursor:not-allowed}
+
+.wel-input{
+  width:100%;
+  padding:9px 10px;
+  border-radius:8px;
+  border:1px solid #555;
+  background:#111;
+  color:#fff;
+  font-size:13px;
+  outline:none;
+}
+.wel-input:focus{border-color:#67BCF0; box-shadow:0 0 0 3px rgba(103,188,240,.25)}
+
+/* Brand rechts unten */
+.wel-brand{
+  position:fixed; right:32px; bottom:24px;
+  opacity:.85; font-weight:600;
+}
+
+/* kleine Responsiveness */
+@media (max-width: 840px){
+  .wel-body{grid-template-columns:1fr}
+  .wel-actions{align-items:stretch}
+  .wel-create{width:100%}
+}

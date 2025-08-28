@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import type { Project } from "./SesionParameters";
 import { createSheetApiCall } from "../utils/apiSync";
 import config from "../../../config.json";
+import "./WelcomeScreen.css";
+
 const API_PREFIX = config.BACKEND_URL;
 
 export default function WelcomeScreen({
@@ -19,10 +21,11 @@ export default function WelcomeScreen({
     []
   );
   const [baseViewId, setBaseViewId] = useState<number | null>(null);
+
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // NEU: Soft-Delete Bestätigung
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -42,12 +45,7 @@ export default function WelcomeScreen({
       .catch(() => setBaseViews([]));
   }, [creating]);
 
-  // --- Helper: warte bis sheetnames > 0 (Polling, kurz & weich) ---
-  async function waitForSheets(
-    projectId: number,
-    tries = 20,
-    delayMs = 250
-  ): Promise<string[]> {
+  async function waitForSheets(projectId: number, tries = 20, delayMs = 250) {
     for (let i = 0; i < tries; i++) {
       try {
         const names: string[] = await fetch(
@@ -60,7 +58,6 @@ export default function WelcomeScreen({
     return [];
   }
 
-  // Öffnen bestehendes Projekt: rematerializeAll -> warten -> öffnen
   async function openProject(proj: Project) {
     try {
       setBusy(true);
@@ -74,7 +71,6 @@ export default function WelcomeScreen({
     }
   }
 
-  // NEU: Soft-Delete (zweite Bestätigung)
   async function softDelete(projectId: number) {
     setBusy(true);
     setErr(null);
@@ -89,13 +85,13 @@ export default function WelcomeScreen({
         return;
       }
       setProjects((p) => p.filter((x) => x.id !== projectId));
+      if (selectedId === projectId) setSelectedId(null);
       setConfirmingId(null);
     } finally {
       setBusy(false);
     }
   }
 
-  // Neues Projekt + erstes Sheet anlegen, rematerialisieren, warten, öffnen
   async function handleCreate() {
     const pn = projName.trim();
     const sn = sheetName.trim();
@@ -104,7 +100,6 @@ export default function WelcomeScreen({
     setBusy(true);
     setErr(null);
     try {
-      // 1) Projekt
       const res = await fetch(`${API_PREFIX}/api/projects`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -116,7 +111,6 @@ export default function WelcomeScreen({
         return;
       }
 
-      // 2) Erstes Sheet
       const result = await createSheetApiCall({
         display_name: sn,
         base_view_id: baseViewId,
@@ -127,13 +121,11 @@ export default function WelcomeScreen({
         return;
       }
 
-      // 3) Rematerialisieren + warten
       await fetch(`${API_PREFIX}/api/rematerializeAll?project_id=${proj.id}`, {
         method: "POST",
       }).catch(() => null);
       await waitForSheets(proj.id);
 
-      // 4) Öffnen
       setProjects((p) =>
         [...p, proj].sort((a, b) => a.name.localeCompare(b.name))
       );
@@ -148,201 +140,161 @@ export default function WelcomeScreen({
     }
   }
 
-  if (loading) return <div style={{ color: "#fff" }}>Lade Projekte…</div>;
+  if (loading) return <div className="wel-root center">Lade Projekte…</div>;
 
-  const btn = {
-    padding: "1em 2em",
-    fontSize: "1.1em",
-    borderRadius: 8,
-    border: "none",
-    background: "#2170c4",
-    color: "#fff",
-    cursor: "pointer",
-  } as const;
+  const selectedProject = selectedId
+    ? projects.find((p) => p.id === selectedId) || null
+    : null;
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "100vh",
-        background: "#222",
-        color: "#fff",
-        gap: 16,
-      }}
-    >
-      <h1>Welcome!</h1>
-      <p>Wähle ein Projekt:</p>
+    <div className="wel-root">
+      <h1 className="wel-title">Welcome!</h1>
 
-      <div
-        style={{
-          display: "flex",
-          gap: 12,
-          alignItems: "center",
-          flexWrap: "wrap",
-          justifyContent: "center",
-        }}
-      >
-        {!creating ? (
-          <button style={btn} onClick={() => setCreating(true)} disabled={busy}>
-            ➕ Neues Projekt
-          </button>
-        ) : (
-          <>
-            <input
-              placeholder="Projektname"
-              value={projName}
-              onChange={(e) => setProjName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-              autoFocus
-              style={{
-                padding: "0.8em 1em",
-                borderRadius: 8,
-                border: "1px solid #555",
-                background: "#111",
-                color: "#fff",
-              }}
-            />
-            <input
-              placeholder="Erstes Sheet (Anzeige)"
-              value={sheetName}
-              onChange={(e) => setSheetName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-              style={{
-                padding: "0.8em 1em",
-                borderRadius: 8,
-                border: "1px solid #555",
-                background: "#111",
-                color: "#fff",
-              }}
-            />
-            <select
-              value={baseViewId ?? ""}
-              onChange={(e) =>
-                setBaseViewId(
-                  e.target.value === "" ? null : Number(e.target.value)
-                )
-              }
-              style={{
-                padding: "0.8em 1em",
-                borderRadius: 8,
-                border: "1px solid #555",
-                background: "#111",
-                color: "#fff",
-              }}
-            >
-              <option value="" disabled>
-                — Typ wählen —
-              </option>
-              {baseViews.map((bv) => (
-                <option key={bv.id} value={bv.id}>
-                  {bv.name}
-                </option>
+      <div className="wel-card">
+        <div className="wel-hero" />
+
+        <div className="wel-body">
+          {/* Linke Spalte: schwarzes Quadrat (Projektliste) */}
+          <div className="wel-left">
+            <div className="wel-label">Project:</div>
+            <div className="wel-projects">
+              {projects.map((p) => (
+                <div
+                  key={p.id}
+                  className={`wel-item ${
+                    selectedId === p.id ? "is-active" : ""
+                  }`}
+                  onClick={() => {
+                    setSelectedId(p.id);
+                    setConfirmingId(null);
+                  }}
+                  title={p.name}
+                >
+                  <span className="wel-name">{p.name}</span>
+                  <button
+                    className="wel-btn wel-btn--muted wel-btn--xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmingId(p.id);
+                    }}
+                    disabled={busy}
+                  >
+                    Löschen
+                  </button>
+                </div>
               ))}
-            </select>
+            </div>
 
-            <button
-              style={{
-                ...btn,
-                opacity:
-                  projName.trim() && sheetName.trim() && baseViewId != null
-                    ? 1
-                    : 0.6,
-                cursor:
-                  projName.trim() && sheetName.trim() && baseViewId != null
-                    ? "pointer"
-                    : "not-allowed",
-              }}
-              disabled={
-                !projName.trim() ||
-                !sheetName.trim() ||
-                baseViewId == null ||
-                busy
-              }
-              onClick={handleCreate}
-            >
-              {busy ? "Anlegen…" : "Projekt erstellen"}
-            </button>
-            <button
-              style={{ ...btn, background: "#444" }}
-              onClick={() => {
-                setCreating(false);
-                setErr(null);
-                setProjName("");
-                setSheetName("");
-                setBaseViewId(null);
-                setConfirmingId(null);
-              }}
-            >
-              Abbrechen
-            </button>
-          </>
-        )}
-      </div>
-
-      {err && <div style={{ color: "#ff8a8a" }}>{err}</div>}
-
-      <div
-        style={{
-          display: "flex",
-          gap: 12,
-          flexDirection: "column",
-          flexWrap: "nowrap",
-          justifyContent: "center",
-        }}
-      >
-        {projects.map((p) => (
-          <div
-            key={p.id}
-            style={{
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <button
-              style={btn}
-              onClick={() => openProject(p)}
-              disabled={busy}
-              title="Projekt öffnen"
-            >
-              {p.name}
-            </button>
-
-            {confirmingId === p.id ? (
-              <>
+            {confirmingId && (
+              <div className="wel-row" style={{ marginTop: 8 }}>
                 <button
-                  style={{ ...btn, background: "#b00020" }}
-                  onClick={() => softDelete(p.id)}
+                  className="wel-btn wel-btn--danger wel-btn--sm"
+                  onClick={() => softDelete(confirmingId)}
                   disabled={busy}
-                  title="Endgültig als gelöscht markieren (Soft-Delete)"
                 >
                   Wirklich löschen
                 </button>
                 <button
-                  style={{ ...btn, background: "#444" }}
+                  className="wel-btn wel-btn--muted wel-btn--sm"
                   onClick={() => setConfirmingId(null)}
                   disabled={busy}
                 >
                   Abbrechen
                 </button>
-              </>
-            ) : (
+              </div>
+            )}
+
+            {err && <div className="wel-err">{err}</div>}
+          </div>
+
+          {/* Rechte Spalte: Open + Create */}
+          <div className="wel-actions">
+            <button
+              className="wel-btn wel-btn--primary"
+              onClick={() => selectedProject && openProject(selectedProject)}
+              disabled={!selectedProject || busy}
+            >
+              Open Project
+            </button>
+
+            {!creating ? (
               <button
-                style={{ ...btn, background: "#7a2c2c" }}
-                onClick={() => setConfirmingId(p.id)}
+                className="wel-btn wel-btn--muted"
+                onClick={() => setCreating(true)}
                 disabled={busy}
-                title="Löschen (Soft-Delete) – zweite Bestätigung nötig"
               >
-                Löschen
+                ➕ Neues Projekt
               </button>
+            ) : (
+              <div className="wel-create">
+                <input
+                  className="wel-input"
+                  placeholder="Projektname"
+                  value={projName}
+                  onChange={(e) => setProjName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                  autoFocus
+                />
+                <input
+                  className="wel-input"
+                  placeholder="Erstes Sheet (Anzeige)"
+                  value={sheetName}
+                  onChange={(e) => setSheetName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                />
+                <select
+                  className="wel-input"
+                  value={baseViewId ?? ""}
+                  onChange={(e) =>
+                    setBaseViewId(
+                      e.target.value === "" ? null : Number(e.target.value)
+                    )
+                  }
+                >
+                  <option value="" disabled>
+                    — Typ wählen —
+                  </option>
+                  {baseViews.map((bv) => (
+                    <option key={bv.id} value={bv.id}>
+                      {bv.name}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="wel-create-row">
+                  <button
+                    className="wel-btn wel-btn--primary"
+                    onClick={handleCreate}
+                    disabled={
+                      !projName.trim() ||
+                      !sheetName.trim() ||
+                      baseViewId == null ||
+                      busy
+                    }
+                  >
+                    {busy ? "Anlegen…" : "Projekt erstellen"}
+                  </button>
+                  <button
+                    className="wel-btn wel-btn--muted"
+                    onClick={() => {
+                      setCreating(false);
+                      setErr(null);
+                      setProjName("");
+                      setSheetName("");
+                      setBaseViewId(null);
+                    }}
+                    disabled={busy}
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
             )}
           </div>
-        ))}
+        </div>
       </div>
+
+      <div className="wel-brand">Visto&Listo</div>
     </div>
   );
 }
