@@ -46,7 +46,7 @@ function TableGrid({
   selectedProject,
   onStatusChange,
 }: TableGridProps) {
-  // --- FIX 1: safeData stabilisieren (kein re-render noise, satisfies react-hooks/exhaustive-deps)
+  // Stabilisiertes safeData
   const colCount = colHeaders.length;
   const safeData = useMemo<(string | number)[][]>(() => {
     if (Array.isArray(data) && data.length === 0 && colCount > 0) {
@@ -56,43 +56,6 @@ function TableGrid({
   }, [data, colCount]);
 
   const rowIdIndex = colHeaders.indexOf("project_article_id");
-  const kommentarIdx = colHeaders.indexOf("Kommentar");
-
-  const headerRows = useMemo(() => {
-    if (kommentarIdx === -1) return new Set<number>();
-    const s = new Set<number>();
-    for (let i = 0; i < safeData.length; i++) {
-      if (String(safeData[i]?.[kommentarIdx] ?? "") === "HEADER") s.add(i);
-    }
-    return s;
-  }, [safeData, kommentarIdx]);
-
-  const entfallenRows = useMemo(() => {
-    if (kommentarIdx === -1) return new Set<number>();
-    const s = new Set<number>();
-    for (let i = 0; i < safeData.length; i++) {
-      const v = safeData[i]?.[kommentarIdx];
-      if (v != null && String(v).toLowerCase().includes("entfallen")) s.add(i);
-    }
-    return s;
-  }, [safeData, kommentarIdx]);
-
-  const isHeaderRow = (rowIdx: number) => headerRows.has(rowIdx);
-
-  const selectionHasHeader = () => {
-    const hot = hotRef?.current?.hotInstance;
-    if (!hot) return false;
-    const sel = hot.getSelected();
-    if (!sel) return false;
-    for (const [r1, , r2] of sel) {
-      const from = Math.min(r1, r2);
-      const to = Math.max(r1, r2);
-      for (let r = from; r <= to; r++) {
-        if (isHeaderRow(r)) return true;
-      }
-    }
-    return false;
-  };
 
   const { dropdowns } = useDropdownOptions(selectedProject.id, colHeaders);
   const columnDefsRaw = useDropdownColumns(colHeaders, dropdowns);
@@ -103,31 +66,12 @@ function TableGrid({
 
   const baseCellProps = useCellProperties(safeData, rowIdIndex, sheetName);
 
+  // Keine ReadOnly-Entscheidung mehr hier – das macht der WrappedTraitsRenderer
   const getCellProps = useCallback(
     (row: number, col: number) => {
-      const base = baseCellProps(row, col);
-
-      if (headerRows.has(row)) {
-        return {
-          ...base,
-          readOnly: true,
-          editor: false,
-          className:
-            (base.className ? base.className + " " : "") + "het-header-row",
-        } as Handsontable.CellProperties;
-      }
-
-      if (entfallenRows.has(row)) {
-        return {
-          ...base,
-          className:
-            (base.className ? base.className + " " : "") + "row-entfallen",
-        } as Handsontable.CellProperties;
-      }
-
-      return base as Handsontable.CellProperties;
+      return baseCellProps(row, col) as Handsontable.CellProperties;
     },
-    [baseCellProps, headerRows, entfallenRows]
+    [baseCellProps]
   );
 
   const columnDefs = columnDefsRaw.map((def, index) => {
@@ -175,6 +119,24 @@ function TableGrid({
     onStatusChange?.(s);
   };
 
+  // Auswahl enthält Header-Zeilen? → prüfe Row-Meta (readOnly) auf irgendeiner Spalte (z. B. 0)
+  const selectionHasHeader = () => {
+    const hot = hotRef?.current?.hotInstance;
+    if (!hot) return false;
+    const sel = hot.getSelected();
+    if (!sel) return false;
+
+    for (const [r1, , r2] of sel) {
+      const from = Math.min(r1, r2);
+      const to = Math.max(r1, r2);
+      for (let r = from; r <= to; r++) {
+        const meta = hot.getCellMeta(r, 0);
+        if (meta.readOnly === true) return true;
+      }
+    }
+    return false;
+  };
+
   return (
     <div style={{ height: "100%" }}>
       <HotTable
@@ -197,25 +159,12 @@ function TableGrid({
         stretchH="none"
         licenseKey="non-commercial-and-evaluation"
         afterSelection={handleSelection}
-        beforeChange={(changes) => {
-          if (!changes) return;
-          for (let i = changes.length - 1; i >= 0; i--) {
-            const change = changes[i];
-            if (!change) continue;
-            const row = change[0] as number;
-            if (isHeaderRow(row)) changes.splice(i, 1);
-          }
-        }}
-        beforePaste={(_data, coords) => {
-          const r0 = coords?.[0]?.startRow;
-          if (r0 != null && isHeaderRow(r0)) return false;
-        }}
+        // Keine beforeChange/beforePaste-Header-Blocker mehr – wird durch readOnly-Meta abgefangen
         afterGetColHeader={(col, TH) => afterGetColHeader(col, TH, colHeaders)}
         afterFilter={() => {
           const hot = hotRef?.current?.hotInstance ?? null;
           if (!hot) return;
           setTimeout(() => {
-            // --- FIX 2: kein 'any' – strukturell typisieren
             const dm = hot.getPlugin("dropdownMenu") as unknown as {
               close?: () => void;
               menu?: { close?: () => void } | null;
