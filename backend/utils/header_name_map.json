@@ -30,7 +30,7 @@
   "Spannung / V": "spannung_v",
   "Strom / A": "strom_a",
   "Leistung / kW": "leistung_kw",
-  "Geschwindigkeit / rpm": "geschwindigkeit_rpm",
+  "Geschwindigkeit / rpm //Steuerung": "geschwindigkeit_rpm_steuerung",
   "Stecker": "stecker",
   "SPS 1-Band 2-Behandlung 3-Kunde": "sps_1band_2behandlung_3kunde",
   "Elektr. Daten": "elektr_daten",
@@ -64,5 +64,18 @@
   "Bauteil-ID": "bauteil_id",
   "Kommentar zur Äanderung": "kommentar_zur_aenderung",
   "Änderungsindex": "aenderungsindex",
-  "REVISION": "revision"
+  "REVISION": "revision",
+  "Wirkungsgrad": "wirkungsgrad",
+  "Getriebe": "getriebe",
+  "Nenndrehmoment / Nm": "nenndreahmoment_nm",
+  "Ventilator": "ventilator",
+  "Encoder": "encoder",
+  "Antriebs-CLIQ": "antriebs_cliq",
+  "Bremse": "bremse",
+  "Motorschutz": "motorschutz",
+  " Not-Aus / PLd": "not_aus_pld",
+  "Notleistung": "notlesitung",
+  "Leistung Not": "leistung_not",
+  "Freigegeben": "freigegeben"
+
 }
