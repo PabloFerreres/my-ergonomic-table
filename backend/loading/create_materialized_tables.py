@@ -28,6 +28,12 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
     conn = psycopg2.connect(DB_URL)
     cursor = conn.cursor()
 
+    # 0) Index für schnellen Lookup (id ohne Cast nutzbar)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_me_pid_id
+        ON materialized_einbauorte(project_id, id);
+    """)
+
     table_name = get_materialized_table_name(cursor, project_id, view_id)
     if not table_name:
         if DEBUG:
@@ -100,11 +106,10 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
     col_exprs.append("(pd.data->>'project_article_id')::int AS project_article_id")
     output_cols.append("project_article_id")
 
-    # Display-Namen merken
     kommentar_display = layout_name_map.get("kommentar", "Kommentar")
     einbauort_display = layout_name_map.get("einbauort", "Einbauort")
 
-    # Einbauort-ID-Expr (als Text) für Gruppenerkennung (Header-Einfügen)
+    # Einbauort-ID-Expr (als TEXT) für Gruppenerkennung (Header)
     einbauort_id_text_expr = None
 
     for layout_col, materialized_col in layout_name_map.items():
@@ -136,7 +141,7 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
         coalesce_inserted_ai = f"COALESCE({inserted_expr}, {ai_expr})"
 
         if layout_col == "einbauort":
-            # TEXT-Varianten für ID (als Text) aufbereiten
+            # TEXT-Varianten für ID (als Text), später rechts gecastet -> indexfreundlich
             to_txt_layout   = f"NULLIF(TRIM(({layout_expr})::text), '')"
             to_txt_inserted = f"NULLIF(TRIM(({inserted_expr})::text), '')"
             to_txt_coalesce = f"NULLIF(TRIM(({coalesce_inserted_ai})::text), '')"
@@ -153,16 +158,15 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
                 END
             """.strip()
 
-            # Merken für Gruppierung
             einbauort_id_text_expr = id_text_expr
 
-            # sichtbarer Wert = full_name
+            # sichtbarer Wert = full_name; ACHTUNG: id nicht casten, rechte Seite casten!
             expr = f"""
                 (
                     SELECT me.full_name
                     FROM materialized_einbauorte me
                     WHERE me.project_id = {project_id}
-                      AND me.id::text = {id_text_expr}
+                      AND me.id = ({id_text_expr})::int
                 ) AS "{materialized_col}"
             """.strip()
         else:
@@ -232,7 +236,7 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
             LEFT JOIN inserted_rows ins ON ins.project_article_id = (pd.data->>'project_article_id')::int
             LEFT JOIN articles ai ON ins.article_id = ai.id
         ),
-        -- NEU: carry des Einbauorts über leere Zeilen
+        -- carry des Einbauorts über leere Zeilen
         ff AS (
             SELECT
                 b.*,
@@ -273,7 +277,8 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
             UNION ALL
             SELECT * FROM body
         ) u
-        ORDER BY u.order_key;
+        -- 2) Stabile Sortierung: Tie-Breaker nach project_article_id
+        ORDER BY u.order_key, COALESCE(project_article_id, 0);
     '''
     if DEBUG:
         print(f"[DEBUG] Running CREATE SQL:\n{sql}")
@@ -282,6 +287,7 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
     print(f"✅ Created: {table_name}")
     cursor.close()
     conn.close()
+
 
 
 def refresh_all_materialized(project_id: int):
