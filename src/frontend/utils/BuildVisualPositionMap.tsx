@@ -9,7 +9,7 @@ export function buildVisualPositionMap(
   sheet: string;
   rows: {
     rowId: string | number;
-    project_article_id: string | number;
+    project_article_id: string | number | null; // null = Platzhalter/leer
     position: number;
   }[];
 } | null {
@@ -24,7 +24,7 @@ export function buildVisualPositionMap(
     return null;
   }
 
-  // ⬇️ NEU: Kommentar-Index für Header-Erkennung
+  // Fallback für Header-Erkennung
   const colKommentar = headers.indexOf("Kommentar");
 
   console.log("buildVisualPositionMap", {
@@ -35,7 +35,7 @@ export function buildVisualPositionMap(
 
   const rows: {
     rowId: string | number;
-    project_article_id: string | number;
+    project_article_id: string | number | null;
     position: number;
   }[] = [];
 
@@ -46,18 +46,23 @@ export function buildVisualPositionMap(
     const row = data[physicalRow];
     if (!row) continue;
 
-    // ⬇️ NEU: Header-Zeilen überspringen (Kommentar === "HEADER")
-    if (colKommentar !== -1 && String(row[colKommentar] ?? "") === "HEADER") {
-      continue;
-    }
+    // Header raus: 1) Renderer-Flag  2) Fallback Kommentar === "HEADER"
+    const meta0: any = hotInstance.getCellMeta(physicalRow, 0);
+    const isHeaderByMeta = !!meta0?._hetRowState?.isHeader;
+    const isHeaderByComment =
+      colKommentar !== -1 && String(row[colKommentar] ?? "") === "HEADER";
+    if (isHeaderByMeta || isHeaderByComment) continue;
 
-    const id = row[colId];
-    if (id === undefined || id === null || id === "") continue; // doppelt sicher
+    const rawId = row[colId];
+    const projectId =
+      rawId === undefined || rawId === null || rawId === ""
+        ? null
+        : (rawId as string | number);
 
     rows.push({
-      rowId: id,
-      project_article_id: id,
-      position: visualRow + 1,
+      rowId: projectId ?? "",
+      project_article_id: projectId,
+      position: visualRow + 1, // beibehalten: 1-based Position
     });
   }
 

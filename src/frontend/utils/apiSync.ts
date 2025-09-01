@@ -57,7 +57,7 @@ export async function sendEdits(
 
 export async function sendPositionMap(
   sheet: string,
-  rows: { project_article_id: string | number; position: number }[],
+  rows: { project_article_id: string | number | null; position: number }[],
   project_id: number
 ) {
   try {

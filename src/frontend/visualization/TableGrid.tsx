@@ -119,8 +119,13 @@ function TableGrid({
     onStatusChange?.(s);
   };
 
+  type CellMetaWithHeader = { _hetRowState?: { isHeader?: boolean } } & Record<
+    string,
+    unknown
+  >;
+
   // Auswahl enthält Header-Zeilen? → prüfe Row-Meta (readOnly) auf irgendeiner Spalte (z. B. 0)
-  const selectionHasHeader = () => {
+  const selectionHasHeader = (): boolean => {
     const hot = hotRef?.current?.hotInstance;
     if (!hot) return false;
     const sel = hot.getSelected();
@@ -130,8 +135,11 @@ function TableGrid({
       const from = Math.min(r1, r2);
       const to = Math.max(r1, r2);
       for (let r = from; r <= to; r++) {
-        const meta = hot.getCellMeta(r, 0);
-        if (meta.readOnly === true) return true;
+        const meta = hot.getCellMeta(r, 0) as CellMetaWithHeader;
+        if (meta?._hetRowState?.isHeader === true) {
+          // uiConsole?.("[CTX:hasHeader]", { row: r, header: true });
+          return true;
+        }
       }
     }
     return false;
@@ -264,6 +272,37 @@ function TableGrid({
         columnSorting={true}
         manualRowMove={!isBlocked}
         afterChange={onChange}
+        afterCreateRow={(_index: number, _amount: number) => {
+          // silence ESLint/TS unused params:
+          void _index;
+          void _amount;
+          if (isBlocked) return;
+          const hot = hotRef?.current?.hotInstance;
+          if (!hot) return;
+          // kurz warten bis HOT seine interne Datenstruktur aktualisiert hat
+          setTimeout(() => {
+            const sourceData = (hot.getSourceData?.() ?? safeData) as (
+              | string
+              | number
+            )[][];
+            const map = buildVisualPositionMap(
+              sheetName,
+              hot,
+              colHeaders,
+              sourceData
+            );
+            if (map) {
+              // nur auf Shape trimmen; null bleibt null (wichtig für SQL)
+              const rowsForApi = map.rows.map(
+                ({ project_article_id, position }) => ({
+                  project_article_id,
+                  position,
+                })
+              );
+              sendPositionMap(map.sheet, rowsForApi, selectedProject.id);
+            }
+          }, 0);
+        }}
         afterRowMove={onRowMove}
         afterRemoveRow={() => {
           if (!isBlocked) {
@@ -276,7 +315,16 @@ function TableGrid({
               colHeaders,
               safeData
             );
-            if (map) sendPositionMap(map.sheet, map.rows, selectedProject.id);
+            if (map) {
+              // nur auf Shape trimmen; null bleibt null (wichtig für SQL)
+              const rowsForApi = map.rows.map(
+                ({ project_article_id, position }) => ({
+                  project_article_id,
+                  position,
+                })
+              );
+              sendPositionMap(map.sheet, rowsForApi, selectedProject.id);
+            }
           }
         }}
       />

@@ -90,7 +90,7 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
             "inserted_rows": "i"
         }[table]
         colmap[key].add(col)
-    colmap["ai"] = colmap["a"]  # NEU: ai wie a
+    colmap["ai"] = colmap["a"]  # ai wie a
     if DEBUG:
         print(f"[DEBUG] colmap: {colmap}")
 
@@ -100,11 +100,11 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
     col_exprs.append("(pd.data->>'project_article_id')::int AS project_article_id")
     output_cols.append("project_article_id")
 
-    # Wir merken uns, wie die Display-Namen der wichtigen Spalten heißen
+    # Display-Namen merken
     kommentar_display = layout_name_map.get("kommentar", "Kommentar")
     einbauort_display = layout_name_map.get("einbauort", "Einbauort")
 
-    # Einbauort-ID-Expr (als Text) für interne Gruppenerkennung (Header-Einfügen)
+    # Einbauort-ID-Expr (als Text) für Gruppenerkennung (Header-Einfügen)
     einbauort_id_text_expr = None
 
     for layout_col, materialized_col in layout_name_map.items():
@@ -186,7 +186,6 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
         print(f"[DEBUG] Column expressions:\n{col_exprs_sql}")
 
     # 5. Final SQL mit Header-Zeilen (Kommentar='HEADER' & Einbauort=full_name)
-    #    base_rows liefert Daten + __pos + __eid; danach body und headers.
     quoted_cols = [f"\"{c}\"" for c in output_cols]
 
     # Header-Select-Zeile für Alias b
@@ -212,7 +211,7 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
         print(f"[DEBUG] Will inject header rows (Kommentar='HEADER') using __eid derived: {einbauort_id_text_expr is not None}")
 
     print(f"🧱 Creating table: {table_name}")
-    cursor.execute(f'DROP TABLE IF EXISTS \"{table_name}\";')
+    cursor.execute(f'DROP TABLE IF EXISTS "{table_name}";')
     sql = f'''
         CREATE TABLE "{table_name}" AS
         WITH position_data AS (
@@ -233,6 +232,20 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
             LEFT JOIN inserted_rows ins ON ins.project_article_id = (pd.data->>'project_article_id')::int
             LEFT JOIN articles ai ON ins.article_id = ai.id
         ),
+        -- NEU: carry des Einbauorts über leere Zeilen
+        ff AS (
+            SELECT
+                b.*,
+                SUM(CASE WHEN b.__eid IS NOT NULL THEN 1 ELSE 0 END)
+                  OVER (ORDER BY b.__pos) AS grp
+            FROM base_rows b
+        ),
+        carry AS (
+            SELECT
+                ff.*,
+                MAX(ff.__eid) OVER (PARTITION BY ff.grp) AS carried_eid
+            FROM ff
+        ),
         body AS (
             SELECT
                 {body_row_select_sql},
@@ -241,19 +254,19 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
         ),
         headers_base AS (
             SELECT
-                b.*,
-                LAG(b.__eid) OVER (ORDER BY b.__pos) AS prev_eid
-            FROM base_rows b
+                carry.*,
+                LAG(carry.carried_eid) OVER (ORDER BY carry.__pos) AS prev_carried_eid
+            FROM carry
         ),
         headers AS (
-            -- Header nur erzeugen, wenn wir eine __eid haben und ein Wechsel vorliegt
+            -- Header nur erzeugen, wenn wir eine __eid haben und sich der getragene Einbauort ändert
             SELECT
                 {header_row_select_sql_hb},
                 (hb.__pos - 0.5)::numeric AS order_key
             FROM headers_base hb
             WHERE
                 hb.__eid IS NOT NULL
-                AND (hb.prev_eid IS NULL OR hb.__eid IS DISTINCT FROM hb.prev_eid)
+                AND (hb.prev_carried_eid IS NULL OR hb.__eid IS DISTINCT FROM hb.prev_carried_eid)
         )
         SELECT * FROM (
             SELECT * FROM headers
@@ -269,6 +282,7 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
     print(f"✅ Created: {table_name}")
     cursor.close()
     conn.close()
+
 
 def refresh_all_materialized(project_id: int):
     views_to_show = get_views_to_show(project_id)
