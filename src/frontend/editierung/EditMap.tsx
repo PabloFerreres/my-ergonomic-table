@@ -159,3 +159,16 @@ export const clearRowOps = (sheet: string) => {
   if (editMap._rowDeletes) delete editMap._rowDeletes[sheet];
   if (editMap._visualOrder) delete editMap._visualOrder[sheet];
 };
+
+export const removeEdit = (
+  sheet: string,
+  rowId: string | number,
+  col: string | number
+) => {
+  const list = editMap[sheet];
+  if (!list) return;
+  editMap[sheet] = list.filter(
+    (e) => String(e.rowId) !== String(rowId) || String(e.col) !== String(col)
+  );
+  if (editMap[sheet].length === 0) delete editMap[sheet];
+};

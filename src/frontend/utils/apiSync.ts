@@ -16,44 +16,84 @@ export async function fetchDropdownOptions(
   return res.json();
 }
 
+// oben (bei den Imports) ergänzen
+type SendResult = {
+  status?: "ok" | "saved";
+  error?: string;
+  count?: number;
+  log?: string;
+};
+
 export async function sendEdits(
   sheet: string,
   edits: EditEntry[],
   project_id: number
-) {
-  try {
-    if (!edits || edits.length === 0) {
-      return { status: "ok", count: 0, log: "⚪️ keine Edits" };
-    }
-
-    const payload = {
-      sheet, // <<< wichtig für Backend-Entscheidung (SSE/Remat)
-      edits,
-      lastUsedInsertedId: getLastUsedInsertedId(),
-    };
-
-    const res = await fetch(
-      `${API_PREFIX}/api/updateEdits?project_id=${project_id}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }
-    );
-
-    if (!res.ok) throw new Error(`Server error ${res.status}`);
-    const result = await res.json();
-    const msg =
-      result?.log ||
-      `✅ Edits gespeichert (${result?.count ?? edits.length}) für Sheet: ${sheet}`;
-    uiConsole(msg);
-    return result;
-  } catch (err) {
-    console.error("❌ Failed to sync edits:", err);
-    uiConsole("❌ Edits sync fehlgeschlagen");
-    return { status: "error", error: String(err) };
+): Promise<SendResult> {
+  if (!edits || edits.length === 0) {
+    return { status: "ok", count: 0, log: "⚪️ keine Edits" };
   }
+
+  const payload = {
+    sheet, // wichtig für Backend-Entscheidung (SSE/Remat)
+    edits,
+    lastUsedInsertedId: getLastUsedInsertedId(),
+  };
+
+  const res = await fetch(
+    `${API_PREFIX}/api/updateEdits?project_id=${project_id}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  const text = await res.text();
+
+  // parse + normalisieren auf SendResult
+  let result: SendResult | null = null;
+  let raw: any = null;
+  try { raw = text ? JSON.parse(text) : null; } catch { raw = null; }
+
+  if (raw) {
+    const s = raw.status;
+    result = {
+      status: s === "ok" || s === "saved" ? s : undefined,
+      error: typeof raw.error === "string" ? raw.error : undefined,
+      count: typeof raw.count === "number" ? raw.count : undefined,
+      log: typeof raw.log === "string" ? raw.log : undefined,
+    };
+  }
+
+  // ❗ HTTP-Fehler → werfen
+  if (!res.ok) {
+    const msg = result?.error || `Server error ${res.status}`;
+    console.error("🛑 sendEdits() HTTP error", {
+      sheet, editsCount: edits.length, status: res.status, result
+    });
+    uiConsole(`❌ Edits sync fehlgeschlagen: ${msg}`);
+    throw new Error(msg);
+  }
+
+  // ❗ Logischer Fehler
+  if (raw?.status && raw.status !== "ok" && raw.status !== "saved") {
+    const msg = result?.error || `Bad status: ${raw.status}`;
+    console.error("🛑 sendEdits() logical error", {
+      sheet, editsCount: edits.length, rawStatus: raw.status, result
+    });
+    uiConsole(`❌ Edits sync fehlgeschlagen: ${msg}`);
+    throw new Error(msg);
+  }
+
+  const msg =
+    result?.log ||
+    `✅ Edits gespeichert (${result?.count ?? edits.length}) für Sheet: ${sheet}`;
+  uiConsole(msg);
+
+  return result ?? { status: "ok", count: edits.length };
 }
+
+
 
 export async function sendPositionMap(
   sheet: string,

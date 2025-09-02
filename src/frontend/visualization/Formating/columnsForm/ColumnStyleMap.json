@@ -4,14 +4,16 @@
     "color": " #B266FF",
     "headers": [
       "position",
-      "project_article_id"
+      "project_article_id",
+      "order_key",
+      "article_id"
     ]
   },
 
   "header-green": {
     "color": "#99CC00",
     "headers": [
-      "lfd.Nr. aufsteigend!",
+      "Lfd.Nr. aufsteigend!",
       "Status",
       "Relevance E-Tech.",
       "Kommentar",
@@ -51,7 +53,9 @@
       "Bestelldatum",
       "Liefertermin laut AB (KW)",
       "Auftragsbestätigung",
-      "Geliefert"
+      "Geliefert",
+      "Weitere technische Daten",
+      "Weitere Funktionen Verschaltung"
     ]
   },
   "header-yellow": {
@@ -95,7 +99,7 @@
       "Anlagekategorie in Vault",
       "Bauteil-ID",
       "Änderungsindex",
-      "Kommentar zur Äanderung"
+      "Kommentar zur Änderung"
     ]
   },
   "header-orange": {
@@ -105,8 +109,28 @@
     ]
   },
 
+  "header-metall-grey": {
+    "color": "rgb(127, 135, 151)",
+    "headers": [
+      "Wirkungsgrad",
+      "Getriebe", 
+      "Nenndrehmoment / Nm",
+      "Geschwindigkeit / rpm //Steuerung",
+      "Ventilator",
+      "Encoder",
+      "Antriebs-CLIQ",
+      "Encoder-Typ",
+      "Bremse",
+      "Motorschutz",
+      "Not-Aus / PLd",
+      "Notleistung",
+      "Leistung Not",
+      "Freigegeben"
+    ]
+  },
+
   "grid-header-rows": {
-    "color": "#E5E7EB",
+    "color": "#98A5BF",
     "headers": [],
     "used_for": ["HEADER rows (Einbauort-Gruppen) Hintergrund"]
   },
