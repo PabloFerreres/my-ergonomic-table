@@ -50,8 +50,8 @@ export function afterGetColHeader(
 
   TH.style.position = "relative";
   TH.style.fontWeight = "bold";
-  TH.style.fontSize = "14px";
-  TH.style.height = "100px";
+  TH.style.fontSize = "12px";
+  TH.style.height = "110px";
   TH.style.lineHeight = "1";
   TH.style.overflow = "visible";
   TH.style.paddingRight = "32px";
@@ -70,8 +70,8 @@ export function afterGetColHeader(
   const headerLabel = TH.querySelector(".colHeader") as HTMLElement;
   if (headerLabel) {
     headerLabel.style.position = "absolute";
-    headerLabel.style.bottom = "4px";
-    headerLabel.style.left = "-12px";
+    headerLabel.style.bottom = "0px";
+    headerLabel.style.left = "-5px";
     headerLabel.style.transform = "rotate(-30deg)";
     headerLabel.style.transformOrigin = "left bottom";
     headerLabel.style.whiteSpace = "normal";
