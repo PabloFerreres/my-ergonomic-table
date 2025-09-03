@@ -26,6 +26,14 @@ import { initSSERefresh } from "../utils/sse";
 import config from "../../../config.json";
 import ExportExcelButton from "../../appButtonFunctions/ExportExcelButton";
 
+import FunctionDock from "./uiSquares/FunctionDock";
+import type {
+  FunctionDockHandle,
+  FocusableToolHandle,
+} from "./uiSquares/FunctionDock";
+import SquareQuickFilter from "./uiSquares/SquareQuickFilter";
+import { applyQuickFilter } from "./uiButtonFormats/quickFilter";
+
 const API_PREFIX = config.BACKEND_URL;
 const ENABLE_WELCOME_SCREEN = true;
 
@@ -82,7 +90,38 @@ function App() {
   const { search, goNext, goPrev, matchIndex, matchCount } = useSearchFunctions(
     hotRefs.current[activeSheet ?? ""]?.current?.hotInstance ?? null
   );
-  const searchBarRef = useRef<SearchBarHandle>(null);
+
+  // --- Dock + QuickFilter verdrahtung ---
+  const dockRef = useRef<FunctionDockHandle>(null);
+
+  const applyQuickFilterForActiveSheet = (query: string, exact: boolean) => {
+    const hot =
+      hotRefs.current[activeSheet ?? ""]?.current?.hotInstance ?? null;
+    if (!hot || !activeSheet) return;
+    const col = selectedCell?.col ?? 0;
+    applyQuickFilter(hot, col, query, exact);
+  };
+
+  const clearQuickFilterForActiveCol = () => {
+    const hot =
+      hotRefs.current[activeSheet ?? ""]?.current?.hotInstance ?? null;
+    if (!hot || !activeSheet) return;
+    const col = selectedCell?.col ?? 0;
+    applyQuickFilter(hot, col, "", false);
+  };
+
+  const handleQuickFilterFocus = (col: number) => {
+    setSelectedCell((prev) => ({ row: prev?.row ?? 0, col }));
+    dockRef.current?.showQuickFilter();
+    dockRef.current?.focus();
+  };
+
+  const handleSearchShortcut = () => {
+    hotRefs.current[activeSheet ?? ""]?.current?.hotInstance?.deselectCell();
+    dockRef.current?.showSearch();
+    dockRef.current?.focus();
+  };
+  // --- Ende Dock-Block ---
 
   useEffect(() => {
     if (showSheetMenu) {
@@ -180,14 +219,16 @@ function App() {
       .catch((err) => console.error("Failed to load sheets", err));
   }, [selectedProject]);
 
+  // Global Ctrl/Cmd+F -> Dock Search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key.toLowerCase() === "f") {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
         e.preventDefault();
         hotRefs.current[
           activeSheet ?? ""
         ]?.current?.hotInstance?.deselectCell();
-        searchBarRef.current?.focusInput();
+        dockRef.current?.showSearch();
+        dockRef.current?.focus();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -381,13 +422,29 @@ function App() {
             onMoveDown={moveRowsDown}
             blocked={isElektrikActive}
           />
-          <SquareSearch
-            ref={searchBarRef}
-            onSearch={search}
-            onNext={goNext}
-            onPrev={goPrev}
-            matchIndex={matchIndex}
-            matchCount={matchCount}
+
+          {/* 🔁 Dynamischer Dock: Searchbar ODER QuickFilter */}
+          <FunctionDock
+            ref={dockRef}
+            defaultMode="none"
+            renderSearch={(ref) => (
+              <SquareSearch
+                ref={ref as unknown as React.Ref<SearchBarHandle>}
+                onSearch={search}
+                onNext={goNext}
+                onPrev={goPrev}
+                matchIndex={matchIndex}
+                matchCount={matchCount}
+              />
+            )}
+            renderQuickFilter={(ref) => (
+              <SquareQuickFilter
+                ref={ref as React.Ref<FocusableToolHandle>}
+                header={sheets[activeSheet!]?.headers[selectedCell?.col ?? 0]}
+                onApply={applyQuickFilterForActiveSheet}
+                onClear={clearQuickFilterForActiveCol}
+              />
+            )}
           />
 
           <div
@@ -556,6 +613,9 @@ function App() {
                               [name]: s,
                             }))
                           }
+                          // 🔁 Dock-Steuerung aus dem Grid heraus
+                          onQuickFilterFocus={handleQuickFilterFocus}
+                          onSearchShortcut={handleSearchShortcut}
                         />
                       </div>
                     </div>

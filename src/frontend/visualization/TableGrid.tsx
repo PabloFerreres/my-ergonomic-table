@@ -30,6 +30,8 @@ interface TableGridProps {
   sheetName: string;
   isBlocked?: boolean;
   onSelectionChange?: (cell: { row: number; col: number }) => void;
+  onQuickFilterFocus?: (col: number) => void; // Alt+Click -> QuickFilter
+  onSearchShortcut?: () => void; // Ctrl+F -> Searchbar
   selectedProject: Project;
   onStatusChange?: (s: { isFiltered: boolean; isSorted: boolean }) => void;
 }
@@ -43,6 +45,8 @@ function TableGrid({
   sheetName,
   isBlocked = false,
   onSelectionChange,
+  onQuickFilterFocus,
+  onSearchShortcut,
   selectedProject,
   onStatusChange,
 }: TableGridProps) {
@@ -64,7 +68,6 @@ function TableGrid({
   );
 
   const baseCellProps = useCellProperties(safeData, rowIdIndex, sheetName);
-
   const getCellProps = useCallback(
     (row: number, col: number) =>
       baseCellProps(row, col) as Handsontable.CellProperties,
@@ -138,11 +141,25 @@ function TableGrid({
     return false;
   };
 
-  // Alt+Enter: newline; Ctrl+Enter: commit & stay (Excel-like)
+  // Alt+Enter: newline; Ctrl+Enter: commit & stay; Ctrl+F: Search öffnen
   const handleGridKeys = useCallback(
     (e: KeyboardEvent) => {
       const hot = hotRef?.current?.hotInstance;
       if (!hot) return;
+
+      // Ctrl/Cmd+F -> Search-Dock
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        String(e.key).toLowerCase() === "f"
+      ) {
+        onSearchShortcut?.();
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return;
+      }
 
       const isEnter = e.key === "Enter";
 
@@ -188,12 +205,17 @@ function TableGrid({
         e.stopImmediatePropagation();
       }
     },
-    [hotRef]
+    [hotRef, onSearchShortcut]
   );
+
+  // lokale, schlanke Typdefinition für DropdownMenu-Plugin (kein any)
+  type DropdownMenuPlugin = {
+    close?: () => void;
+    menu?: { close?: () => void } | null;
+  };
 
   return (
     <div style={{ height: "100%" }}>
-      {/* Alt+Enter: newline, Ctrl+Enter: commit & stay */}
       <HotTable
         ref={hotRef as React.RefObject<HotTableClass>}
         data={safeData}
@@ -221,22 +243,52 @@ function TableGrid({
         stretchH="none"
         licenseKey="non-commercial-and-evaluation"
         afterSelection={handleSelection}
+        // ✅ richtige Reihenfolge: (event, coords, TD)
+        afterOnCellMouseDown={(event, coords) => {
+          const hot = hotRef?.current?.hotInstance ?? null;
+          if (event?.altKey && coords?.col != null && coords.col >= 0 && hot) {
+            // 1) genau die angeklickte Zelle kurz selektieren (NICHT die ganze Spalte)
+            const r =
+              typeof coords.row === "number" && coords.row >= 0
+                ? coords.row
+                : hot.getSelectedLast()?.[0] ?? 0;
+            hot.selectCell(r, coords.col);
+
+            // 2) QuickFilter öffnen & fokussieren (App -> Dock kümmert sich darum)
+            onQuickFilterFocus?.(coords.col);
+
+            // 3) Zelle wieder deselektieren, NACHDEM der Dock fokussiert hat
+            //    (triple RAF, damit wir HOTs eigene Fokus-Logik sicher "überholen")
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  hot.deselectCell?.();
+                });
+              });
+            });
+
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
         beforeKeyDown={handleGridKeys}
         afterGetColHeader={(col, TH) => afterGetColHeader(col, TH, colHeaders)}
         afterFilter={() => {
           const hot = hotRef?.current?.hotInstance ?? null;
           if (!hot) return;
-          // Menü zu (wie gehabt)
+
+          // ✅ sauber typisieren ohne getPlugin-Generics
+          const dm = hot.getPlugin("dropdownMenu") as unknown as {
+            close?: () => void;
+            menu?: { close?: () => void } | null;
+          };
+
           setTimeout(() => {
-            const dm = hot.getPlugin("dropdownMenu") as any;
             dm?.close?.();
             dm?.menu?.close?.();
           }, 0);
-          // Status im Microtask lesen (nachdem Conditions final sind)
+
           Promise.resolve().then(() => emitStatus());
-        }}
-        afterDropdownMenuHide={() => {
-          emitStatus();
         }}
         contextMenu={{
           items: {
