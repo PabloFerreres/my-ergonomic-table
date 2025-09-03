@@ -208,7 +208,14 @@ function TableGrid({
         autoColumnSize={false}
         renderAllColumns={false}
         filters={true}
-        dropdownMenu={true}
+        dropdownMenu={{
+          items: [
+            "filter_by_condition",
+            "filter_operators",
+            "filter_by_value",
+            "filter_action_bar",
+          ],
+        }}
         width="100%"
         height="100%"
         stretchH="none"
