@@ -73,7 +73,7 @@ export const WrappedTraitsRenderer = (
     cellProperties
   );
 
-  // 2) Word-Wrap Styles nur einmal je recycelter TD setzen
+  // 2) Word-Wrap-Basisstyles einmalig pro recycelter TD
   if (!TD_WRAPPED.has(td)) {
     td.style.whiteSpace = "normal";
     td.style.wordBreak = "break-word";
@@ -81,15 +81,26 @@ export const WrappedTraitsRenderer = (
     TD_WRAPPED.add(td);
   }
 
-  // 3) *text* → <span class="red-inline">text</span> (nur wenn nötig)
-  if (typeof value === "string" && value.includes("*")) {
-    if (STAR_INLINE_RE.test(value)) {
-      td.innerHTML = value.replace(STAR_INLINE_RE, '<span class="red-inline">$1</span>');
-    }
+  // 2b) Anzeige-String mit Umbruch-Markern normalisieren:
+  // - ultrasicherer Marker "\\\n"  → echter \n
+  // - optional: "/n" nur am Zeilenanfang oder nach Whitespace → \n
+  const raw = value == null ? "" : String(value);
+  const display = raw
+    .replace(/\\{3}n/g, "\n")
+    .replace(/(^|[\s])\/n/g, "$1\n");
+
+  // 3) Inline-*rot* (nur wenn nötig); sonst sicherer Textcontent
+  if (display.includes("*") && STAR_INLINE_RE.test(display)) {
+    td.innerHTML = display.replace(STAR_INLINE_RE, '<span class="red-inline">$1</span>');
     STAR_INLINE_RE.lastIndex = 0;
+  } else {
+    td.textContent = display;
   }
 
-  // 4) HEADER / ENTFALLEN + readOnly direkt im cellProperties (render-basiert, sort/filter-sicher)
+  // 3b) Nur wenn echte Newlines vorhanden sind, pre-wrap aktivieren
+  td.style.whiteSpace = display.includes("\n") ? "pre-wrap" : "normal";
+
+  // 4) HEADER / ENTFALLEN + readOnly via Meta
   const kommentarIdx = getKommentarIdx(instance);
   const rs = getRowState(instance, row, col, kommentarIdx, value);
 
@@ -98,7 +109,6 @@ export const WrappedTraitsRenderer = (
     td.classList.toggle("row-entfallen", rs.isEntfallen);
 
     if (rs.isHeader) {
-      // Hard block: HOT verhindert Edit/Paste automatisch bei readOnly
       cellProperties.readOnly = true;
       cellProperties.editor = false;
     }

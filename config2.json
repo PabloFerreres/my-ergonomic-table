@@ -1,4 +1,5 @@
 {
   "DB_URL": "postgresql://pablo:meinpasswort@192.168.19.71:5432/mini_project_milestone",
-  "BACKEND_URL": "http://192.168.19.71:8000"
+  "BACKEND_URL": "http://192.168.19.71:8000",
+  "FRONTEND_ORIGINS": ["http://192.168.19.71:5173"]
 }

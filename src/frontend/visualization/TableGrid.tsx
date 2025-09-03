@@ -46,7 +46,6 @@ function TableGrid({
   selectedProject,
   onStatusChange,
 }: TableGridProps) {
-  // Stabilisiertes safeData
   const colCount = colHeaders.length;
   const safeData = useMemo<(string | number)[][]>(() => {
     if (Array.isArray(data) && data.length === 0 && colCount > 0) {
@@ -66,11 +65,9 @@ function TableGrid({
 
   const baseCellProps = useCellProperties(safeData, rowIdIndex, sheetName);
 
-  // Keine ReadOnly-Entscheidung mehr hier – das macht der WrappedTraitsRenderer
   const getCellProps = useCallback(
-    (row: number, col: number) => {
-      return baseCellProps(row, col) as Handsontable.CellProperties;
-    },
+    (row: number, col: number) =>
+      baseCellProps(row, col) as Handsontable.CellProperties,
     [baseCellProps]
   );
 
@@ -124,7 +121,6 @@ function TableGrid({
     unknown
   >;
 
-  // Auswahl enthält Header-Zeilen? → prüfe Row-Meta (readOnly) auf irgendeiner Spalte (z. B. 0)
   const selectionHasHeader = (): boolean => {
     const hot = hotRef?.current?.hotInstance;
     if (!hot) return false;
@@ -136,17 +132,68 @@ function TableGrid({
       const to = Math.max(r1, r2);
       for (let r = from; r <= to; r++) {
         const meta = hot.getCellMeta(r, 0) as CellMetaWithHeader;
-        if (meta?._hetRowState?.isHeader === true) {
-          // uiConsole?.("[CTX:hasHeader]", { row: r, header: true });
-          return true;
-        }
+        if (meta?._hetRowState?.isHeader === true) return true;
       }
     }
     return false;
   };
 
+  // Alt+Enter: newline; Ctrl+Enter: commit & stay (Excel-like)
+  const handleGridKeys = useCallback(
+    (e: KeyboardEvent) => {
+      const hot = hotRef?.current?.hotInstance;
+      if (!hot) return;
+
+      const isEnter = e.key === "Enter";
+
+      // Ctrl+Enter -> commit & bleiben
+      if (isEnter && e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+        const editor =
+          (hot.getActiveEditor?.() as Handsontable.editors.BaseEditor | null) ??
+          null;
+        if (editor?.isOpened?.()) {
+          editor.finishEditing?.();
+        } else {
+          const sel = hot.getSelectedLast();
+          if (sel) hot.selectCell(sel[0], sel[1]);
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return;
+      }
+
+      // Alt+Enter -> echter Zeilenumbruch in der Zelle
+      if (isEnter && e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey) {
+        const editor =
+          (hot.getActiveEditor?.() as Handsontable.editors.BaseEditor | null) ??
+          null;
+        if (!editor || !editor.isOpened?.()) return;
+
+        const textEditor = editor as Handsontable.editors.TextEditor;
+        const textarea = textEditor.TEXTAREA as HTMLTextAreaElement | undefined;
+        if (!textarea) return;
+
+        const s = textarea.selectionStart ?? textarea.value.length;
+        const t = textarea.selectionEnd ?? textarea.value.length;
+        const v = textarea.value ?? "";
+        const next = v.slice(0, s) + "\n" + v.slice(t);
+
+        textarea.value = next;
+        editor.setValue?.(next);
+        textarea.selectionStart = textarea.selectionEnd = s + 1;
+
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      }
+    },
+    [hotRef]
+  );
+
   return (
     <div style={{ height: "100%" }}>
+      {/* Alt+Enter: newline, Ctrl+Enter: commit & stay */}
       <HotTable
         ref={hotRef as React.RefObject<HotTableClass>}
         data={safeData}
@@ -167,7 +214,7 @@ function TableGrid({
         stretchH="none"
         licenseKey="non-commercial-and-evaluation"
         afterSelection={handleSelection}
-        // Keine beforeChange/beforePaste-Header-Blocker mehr – wird durch readOnly-Meta abgefangen
+        beforeKeyDown={handleGridKeys}
         afterGetColHeader={(col, TH) => afterGetColHeader(col, TH, colHeaders)}
         afterFilter={() => {
           const hot = hotRef?.current?.hotInstance ?? null;
@@ -273,13 +320,11 @@ function TableGrid({
         manualRowMove={!isBlocked}
         afterChange={onChange}
         afterCreateRow={(_index: number, _amount: number) => {
-          // silence ESLint/TS unused params:
           void _index;
           void _amount;
           if (isBlocked) return;
           const hot = hotRef?.current?.hotInstance;
           if (!hot) return;
-          // kurz warten bis HOT seine interne Datenstruktur aktualisiert hat
           setTimeout(() => {
             const sourceData = (hot.getSourceData?.() ?? safeData) as (
               | string
@@ -292,7 +337,6 @@ function TableGrid({
               sourceData
             );
             if (map) {
-              // nur auf Shape trimmen; null bleibt null (wichtig für SQL)
               const rowsForApi = map.rows.map(
                 ({ project_article_id, position }) => ({
                   project_article_id,
@@ -316,7 +360,6 @@ function TableGrid({
               safeData
             );
             if (map) {
-              // nur auf Shape trimmen; null bleibt null (wichtig für SQL)
               const rowsForApi = map.rows.map(
                 ({ project_article_id, position }) => ({
                   project_article_id,

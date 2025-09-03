@@ -3,6 +3,22 @@
 from backend.layout.layout_constants import ROTATED_HEADER_LAYOUT, CELL_LAYOUT;
 import math;
 from backend.debug_config import DEBUG_FLAGS;
+import re
+
+
+def _normalize_breaks(text: str) -> str:
+    """
+    Interpretiert den Marker '\\\\\n' (drei Backslashes + 'n') als echten Zeilenumbruch.
+    Optional: '/n' nur am Zeilenanfang oder nach Whitespace ebenfalls als Zeilenumbruch.
+    """
+    if not text:
+        return text
+    # \\ \ n  -> \n
+    text = re.sub(r'\\{3}n', '\n', text)
+    # nur Anfang oder nach Whitespace: /n -> \n (verhindert false positives wie /news)
+    text = re.sub(r'(^|\s)/n', r'\1\n', text)
+    return text
+
 
 def estimate_rotated_header_width(text: str) -> int:
     if not text.strip():
@@ -28,12 +44,22 @@ def estimate_rotated_header_width(text: str) -> int:
 
 
 def estimate_wrapped_cell_width(text: str, row_height: int, header: str) -> int:
+    text = _normalize_breaks(text)
     if not text.strip():
         return CELL_LAYOUT["empty_width"]
 
     max_lines = max(1, row_height // CELL_LAYOUT["line_height"])
-    min_chars_per_line = math.ceil(len(text) / max_lines)
+
+    # Explizite Umbrüche reduzieren effektive Segmentlänge
+    parts = text.split("\n")
+    longest = max((len(p) for p in parts), default=0)
+
+    # Verteile die verfügbare Zeilenhöhe grob auf Segmente
+    per_segment_lines = max(1, max_lines // max(1, len(parts)))
+    min_chars_per_line = max(1, math.ceil(longest / per_segment_lines))
+
     estimated_width = CELL_LAYOUT["padding"] + min_chars_per_line * CELL_LAYOUT["cell_char_width"]
+
     if DEBUG_FLAGS.get("layout_estimation"): 
         print(f"🔍 Checking header: >{repr(header)}< | stripped: >{header.strip()}<")
 
@@ -45,7 +71,6 @@ def estimate_wrapped_cell_width(text: str, row_height: int, header: str) -> int:
         if DEBUG_FLAGS.get("layout_estimation"):
             print(f"❌ Did not match: {repr(header)}")
         max_allowed_width = CELL_LAYOUT["max_width"]
-
 
     return min(estimated_width, max_allowed_width)
 
@@ -61,10 +86,15 @@ def estimate_row_height_for_cells(row: list[str | int], headers: list[str]) -> i
         else:
             max_allowed_width = CELL_LAYOUT["max_width"]
 
-        text = str(cell).strip()
+        text = _normalize_breaks(str(cell)).strip()
         chars_per_line = max(1, max_allowed_width // CELL_LAYOUT["cell_char_width"])
-        line_count = math.ceil(len(text) / chars_per_line)
-        height = line_count * CELL_LAYOUT["line_height"] + CELL_LAYOUT["padding"]
+
+        # Explizite Zeilenumbrüche additiv zählen
+        total_lines = 0
+        for part in (text.split("\n") if text else [""]):
+            total_lines += max(1, math.ceil(len(part) / chars_per_line))
+
+        height = total_lines * CELL_LAYOUT["line_height"] + CELL_LAYOUT["padding"]
         max_height = max(max_height, height)
 
     return max_height
