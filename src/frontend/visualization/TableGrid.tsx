@@ -219,15 +219,14 @@ function TableGrid({
         afterFilter={() => {
           const hot = hotRef?.current?.hotInstance ?? null;
           if (!hot) return;
+          // Menü zu (wie gehabt)
           setTimeout(() => {
-            const dm = hot.getPlugin("dropdownMenu") as unknown as {
-              close?: () => void;
-              menu?: { close?: () => void } | null;
-            } | null;
+            const dm = hot.getPlugin("dropdownMenu") as any;
             dm?.close?.();
             dm?.menu?.close?.();
           }, 0);
-          emitStatus();
+          // Status im Microtask lesen (nachdem Conditions final sind)
+          Promise.resolve().then(() => emitStatus());
         }}
         afterDropdownMenuHide={() => {
           emitStatus();
