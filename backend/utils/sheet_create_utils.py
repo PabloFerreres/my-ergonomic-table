@@ -1,9 +1,9 @@
 import re
 import unicodedata
+import json
 import psycopg2
 from backend.settings.connection_points import DB_URL
 from backend.loading.create_materialized_tables import create_materialized_table
-from backend.central_managers.inserted_id_central_manager import get_and_decrement_last_id
 
 # ----- Helpers ---------------------------------------------------------------
 
@@ -42,13 +42,11 @@ def _ensure_unique_view_name(cursor, project_id: int, base: str) -> str:
         i += 1
 
 def get_project_name(cursor, project_id):
-    # bleibt für Backwards-Compat erhalten (falls anderswo benutzt)
     cursor.execute("SELECT name FROM projects WHERE id=%s", (project_id,))
     res = cursor.fetchone()
     return res[0] if res else None
 
 def _get_project_suffix(cursor, project_id):
-    # für materialized_*_SUFFIX (wie in /sheetnames)
     cursor.execute("SELECT project_materialized_name FROM projects WHERE id=%s", (project_id,))
     res = cursor.fetchone()
     return res[0] if res else None
@@ -57,16 +55,18 @@ def _get_project_suffix(cursor, project_id):
 
 def create_sheet_full(display_name, base_view_id, project_id):
     """
-    Lege neuen View an + Welcome-Zeile + Materialized Table + position_meta + multiproject_meta_datas.
-    - display_name: UI-Name (wie eingegeben, getrimmt)
-    - name        : stabiler, normalisierter Identifier (lower_snake_case), projektweit eindeutig
+    Neuer View:
+    - legt View an
+    - schreibt leere position_meta (20 Platzhalterzeilen, position 1..20)
+    - verknüpft multiproject_meta_datas
+    - erzeugt materialized_* basierend auf position_meta
     """
     conn = None
     try:
         conn = psycopg2.connect(DB_URL)
         cursor = conn.cursor()
 
-        # Existenzcheck (Display-Name pro Projekt)
+        # 0) Display-Name-Guard
         cursor.execute(
             "SELECT id FROM views WHERE display_name=%s AND project_id=%s",
             (display_name, project_id)
@@ -76,86 +76,57 @@ def create_sheet_full(display_name, base_view_id, project_id):
             conn.close()
             return False, {"error": "Display name already exists"}
 
-        # Stabilen internen Namen bestimmen (nicht mehr UPPER)
+        # 1) stabilen internen Namen bestimmen
         base_name = _normalize_view_name(display_name)
         name = _ensure_unique_view_name(cursor, project_id, base_name)
 
-        # View anlegen
+        # 2) View anlegen
         cursor.execute(
             "INSERT INTO views (project_id, name, display_name, base_view_id) VALUES (%s, %s, %s, %s) RETURNING id",
             (project_id, name, display_name.strip(), base_view_id)
         )
-        result = cursor.fetchone()
-        if result is None:
+        row = cursor.fetchone()
+        if not row:
             cursor.close()
             conn.close()
             return False, {"error": "View insert failed"}
-        view_id = result[0]
-        conn.commit()  # beibehalten wie zuvor
+        view_id = row[0]
+        conn.commit()
 
-        # Sheet-Name generieren (Suffix aus project_materialized_name)
+        # 3) sheet_name bilden
         suffix = _get_project_suffix(cursor, project_id)
         if not suffix:
-            # Fallback: alter Projektname (nur falls Spalte nicht gepflegt)
             fallback = get_project_name(cursor, project_id) or f"project{project_id}"
             suffix = _normalize_view_name(fallback)
         sheet_name = f"materialized_{name}_{suffix.lower()}"
 
-        # 1. next inserted_id holen (negativ)
-        welcome_id = get_and_decrement_last_id(cursor)
-
-        # 2. Welcome-Zeile in inserted_rows einfügen
-        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'inserted_rows'")
-        columns = [r[0] for r in cursor.fetchall()]
-        if "project_id" in columns:
-            cursor.execute(
-                """
-                INSERT INTO inserted_rows (project_article_id, Kommentar, project_id)
-                VALUES (%s, %s, %s)
-                """,
-                (welcome_id, "Willkommen! Tragen Sie hier Ihre erste Zeile ein.", project_id)
-            )
-        else:
-            cursor.execute(
-                """
-                INSERT INTO inserted_rows (project_article_id, Kommentar)
-                VALUES (%s, %s)
-                """,
-                (welcome_id, "Willkommen! Tragen Sie hier Ihre erste Zeile ein.")
-            )
-
-        # 3. Materialized-Tabelle erstellen (intern nutzt view_id/base_view_id)
-        create_materialized_table(project_id, view_id, base_view_id)
-
-        # 4. position_meta initial
-        pos_map = [{
-            "project_article_id": welcome_id,
-            "Kommentar": "Willkommen! Tragen Sie hier Ihre erste Zeile ein.",
-            "position": 1
-        }]
-        import json
+        # 4) position_meta: 20 leere Zeilen (keine IDs!), position 1..20
+        position_map = [{"project_article_id": None, "position": i} for i in range(1, 21)]
         cursor.execute(
             "INSERT INTO position_meta (sheet_name, position_map) VALUES (%s, %s) RETURNING id",
-            (sheet_name, json.dumps(pos_map))
+            (sheet_name, json.dumps(position_map))
         )
-        pos_result = cursor.fetchone()
-        if pos_result is None:
+        pos_res = cursor.fetchone()
+        if not pos_res:
             cursor.close()
             conn.close()
             return False, {"error": "position_meta insert failed"}
-        position_meta_id = pos_result[0]
+        position_meta_id = pos_res[0]
 
-        # 5. multiproject_meta_datas anlegen
+        # 5) multiproject_meta_datas verknüpfen
         cursor.execute(
             "INSERT INTO multiproject_meta_datas (project_id, view_id, position_meta_id) VALUES (%s, %s, %s)",
             (project_id, view_id, position_meta_id)
         )
         conn.commit()
 
-        # last_id holen
+        # 6) materialized_* erzeugen (baut aus position_meta => sofort 20 leere Zeilen sichtbar)
+        create_materialized_table(project_id, view_id, base_view_id)
+
+        # 7) last_id nur lesen
         cursor.execute("SELECT last_id FROM inserted_id_meta WHERE id = 1")
-        last_id_result = cursor.fetchone()
-        last_id = last_id_result[0] if last_id_result else None
+        last_id_row = cursor.fetchone()
+        last_id = last_id_row[0] if last_id_row else None
 
         cursor.close()
         conn.close()
@@ -163,7 +134,7 @@ def create_sheet_full(display_name, base_view_id, project_id):
             "view_id": view_id,
             "sheet_name": sheet_name,
             "last_id": last_id,
-            "welcome_id": welcome_id,
+            "welcome_id": None,  # Backcompat
         }
 
     except Exception as e:
