@@ -25,6 +25,7 @@ import { softAktualisierenSheets } from "../../appButtonFunctions/SoftAktualisie
 import { initSSERefresh } from "../utils/sse";
 import config from "../../../config.json";
 import ExportExcelButton from "../../appButtonFunctions/ExportExcelButton";
+import { deleteSheetApiCall } from "../utils/apiSync";
 
 import FunctionDock from "./uiSquares/FunctionDock";
 import type {
@@ -69,6 +70,57 @@ function App() {
   >({});
 
   const projectId = selectedProject?.id ?? undefined;
+
+  const [tabMenu, setTabMenu] = useState<null | {
+    x: number;
+    y: number;
+    sheet: string;
+  }>(null);
+
+  const reloadSheetNames = async () => {
+    if (!selectedProject?.id) return;
+    const res = await fetch(
+      `${API_PREFIX}/api/sheetnames?project_id=${selectedProject.id}`
+    );
+    const names: string[] = await res.json();
+    setSheetNames(names);
+    if (names.length && !names.includes(activeSheet ?? "")) {
+      setActiveSheet(names[0]);
+    }
+  };
+
+  // robustes Laden mit kleinem Retry (3x)
+  const fetchTableDataWithRetry = async (
+    table: string,
+    projectId: number,
+    tries = 3,
+    delayMs = 250
+  ) => {
+    for (let i = 0; i < tries; i++) {
+      const res = await fetch(
+        `${API_PREFIX}/api/tabledata?table=${table}&limit=700&project_id=${projectId}`
+      );
+      if (res.ok) return res.json();
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+    // letzter Versuch: Fehler werfen (wird oben gefangen)
+    const res = await fetch(
+      `${API_PREFIX}/api/tabledata?table=${table}&limit=700&project_id=${projectId}`
+    );
+    if (!res.ok) throw new Error(`tabledata failed: HTTP ${res.status}`);
+    return res.json();
+  };
+
+  const loadSheetAndActivate = async (table: string, projectId: number) => {
+    setActiveSheet(table); // sofort aktivieren (UI)
+    const { headers, data } = await fetchTableDataWithRetry(table, projectId);
+    await new Promise<void>((resolve) => {
+      triggerLayoutCalculation(headers, data, (layout) => {
+        setSheets((prev) => ({ ...prev, [table]: { headers, data, layout } }));
+        resolve();
+      });
+    });
+  };
 
   const getStatus = (sheet?: string | null): HotStatus =>
     gridStatusBySheet[sheet ?? ""] ?? { isFiltered: false, isSorted: false };
@@ -322,7 +374,6 @@ function App() {
             🔄 Alle Tabellen aktualisieren
           </button>
         </div>
-
         <button
           onClick={() => setShowHierarchy(true)}
           style={{
@@ -337,7 +388,6 @@ function App() {
         >
           🧱 Hierarchie öffnen
         </button>
-
         {/* Einbauorte aktualisieren */}
         <button
           onClick={async () => {
@@ -365,7 +415,6 @@ function App() {
         >
           🔄 Materialized Einbauorte aktualisieren
         </button>
-
         {/* Weitere Buttons + Filterstatus */}
         <div
           style={{
@@ -458,7 +507,6 @@ function App() {
             <ConsolePanel logs={logs} />
           </div>
         </div>
-
         {/* Sheet Tabs */}
         <div
           style={{
@@ -493,40 +541,46 @@ function App() {
                 alert("Kein Projekt gewählt!");
                 return;
               }
-              const result = await createSheetApiCall({
-                display_name: newTableName,
-                base_view_id: baseViewId,
-                project_id: selectedProject.id,
-              });
-              if (result.success) {
-                if (result.last_id !== undefined) {
-                  setInitialInsertedId(result.last_id);
+              try {
+                const result = await createSheetApiCall({
+                  display_name: newTableName,
+                  base_view_id: baseViewId,
+                  project_id: selectedProject.id,
+                });
+
+                if (!result.success) {
+                  alert(result.error || "Sheet konnte nicht erstellt werden");
+                  return;
                 }
-                fetch(
+
+                if (result.last_id !== undefined)
+                  setInitialInsertedId(result.last_id);
+
+                // Liste neu laden
+                const res = await fetch(
                   `${API_PREFIX}/api/sheetnames?project_id=${selectedProject.id}`
-                )
-                  .then((res) => res.json())
-                  .then(async (names) => {
-                    setSheetNames(names);
-                    const newSheetName = names.length
-                      ? names[names.length - 1]
-                      : null;
-                    setActiveSheet(newSheetName);
-                    if (newSheetName) {
-                      const tableRes = await fetch(
-                        `${API_PREFIX}/api/tabledata?table=${newSheetName}&limit=700&project_id=${selectedProject.id}`
-                      );
-                      const { headers, data } = await tableRes.json();
-                      triggerLayoutCalculation(headers, data, (layout) => {
-                        setSheets((prev) => ({
-                          ...prev,
-                          [newSheetName]: { headers, data, layout },
-                        }));
-                      });
-                    }
-                  });
-              } else {
-                alert(result.error || "Sheet konnte nicht erstellt werden");
+                );
+                const names: string[] = await res.json();
+                setSheetNames(names);
+
+                // Ziel: exakt der vom Server zurückgegebene sheet_name
+                const target =
+                  result.sheet_name && names.includes(result.sheet_name)
+                    ? result.sheet_name
+                    : names[0] ?? null;
+
+                if (!target) {
+                  alert("Neues Sheet wurde nicht gefunden.");
+                  return;
+                }
+
+                // Daten für neues Sheet robust laden
+                await loadSheetAndActivate(target, selectedProject.id);
+              } catch (err) {
+                console.error(err);
+                alert(
+                  "Fehler beim Erstellen/Laden des neuen Sheets: " + String(err)
+                );
               }
             }}
             onClose={() => setShowSheetMenu(false)}
@@ -544,6 +598,10 @@ function App() {
               <button
                 key={name}
                 onClick={() => setActiveSheet(name)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setTabMenu({ x: e.clientX, y: e.clientY, sheet: name });
+                }}
                 style={{
                   padding: "0.4rem 0.8rem",
                   background: activeSheet === name ? "#555" : "#222",
@@ -552,13 +610,86 @@ function App() {
                   borderRadius: "4px",
                   cursor: "pointer",
                 }}
+                title={cleanName}
               >
                 {cleanName}
               </button>
             );
           })}
-        </div>
 
+          {/* Kontext-Menü (fix positioniert) */}
+          {tabMenu && (
+            <div
+              style={{
+                position: "fixed",
+                left: tabMenu.x,
+                top: tabMenu.y,
+                background: "#1f1f1f",
+                color: "#fff",
+                border: "1px solid #444",
+                borderRadius: 6,
+                boxShadow: "0 6px 24px rgba(0,0,0,0.4)",
+                zIndex: 9999,
+                minWidth: 160,
+                userSelect: "none",
+              }}
+              onMouseLeave={() => setTabMenu(null)}
+            >
+              {/* Delete */}
+              <div
+                style={{ padding: "8px 12px", cursor: "pointer" }}
+                onClick={async () => {
+                  if (!selectedProject?.id) {
+                    setTabMenu(null);
+                    return;
+                  }
+                  if (!window.confirm("Sheet wirklich löschen?")) {
+                    setTabMenu(null);
+                    return;
+                  }
+
+                  const res = await deleteSheetApiCall(
+                    selectedProject.id,
+                    tabMenu.sheet
+                  );
+                  if (!res?.success) {
+                    alert(res?.error || "Delete fehlgeschlagen");
+                    setTabMenu(null);
+                    return;
+                  }
+
+                  // lokalen Cache säubern
+                  setSheets((prev) => {
+                    const copy = { ...prev };
+                    delete copy[tabMenu.sheet];
+                    return copy;
+                  });
+
+                  // Liste neu laden (materialized-Reste werden serverseitig ignoriert)
+                  await reloadSheetNames();
+
+                  setTabMenu(null);
+                }}
+              >
+                Delete
+              </div>
+
+              {/* Rename – Platzhalter */}
+              <div
+                style={{
+                  padding: "8px 12px",
+                  cursor: "not-allowed",
+                  opacity: 0.5,
+                }}
+                title="Rename kommt später"
+                onClick={() => setTabMenu(null)}
+              >
+                Rename
+              </div>
+            </div>
+          )}
+        </div>{" "}
+        {/* ← Tabs-Container sauber schließen */}
         {/* --- Main Grid --- */}
         <Zoom>
           {(zoom, controls) => (

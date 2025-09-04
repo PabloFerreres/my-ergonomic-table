@@ -24,6 +24,23 @@ type SendResult = {
   log?: string;
 };
 
+export async function deleteSheetApiCall(project_id: number, sheet_name: string) {
+  try {
+    const res = await fetch(`${API_PREFIX}/api/views/soft_delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id, sheet_name }),
+    });
+    const json = await res.json();
+    if (!res.ok || json?.success !== true) {
+      throw new Error(json?.detail || json?.error || `HTTP ${res.status}`);
+    }
+    return json;
+  } catch (err) {
+    return { success: false, error: String(err) };
+  }
+}
+
 export async function sendEdits(
   sheet: string,
   edits: EditEntry[],

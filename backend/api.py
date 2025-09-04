@@ -25,8 +25,10 @@ from backend.routes.stair_hierarchy_routes import router as stair_router
 from backend.routes.dropdown_contents import router as dropdown_router
 from backend.routes.export_excel import router as export_excel_router
 from backend.routes.event_routes import router as sse_router
+from backend.routes.views_routes import router as views_router
 
 router = APIRouter(prefix="/api")
+router.include_router(views_router)
 router.include_router(sse_router)
 router.include_router(dropdown_router)
 router.include_router(stair_router)

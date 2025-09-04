@@ -4,7 +4,6 @@ import sqlalchemy
 from backend.settings.connection_points import DB_URL
 
 router = APIRouter()
-
 MATERIALIZED_PREFIX = "materialized_"
 
 def _get_project_suffix(conn: sqlalchemy.engine.Connection, project_id: int) -> str | None:
@@ -16,30 +15,27 @@ def _get_project_suffix(conn: sqlalchemy.engine.Connection, project_id: int) -> 
     ).fetchone()
     return None if not row else row[0]
 
+def _get_active_view_names(conn: sqlalchemy.engine.Connection, project_id: int) -> list[str]:
+    rows = conn.execute(sqlalchemy.text("""
+        SELECT lower(v.name) AS name
+        FROM views v
+        WHERE v.project_id = :pid
+          AND v.deleted_at IS NULL
+    """), {"pid": project_id}).fetchall()
+    return [r.name for r in rows]
+
 @router.get("/sheetnames")
 async def get_sheet_names(project_id: int = Query(...)) -> list[str]:
-    """
-    Liefert die Namen aller bereits existierenden materialisierten Tabellen
-    für das gegebene Projekt: materialized_<view>_<project_materialized_name>
-    """
     engine = sqlalchemy.create_engine(DB_URL)
-
-    # 1) Suffix holen
     with engine.connect() as conn:
         suffix = _get_project_suffix(conn, project_id)
-    if not suffix:
-        return []
+        if not suffix:
+            return []
+        active_views = _get_active_view_names(conn, project_id)
+        allowed = {f"{MATERIALIZED_PREFIX}{v}_{suffix}" for v in active_views}
 
-    # 2) Alle Tabellennamen inspizieren (public)
     inspector = sqlalchemy.inspect(engine)
     all_tables = inspector.get_table_names(schema="public")
-
-    # 3) Filtern nach materialized_*_{suffix}
-    names = [
-        t for t in all_tables
-        if t.startswith(MATERIALIZED_PREFIX) and t.endswith(f"_{suffix}")
-    ]
-
-    # 4) Stabil sortieren (alphabetisch)
+    names = [t for t in all_tables if t in allowed]
     names.sort()
     return names
