@@ -8,7 +8,7 @@ export const traitColors: Record<string, { bg: string; fg: string }> = {
   "header-lavender": { bg: "#CCC0DA", fg: "#000" },
   "header-bright-yellow": { bg: "#FFFF00", fg: "#000" },
   "header-orange": { bg: "#E26B0A", fg: "#000" },
-  "header-metall-grey": {bg:"rgb(187, 193, 207)", fg: "rgb(0, 0, 0)"}
+  "header-metall-grey": {bg:"#A3B5B3", fg: "rgb(0, 0, 0)"}
 };
 
 export default traitColors;

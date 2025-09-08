@@ -277,11 +277,9 @@ function TableGrid({
           const hot = hotRef?.current?.hotInstance ?? null;
           if (!hot) return;
 
-          // ✅ sauber typisieren ohne getPlugin-Generics
-          const dm = hot.getPlugin("dropdownMenu") as unknown as {
-            close?: () => void;
-            menu?: { close?: () => void } | null;
-          };
+          const dm = hot.getPlugin(
+            "dropdownMenu"
+          ) as unknown as DropdownMenuPlugin;
 
           setTimeout(() => {
             dm?.close?.();
@@ -376,6 +374,7 @@ function TableGrid({
         }}
         columnSorting={true}
         manualRowMove={!isBlocked}
+        beforeRowMove={() => (isBlocked ? false : undefined)}
         afterChange={onChange}
         afterCreateRow={(_index: number, _amount: number) => {
           void _index;
@@ -405,7 +404,7 @@ function TableGrid({
             }
           }, 0);
         }}
-        afterRowMove={onRowMove}
+        afterRowMove={isBlocked ? undefined : onRowMove}
         afterRemoveRow={() => {
           if (!isBlocked) {
             const hot = hotRef?.current?.hotInstance;

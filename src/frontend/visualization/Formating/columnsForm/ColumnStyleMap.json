@@ -110,7 +110,7 @@
   },
 
   "header-metall-grey": {
-    "color": "rgb(127, 135, 151)",
+    "color": "#A3B5B3",
     "headers": [
       "Wirkungsgrad",
       "Getriebe", 
@@ -121,7 +121,7 @@
       "Encoder-Typ",
       "Bremse",
       "Motorschutz",
-      "Not-Aus / PLd",
+      "Not-Aus /PLd",
       "Notleistung",
       "Leistung Not",
       "Freigegeben"
@@ -129,7 +129,7 @@
   },
 
   "grid-header-rows": {
-    "color": "#98A5BF",
+    "color": "#999999",
     "headers": [],
     "used_for": ["HEADER rows (Einbauort-Gruppen) Hintergrund"]
   },

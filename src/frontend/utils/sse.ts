@@ -2,6 +2,7 @@
 import type React from "react";
 import type { HotTableClass } from "@handsontable/react";
 import { softAktualisierenSheets } from "../../appButtonFunctions/SoftAktualisierenSheets";
+import { setHeaderRows, clearPending } from "./HeaderRowsStore";
 
 type Layout = {
   columnWidths: Record<string, number>;
@@ -37,6 +38,8 @@ type RematEvent = {
   project_id: number;
   scope: "sheet" | "elektrik" | "all" | "sheet+elektrik";
   sheet?: string;
+  header_rows?: boolean; // <- für den Toggle-Status
+  reason?: string;
 };
 
 export function initSSERefresh(p: Params) {
@@ -85,6 +88,19 @@ export function initSSERefresh(p: Params) {
         (data as RematEvent).type === "remat_done" &&
         (data as RematEvent).project_id === p.projectId
       ) {
+        const msg = data as RematEvent;
+
+        // ✅ Toggle-Status (falls mitgesendet) übernehmen und Pending lösen
+        if (typeof msg.sheet === "string") {
+          if (typeof msg.header_rows === "boolean") {
+            setHeaderRows(msg.sheet, msg.header_rows);
+          } else {
+            // Backend sendet keinen header_rows-Wert → mindestens Pending lösen
+            clearPending(msg.sheet);
+          }
+        }
+
+        // Danach koaleszierter Refresh
         triggerRefresh();
       }
     } catch {
@@ -93,11 +109,12 @@ export function initSSERefresh(p: Params) {
   });
 
   es.addEventListener("ping", () => {
-    return undefined; // keep-alive; nichts zu tun
+    // keep-alive
+    return undefined;
   });
 
   es.addEventListener("error", () => {
-    // optional: logging / backoff; EventSource reconnectt automatisch
+    // optional: logging/backoff; EventSource reconnectet automatisch
     return undefined;
   });
 

@@ -3,7 +3,20 @@
 import psycopg2
 from backend.settings.connection_points import DB_URL, get_views_to_show, DEBUG
 
-def get_materialized_table_name(cursor, project_id: int, view_id: int):
+
+def _get_header_rows_flag(cursor, view_id: int) -> bool:
+    """
+    Liest views.header_rows; fehlt die Spalte, fallback = TRUE (Backwards-kompatibel).
+    """
+    try:
+        cursor.execute("SELECT COALESCE(header_rows, TRUE) FROM views WHERE id = %s", (view_id,))
+        r = cursor.fetchone()
+        return bool(r[0]) if r else True
+    except Exception:
+        return True
+
+
+def get_materialized_table(cursor, project_id: int, view_id: int):
     cursor.execute("""
         SELECT v.name AS view_name, p.name AS project_name
         FROM views v
@@ -21,7 +34,8 @@ def get_materialized_table_name(cursor, project_id: int, view_id: int):
         print(f"[DEBUG] Table name generated: {table_name}")
     return table_name
 
-def create_materialized_table(project_id:int, view_id, base_view_id):
+
+def create_materialized_table(project_id: int, view_id, base_view_id):
     import json
     from pathlib import Path
 
@@ -34,7 +48,7 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
         ON materialized_einbauorte(project_id, id);
     """)
 
-    table_name = get_materialized_table_name(cursor, project_id, view_id)
+    table_name = get_materialized_table(cursor, project_id, view_id)
     if not table_name:
         if DEBUG:
             print(f"[DEBUG] Skipping create_materialized_table for view_id={view_id}: table name not found.")
@@ -189,7 +203,7 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
     if DEBUG:
         print(f"[DEBUG] Column expressions:\n{col_exprs_sql}")
 
-    # 5. Final SQL mit Header-Zeilen (Kommentar='HEADER' & Einbauort=full_name)
+    # 5. Final SQL (Header-Teil wird unten per Flag ein-/ausgeschaltet)
     quoted_cols = [f"\"{c}\"" for c in output_cols]
 
     # Header-Select-Zeile für Alias b
@@ -211,13 +225,15 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
     body_row_select_sql = ", ".join([f"b.{qc}" for qc in quoted_cols])
     eid_sql = einbauort_id_text_expr if einbauort_id_text_expr else "NULL"
 
+    # ---- Header-Schalter lesen
+    header_on = _get_header_rows_flag(cursor, view_id)
     if DEBUG:
-        print(f"[DEBUG] Will inject header rows (Kommentar='HEADER') using __eid derived: {einbauort_id_text_expr is not None}")
+        print(f"[DEBUG] header_rows={header_on} for view_id={view_id}; __eid present={einbauort_id_text_expr is not None}")
 
     print(f"🧱 Creating table: {table_name}")
     cursor.execute(f'DROP TABLE IF EXISTS "{table_name}";')
-    sql = f'''
-        CREATE TABLE "{table_name}" AS
+
+    ctes_base = f'''
         WITH position_data AS (
             SELECT pm.sheet_name, item.data
             FROM position_meta pm,
@@ -235,59 +251,77 @@ def create_materialized_table(project_id:int, view_id, base_view_id):
             LEFT JOIN articles a ON pa.article_id = a.id
             LEFT JOIN inserted_rows ins ON ins.project_article_id = (pd.data->>'project_article_id')::int
             LEFT JOIN articles ai ON ins.article_id = ai.id
-        ),
-        -- carry des Einbauorts über leere Zeilen
-        ff AS (
-            SELECT
-                b.*,
-                SUM(CASE WHEN b.__eid IS NOT NULL THEN 1 ELSE 0 END)
-                  OVER (ORDER BY b.__pos) AS grp
-            FROM base_rows b
-        ),
-        carry AS (
-            SELECT
-                ff.*,
-                MAX(ff.__eid) OVER (PARTITION BY ff.grp) AS carried_eid
-            FROM ff
-        ),
-        body AS (
-            SELECT
-                {body_row_select_sql},
-                __pos AS order_key
-            FROM base_rows b
-        ),
-        headers_base AS (
-            SELECT
-                carry.*,
-                LAG(carry.carried_eid) OVER (ORDER BY carry.__pos) AS prev_carried_eid
-            FROM carry
-        ),
-        headers AS (
-            -- Header nur erzeugen, wenn wir eine __eid haben und sich der getragene Einbauort ändert
-            SELECT
-                {header_row_select_sql_hb},
-                (hb.__pos - 0.5)::numeric AS order_key
-            FROM headers_base hb
-            WHERE
-                hb.__eid IS NOT NULL
-                AND (hb.prev_carried_eid IS NULL OR hb.__eid IS DISTINCT FROM hb.prev_carried_eid)
         )
-        SELECT * FROM (
-            SELECT * FROM headers
-            UNION ALL
-            SELECT * FROM body
-        ) u
-        -- 2) Stabile Sortierung: Tie-Breaker nach project_article_id
-        ORDER BY u.order_key, COALESCE(project_article_id, 0);
     '''
+
+    if header_on:
+        sql = f'''
+            CREATE TABLE "{table_name}" AS
+            {ctes_base},
+            ff AS (
+                SELECT
+                    b.*,
+                    SUM(CASE WHEN b.__eid IS NOT NULL THEN 1 ELSE 0 END)
+                      OVER (ORDER BY b.__pos) AS grp
+                FROM base_rows b
+            ),
+            carry AS (
+                SELECT
+                    ff.*,
+                    MAX(ff.__eid) OVER (PARTITION BY ff.grp) AS carried_eid
+                FROM ff
+            ),
+            body AS (
+                SELECT
+                    {body_row_select_sql},
+                    __pos AS order_key
+                FROM base_rows b
+            ),
+            headers_base AS (
+                SELECT
+                    carry.*,
+                    LAG(carry.carried_eid) OVER (ORDER BY carry.__pos) AS prev_carried_eid
+                FROM carry
+            ),
+            headers AS (
+                -- Header nur erzeugen, wenn wir eine __eid haben und sich der getragene Einbauort ändert
+                SELECT
+                    {header_row_select_sql_hb},
+                    (hb.__pos - 0.5)::numeric AS order_key
+                FROM headers_base hb
+                WHERE
+                    hb.__eid IS NOT NULL
+                    AND (hb.prev_carried_eid IS NULL OR hb.__eid IS DISTINCT FROM hb.prev_carried_eid)
+            )
+            SELECT * FROM (
+                SELECT * FROM headers
+                UNION ALL
+                SELECT * FROM body
+            ) u
+            -- 2) Stabile Sortierung: Tie-Breaker nach project_article_id
+            ORDER BY u.order_key, COALESCE(project_article_id, 0);
+        '''
+    else:
+        sql = f'''
+            CREATE TABLE "{table_name}" AS
+            {ctes_base},
+            body AS (
+                SELECT
+                    {body_row_select_sql},
+                    __pos AS order_key
+                FROM base_rows b
+            )
+            SELECT * FROM body
+            ORDER BY order_key, COALESCE(project_article_id, 0);
+        '''
+
     if DEBUG:
-        print(f"[DEBUG] Running CREATE SQL:\n{sql}")
+        print(f"[DEBUG] Running CREATE SQL (header_rows={header_on})")
     cursor.execute(sql)
     conn.commit()
     print(f"✅ Created: {table_name}")
     cursor.close()
     conn.close()
-
 
 
 def refresh_all_materialized(project_id: int):
@@ -303,6 +337,7 @@ def refresh_all_materialized(project_id: int):
             print(f"[DEBUG] Creating materialized for view_id={view_id}, base_view_id={base_view_id}")
         create_materialized_table(project_id, view_id, base_view_id)
     print("✅ Alle Materialized Tables wurden aktualisiert.")
+
 
 if __name__ == "__main__":
     refresh_all_materialized(1)

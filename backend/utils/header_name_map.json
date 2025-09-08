@@ -70,10 +70,11 @@
   "Ventilator": "ventilator",
   "Encoder": "encoder",
   "Antriebs-CLIQ": "antriebs_cliq",
+  "Encoder-Typ": "encoder_typ",
   "Bremse": "bremse",
   "Motorschutz": "motorschutz",
-  " Not-Aus / PLd": "not_aus_pld",
-  "Notleistung": "notlesitung",
+  "Not-Aus /PLd": "not_aus_pld",
+  "Notleistung": "notleistung",
   "Leistung Not": "leistung_not",
   "Freigegeben": "freigegeben"
 

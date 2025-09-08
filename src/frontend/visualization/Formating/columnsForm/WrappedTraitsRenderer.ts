@@ -3,12 +3,16 @@
 import { TraitsRenderer } from "./TraitsRenderer";
 import Handsontable from "handsontable";
 
-const STAR_INLINE_RE = /\*(.*?)\*/g;
+const STAR_INLINE_RE = /\*(.*?)\*/g;          // *rot*
+const BOLD_INLINE_RE = /\*\*(.+?)\*\*/g;      // **fett**
 const KOMMENTAR_IDX_CACHE = new WeakMap<Handsontable, number>();
 const TD_WRAPPED = new WeakSet<HTMLTableCellElement>();
 
 type RowState = { kTxt: string; isHeader: boolean; isEntfallen: boolean };
 type HetCellMeta = Partial<Handsontable.CellProperties> & { _hetRowState?: RowState };
+
+const escapeHtml = (s: string) =>
+  s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]!));
 
 function getKommentarIdx(instance: Handsontable): number {
   const cached = KOMMENTAR_IDX_CACHE.get(instance);
@@ -47,7 +51,7 @@ function getRowState(
 
   if (!state || state.kTxt !== kTxt || state.isHeader !== isHeader || state.isEntfallen !== isEntfallen) {
     state = { kTxt, isHeader, isEntfallen };
-    meta0._hetRowState = state;
+    (meta0 as HetCellMeta)._hetRowState = state;
   }
   return state;
 }
@@ -85,17 +89,27 @@ export const WrappedTraitsRenderer = (
   // - ultrasicherer Marker "\\\n"  → echter \n
   // - optional: "/n" nur am Zeilenanfang oder nach Whitespace → \n
   const raw = value == null ? "" : String(value);
-  const display = raw
-    .replace(/\\{3}n/g, "\n")
-    .replace(/(^|[\s])\/n/g, "$1\n");
+  const display = raw.replace(/\\{3}n/g, "\n").replace(/(^|[\s])\/n/g, "$1\n");
 
-  // 3) Inline-*rot* (nur wenn nötig); sonst sicherer Textcontent
-  if (display.includes("*") && STAR_INLINE_RE.test(display)) {
-    td.innerHTML = display.replace(STAR_INLINE_RE, '<span class="red-inline">$1</span>');
-    STAR_INLINE_RE.lastIndex = 0;
-  } else {
-    td.textContent = display;
+  // 3) Inline-Formatierung: zuerst **fett**, dann *rot* – sicher mit HTML-Escape
+  let usedHtml = false;
+  let html = escapeHtml(display);
+
+  // **bold**
+  if (html.includes("**") && BOLD_INLINE_RE.test(html)) {
+    html = html.replace(BOLD_INLINE_RE, "<strong>$1</strong>");
+    BOLD_INLINE_RE.lastIndex = 0;
+    usedHtml = true;
   }
+  // *rot*
+  if (html.includes("*") && STAR_INLINE_RE.test(html)) {
+    html = html.replace(STAR_INLINE_RE, '<span class="red-inline">$1</span>');
+    STAR_INLINE_RE.lastIndex = 0;
+    usedHtml = true;
+  }
+
+  if (usedHtml) td.innerHTML = html;
+  else td.textContent = display;
 
   // 3b) Nur wenn echte Newlines vorhanden sind, pre-wrap aktivieren
   td.style.whiteSpace = display.includes("\n") ? "pre-wrap" : "normal";
@@ -110,7 +124,7 @@ export const WrappedTraitsRenderer = (
 
     if (rs.isHeader) {
       cellProperties.readOnly = true;
-      cellProperties.editor = false;
+      (cellProperties as any).editor = false;
     }
   } else {
     td.classList.remove("het-header-row", "row-entfallen");

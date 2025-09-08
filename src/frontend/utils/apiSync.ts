@@ -41,6 +41,31 @@ export async function deleteSheetApiCall(project_id: number, sheet_name: string)
   }
 }
 
+/**
+ * Header-Zeilen (per sheet_name) setzen.
+ * Server rematerialisiert & sendet SSE mit { type:"remat_done", sheet, header_rows }.
+ */
+export async function setHeaderRowsBySheet(
+  project_id: number,
+  sheet_name: string,
+  header_rows: boolean
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    const res = await fetch(`${API_PREFIX}/api/views/set_header_rows_by_sheet`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id, sheet_name, header_rows }),
+    });
+    const json = await res.json();
+    if (!res.ok || json?.success !== true) {
+      throw new Error(json?.detail || json?.error || `HTTP ${res.status}`);
+    }
+    return json as { success: true };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  }
+}
+
 export async function sendEdits(
   sheet: string,
   edits: EditEntry[],
@@ -109,8 +134,6 @@ export async function sendEdits(
 
   return result ?? { status: "ok", count: edits.length };
 }
-
-
 
 export async function sendPositionMap(
   sheet: string,

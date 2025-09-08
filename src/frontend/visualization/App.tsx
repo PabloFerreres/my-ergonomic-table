@@ -26,6 +26,14 @@ import { initSSERefresh } from "../utils/sse";
 import config from "../../../config.json";
 import ExportExcelButton from "../../appButtonFunctions/ExportExcelButton";
 import { deleteSheetApiCall } from "../utils/apiSync";
+import { setHeaderRowsBySheet } from "../utils/apiSync";
+import {
+  getHeaderRows,
+  isPending,
+  markPending,
+  clearPending,
+  subscribe,
+} from "../utils/HeaderRowsStore";
 
 import FunctionDock from "./uiSquares/FunctionDock";
 import type {
@@ -315,6 +323,100 @@ function App() {
     return (
       <div style={{ padding: "2rem", fontSize: "1.2rem" }}>
         ⏳ Lade Tabellen...
+      </div>
+    );
+  }
+
+  function HeaderRowsToggleRow({
+    sheet,
+    projectId,
+  }: {
+    sheet: string;
+    projectId?: number;
+  }) {
+    const sheetKey = sheet.toLowerCase();
+    const [, force] = useState(0);
+
+    useEffect(() => subscribe(() => force((x) => x + 1)), []);
+
+    const enabled = getHeaderRows(sheetKey);
+    const pending = isPending(sheetKey);
+
+    // ✦ NEU: robustes Erkennen von Elektrik-Sheets (namensbasiert, minimal-invasiv)
+    const isElektrikSheet = /(^|_)elektrik(_|$)/.test(sheetKey);
+
+    const onToggle = async () => {
+      if (!projectId || pending) return;
+
+      // ✦ NEU: Block – in Elektrik darf man Header nicht ausschalten
+      if (isElektrikSheet && enabled) {
+        // optional: kurzer Hinweis; wenn du es ganz still willst, Zeile entfernen
+        console.info(
+          "Elektrik-Sheet: Header sind fixiert (können nicht deaktiviert werden)."
+        );
+        return;
+      }
+
+      const next = !enabled;
+      markPending(sheetKey);
+      try {
+        await setHeaderRowsBySheet(projectId, sheetKey, next);
+        // finaler Zustand kommt über SSE -> Store
+      } catch (e) {
+        clearPending(sheetKey);
+        alert("Toggle fehlgeschlagen: " + String(e));
+      }
+    };
+
+    const isBlockedNow = isElektrikSheet && enabled;
+
+    return (
+      <div
+        style={{
+          padding: "8px 12px",
+          cursor: pending ? "wait" : isBlockedNow ? "not-allowed" : "pointer",
+          opacity: pending || isBlockedNow ? 0.6 : 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+        onClick={onToggle}
+        title={
+          pending
+            ? "Wird angewendet…"
+            : isBlockedNow
+            ? "Elektrik: Header-Zeilen sind fixiert"
+            : enabled
+            ? "Header-Zeilen deaktivieren"
+            : "Header-Zeilen aktivieren"
+        }
+      >
+        <span>Header-Zeilen{isElektrikSheet ? " (Elektrik)" : ""}</span>
+        <div
+          style={{
+            width: 42,
+            height: 22,
+            borderRadius: 999,
+            background: enabled ? "#4ade80" : "#e5e7eb",
+            position: "relative",
+            boxShadow: "inset 0 0 0 1px rgba(0,0,0,.1)",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: 2,
+              left: enabled ? 22 : 2,
+              width: 18,
+              height: 18,
+              borderRadius: "50%",
+              background: "#fff",
+              boxShadow: "0 1px 3px rgba(0,0,0,.35)",
+              transition: "left .2s",
+            }}
+          />
+        </div>
       </div>
     );
   }
@@ -630,11 +732,27 @@ function App() {
                 borderRadius: 6,
                 boxShadow: "0 6px 24px rgba(0,0,0,0.4)",
                 zIndex: 9999,
-                minWidth: 160,
+                minWidth: 200,
                 userSelect: "none",
+                padding: 4,
               }}
               onMouseLeave={() => setTabMenu(null)}
             >
+              {/* Header Rows Toggle */}
+              <HeaderRowsToggleRow
+                sheet={tabMenu.sheet}
+                projectId={selectedProject?.id}
+              />
+
+              {/* Divider */}
+              <div
+                style={{
+                  height: 1,
+                  background: "#333",
+                  margin: "6px 8px",
+                }}
+              />
+
               {/* Delete */}
               <div
                 style={{ padding: "8px 12px", cursor: "pointer" }}
@@ -665,9 +783,7 @@ function App() {
                     return copy;
                   });
 
-                  // Liste neu laden (materialized-Reste werden serverseitig ignoriert)
                   await reloadSheetNames();
-
                   setTabMenu(null);
                 }}
               >
