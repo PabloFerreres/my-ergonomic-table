@@ -3,7 +3,11 @@ from io import BytesIO
 from pathlib import Path
 from typing import Optional, Any, Tuple, Dict, List
 import json
+import re
 import xlsxwriter  # pip install xlsxwriter
+
+# Inline-Writer für **fett** und *rot* (setzt echte Zellteilformate)
+from backend.utils.excel_inline import write_inline
 
 # Pfad zur Color-Map
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -110,6 +114,21 @@ def _autosize_from_values_only(headers: List[Any], data: List[List[Any]]) -> Lis
         widths.append(w)
     return widths
 
+# Anzeige-Normalisierung & Marker-Strip (für Header-Zeilen)
+_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
+_RED_RE  = re.compile(r"\*(.+?)\*")
+
+def _normalize_display(s: str) -> str:
+    s = re.sub(r'\\{3}n', '\n', s or "")
+    s = re.sub(r'(^|\s)/n', r'\1\n', s)
+    return s
+
+def _strip_markers(s: str) -> str:
+    s = _normalize_display(s or "")
+    s = _BOLD_RE.sub(r"\1", s)
+    s = _RED_RE.sub(r"\1", s)
+    return s
+
 def build_excel(payload: dict) -> bytes:
     """
     payload = {
@@ -121,7 +140,7 @@ def build_excel(payload: dict) -> bytes:
       ]
     }
     """
-    header_color_by_name, header_rows_bg, inbetween_red = _load_style_map()
+    header_color_by_name, header_rows_bg, _inbetween_red = _load_style_map()
 
     mem = BytesIO()
     wb = xlsxwriter.Workbook(mem, {"in_memory": True})
@@ -131,7 +150,6 @@ def build_excel(payload: dict) -> bytes:
         name    = str(sheet.get("name", "Sheet"))[:31]
         headers = list(sheet.get("headers") or [])
         data    = list(sheet.get("data") or [])
-        # layout wird NICHT mehr für Zeilenhöhen genutzt
 
         ws = wb.add_worksheet(name)
 
@@ -176,10 +194,11 @@ def build_excel(payload: dict) -> bytes:
         if headers:
             ws.autofilter(0, 0, 0, len(headers) - 1)
 
-        # 5) Daten schreiben (+ HEADER-Zeilen/“**” Logik)
+        # 5) Daten schreiben:
+        #    - HEADER-Zeilen: Hintergrund + Bold aus StyleMap, Marker entfernt
+        #    - sonst: Rich-Text via write_inline(**fett**, *rot*)
         kommentar_idx = next((i for i, hh in enumerate(headers) if str(hh).lower() == "kommentar"), -1)
         fmt_header_row = _fmt(wb, cache, bg=header_rows_bg, fg="#000000", bold=True, align="left")
-        fmt_inbetween  = _fmt(wb, cache, fg=inbetween_red, align="left")
 
         for r, row in enumerate(data, start=1):
             is_header_row = False
@@ -188,13 +207,11 @@ def build_excel(payload: dict) -> bytes:
                 is_header_row = (isinstance(v, str) and v.strip().upper() == "HEADER")
 
             for c, val in enumerate(row):
-                cell_fmt = fmt_header_row if is_header_row else None
-                if isinstance(val, str) and ("**" in val) and not is_header_row:
-                    if cell_fmt is fmt_header_row:
-                        cell_fmt = _fmt(wb, cache, bg=header_rows_bg, fg=inbetween_red, bold=True, align="left")
-                    else:
-                        cell_fmt = fmt_inbetween
-                ws.write(r, c, val, cell_fmt)
+                if is_header_row:
+                    txt = _strip_markers(str(val) if val is not None else "")
+                    ws.write(r, c, txt, fmt_header_row)
+                else:
+                    write_inline(ws, wb, r, c, str(val) if val is not None else "")
 
     wb.close()
     return mem.getvalue()
