@@ -1,7 +1,7 @@
 import Handsontable from "handsontable";
-import { GetColumnTraits } from "../Formating/columnsForm/ColumnTraits";
-import { WrappedTraitsRenderer } from "../Formating/columnsForm/WrappedTraitsRenderer";
-import { traitColors } from "../Formating/columnsForm/TraitColorsHeaders";
+import { GetColumnTraits } from "../Formating/ColumnTraits";
+import { WrappedTraitsRenderer } from "../Formating/WrappedTraitsRenderer";
+import { traitColors } from "../Formating/TraitColorsHeaders";
 
 export function buildColumnDefs(
   colHeaders: string[]

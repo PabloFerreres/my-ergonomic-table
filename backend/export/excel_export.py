@@ -11,7 +11,7 @@ from backend.utils.excel_inline import write_inline
 
 # Pfad zur Color-Map
 REPO_ROOT = Path(__file__).resolve().parents[2]
-STYLE_PATH = REPO_ROOT / "src" / "frontend" / "visualization" / "Formating" / "columnsForm" / "ColumnStyleMap.json"
+STYLE_PATH = REPO_ROOT / "src" / "frontend" / "visualization" / "Formating"  / "ColumnStyleMap.json"
 if not STYLE_PATH.exists():
     raise FileNotFoundError(f"ColumnStyleMap.json not found at {STYLE_PATH}")
 
@@ -22,7 +22,7 @@ DATA_ROW_HEIGHT_PT = 18             # einheitliche Datenzeilenhöhe
 
 def _norm_hex(s: Optional[str]) -> Optional[str]:
     if not s:
-        return None
+        return Nones
     s = s.strip().upper()
     if not s.startswith("#"):
         return None
