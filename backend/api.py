@@ -43,45 +43,6 @@ router.include_router(export_excel_router)
 
 HEADER_MAP = json.loads(Path("backend/utils/header_name_map.json").read_text(encoding="utf-8"))
 
-@router.post("/updateDraft/{draft_id}")
-async def update_draft(draft_id: str, request: Request, project_id: int = Query(...)):
-    payload = await request.json()
-    conn = await asyncpg.connect(DB_URL)
-
-    await conn.execute("""
-        INSERT INTO meta_datas (id, name, data, updated_at)
-        VALUES ($1::uuid,2, $3::jsonb, now())
-        ON CONFLICT (id)
-        DO UPDATE SET name = EXCLUDED.name, data = EXCLUDED.data, updated_at = now()
-    """, draft_id, "payload-test", json.dumps(payload))
-
-    for sheet in payload.get("positions", []):
-        sheet_name = sheet.get("sheet")
-        position_map = sheet.get("rows", [])
-        if not sheet_name:
-            continue
-        await conn.execute("""
-            INSERT INTO position_meta (sheet_name, position_map, updated_at)
-            VALUES ($1, $2::jsonb, now())
-            ON CONFLICT (sheet_name)
-            DO UPDATE SET position_map = EXCLUDED.position_map, updated_at = now()
-        """, sheet_name, json.dumps(position_map))
-
-    if "edits" in payload:
-        await apply_edits_to_draft(conn, payload["edits"])
-
-    if DEBUG:
-        print(f"✅ DB gespeichert: id={draft_id}, edits={len(payload.get('edits', []))}, positions={len(payload.get('positions', []))}")
-
-    # Nur Materialisierung für dynamische Projekt-Views!
-    views_to_show = get_views_to_show(project_id)
-    if DEBUG:
-        print(f"[DEBUG] Refreshing materialized tables for views: {views_to_show}")
-    refresh_all_materialized(project_id)
-
-    await conn.close()
-    return {"status": "saved", "id": draft_id, "sheets": len(payload.get("positions", []))}
-
 
 @router.post("/updatePosition")
 async def update_position(request: Request, project_id: int = Query(...)):
