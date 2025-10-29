@@ -9,8 +9,8 @@ import { afterGetColHeader } from "./uiTableGrid/TableGridConsts";
 import { useDropdownColumns, useDropdownOptions } from "../hooks/useDropdowns";
 import { useCellProperties } from "../hooks/useCellProperties";
 import { useAfterChange } from "../hooks/useAfterChange";
-import { useAfterRowMove } from "../hooks/useAfterRowMove";
 import { useAfterUndo } from "../hooks/useAfterUndo";
+// import { useAfterRowMove } from "../hooks/useAfterRowMove";
 import Handsontable from "handsontable";
 import { buildVisualPositionMap } from "../utils/BuildVisualPositionMap";
 import { sendPositionMap } from "../utils/apiSync";
@@ -100,14 +100,14 @@ function TableGrid({
     selectedProject.id
   );
 
-  const onRowMove = useAfterRowMove(
-    safeData,
-    rowIdIndex,
-    sheetName,
-    hotRef?.current?.hotInstance ?? null,
-    colHeaders,
-    selectedProject.id
-  );
+  // const onRowMove = useAfterRowMove(
+  //   safeData,
+  //   rowIdIndex,
+  //   sheetName,
+  //   hotRef?.current?.hotInstance ?? null,
+  //   colHeaders,
+  //   selectedProject.id
+  // );
 
   const handleSelection = (row: number, col: number) => {
     onSelectionChange?.({ row, col });
@@ -373,8 +373,9 @@ function TableGrid({
           },
         }}
         columnSorting={true}
-        manualRowMove={!isBlocked}
-        beforeRowMove={() => (isBlocked ? false : undefined)}
+        manualRowMove={false}
+        beforeRowMove={() => false}
+        afterRowMove={undefined}
         afterChange={onChange}
         afterCreateRow={(_index: number, _amount: number) => {
           void _index;
@@ -404,7 +405,6 @@ function TableGrid({
             }
           }, 0);
         }}
-        afterRowMove={isBlocked ? undefined : onRowMove}
         afterRemoveRow={() => {
           if (!isBlocked) {
             const hot = hotRef?.current?.hotInstance;

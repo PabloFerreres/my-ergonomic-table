@@ -1,0 +1,18 @@
+flowchart LR
+  DL[PnPDataLinks\n(RowId, DwgId)]:::tab
+  WN[WSPCustomPNID\n(PnPID,...)]:::tab
+  PB[PnPBase\n(PnPID, PnPGuid)]:::tab
+  PD[PnPDrawings\n(PnPID,...)]:::tab
+  OUT[[Result JSON\nfor each smart object]]:::out
+
+  DL -- "dl.DwgId = TARGET_PNPID\n(WHERE)" --> DL
+  DL -- "dl.RowId ∈ wn.PnPID\n(IN)" --> WN
+  DL -- "dl.RowId ∈ pb.PnPID\n(IN)" --> PB
+  PD -- "pd.PnPID = TARGET_PNPID\n(=)" --> PD
+
+  WN --> OUT
+  PB --> OUT
+  PD --> OUT
+
+  classDef tab fill:#f7f7ff,stroke:#777,stroke-width:1px;
+  classDef out fill:#e5ffe5,stroke:#777,stroke-width:1px;
