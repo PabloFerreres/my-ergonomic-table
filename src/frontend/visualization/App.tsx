@@ -76,6 +76,9 @@ function App() {
   const [gridStatusBySheet, setGridStatusBySheet] = useState<
     Record<string, HotStatus>
   >({});
+  const [viewIdBySheet, setViewIdBySheet] = useState<Record<string, number>>(
+    {}
+  );
 
   const projectId = selectedProject?.id ?? undefined;
 
@@ -231,22 +234,25 @@ function App() {
 
   useEffect(() => {
     if (!selectedProject) return;
-
-    fetch(`${API_PREFIX}/api/last_insert_id?project_id=${selectedProject.id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        console.log("📥 Loaded last_insert_id from DB:", data.lastId);
-        const last = data.lastId ?? -1;
-        setInitialInsertedId(last);
-      })
-      .catch((err) => console.error("❌ Failed to fetch last_insert_id:", err));
-
+    // Fetch sheet names
     fetch(`${API_PREFIX}/api/sheetnames?project_id=${selectedProject.id}`)
       .then((res) => res.json())
       .then((names: string[]) => {
         setSheetNames(names);
         setActiveSheet(names[0] ?? null);
-
+        // Fetch all views for mapping
+        fetch(`${API_PREFIX}/api/views?project_id=${selectedProject.id}`)
+          .then((res) => res.json())
+          .then((views: { id: number; name: string }[]) => {
+            // Build mapping: use views.name directly (middle part)
+            const map: Record<string, number> = {};
+            views.forEach((v) => {
+              map[v.name] = v.id;
+            });
+            setViewIdBySheet(map);
+          })
+          .catch(() => setViewIdBySheet({}));
+        // ...existing code for loading sheets...
         return Promise.all(
           names.map((name) =>
             fetch(
@@ -558,6 +564,81 @@ function App() {
             }}
           >
             Rematerialize All
+          </button>
+
+          <button
+            onClick={async () => {
+              if (!selectedProject || !activeSheet) {
+                alert("Kein Projekt oder Sheet gewählt!");
+                return;
+              }
+              // Extract middle part for mapping
+              let sheetKey = activeSheet;
+              if (sheetKey.startsWith("materialized_")) {
+                sheetKey = sheetKey.slice("materialized_".length);
+              }
+              if (sheetKey.includes("_")) {
+                sheetKey = sheetKey.substring(0, sheetKey.lastIndexOf("_"));
+              }
+              const viewId = viewIdBySheet[sheetKey];
+              console.log("[Sync] activeSheet:", activeSheet);
+              console.log("[Sync] sheetKey:", sheetKey);
+              console.log("[Sync] viewIdBySheet:", viewIdBySheet);
+              console.log("[Sync] resolved viewId:", viewId);
+              if (!viewId) {
+                alert("view_id für aktives Sheet nicht gefunden!");
+                return;
+              }
+              try {
+                // Step 2: Trigger sync workflow
+                const payload = {
+                  project_id: selectedProject.id,
+                  view_id: viewId,
+                };
+                console.log("[Sync] Sending payload:", payload);
+                const syncRes = await fetch(`${API_PREFIX}/api/sync_to_cad`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload),
+                });
+                const raw = await syncRes.clone().text();
+                console.log("[Sync] Raw response:", raw);
+                if (!syncRes.ok)
+                  throw new Error(`Sync-Fehler: ${syncRes.status}`);
+                const syncResult = await syncRes.json();
+                console.log("[Sync] Parsed response:", syncResult);
+                const now = new Date().toLocaleTimeString();
+                setLogs((prev) => [
+                  ...prev,
+                  {
+                    text: `✅ Sync erfolgreich für view_id ${viewId}: ${
+                      syncResult.log || "OK"
+                    }`,
+                    time: now,
+                  },
+                ]);
+                alert(`✅ Sync erfolgreich für view_id ${viewId}`);
+              } catch (err) {
+                const errorMsg =
+                  "❌ Advanced Sync fehlgeschlagen: " + String(err);
+                const now = new Date().toLocaleTimeString();
+                setLogs((prev) => [...prev, { text: errorMsg, time: now }]);
+                alert(errorMsg);
+              }
+            }}
+            style={{
+              padding: "0.4rem 0.8rem",
+              background: "#2170c4",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontWeight: "bold",
+              marginLeft: "0.5rem",
+            }}
+            title="Erweiterte Sync-Einstellungen: CAD-Daten synchronisieren (direkt mit view_id)"
+          >
+            Sync With CAD (View)
           </button>
 
           <FilterStatus

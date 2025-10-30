@@ -56,6 +56,63 @@ async def set_header_rows_by_sheet(request: Request):
 
     return {"success": True}
 
+@router.post("/views/get_view_id")
+async def get_view_id(request: Request):
+    """
+    Body: { "project_id": int, "sheet_name": str }
+    Returns: { "view_id": int }
+    """
+    b = await request.json()
+    project_id = int(b["project_id"])
+    sheet_name = str(b["sheet_name"]).lower()
+
+    engine = create_engine(DB_URL)
+    with engine.begin() as conn:
+        row = conn.execute(text("""
+            SELECT v.id AS view_id
+            FROM views v
+            JOIN projects p ON v.project_id = p.id
+            WHERE v.project_id = :pid
+              AND LOWER(CONCAT('materialized_', v.name, '_', p.name)) = :sname
+        """), {"pid": project_id, "sname": sheet_name}).fetchone()
+
+        if not row:
+            raise HTTPException(404, "Sheet/View not found")
+        return {"view_id": row.view_id}
+
+@router.get("/views/get_view_id")
+async def get_view_id_get(request: Request):
+    # Read from query params for GET
+    project_id = request.query_params.get("project_id")
+    sheet_name = request.query_params.get("sheet_name")
+    if not project_id or not sheet_name:
+        raise HTTPException(400, "Missing project_id or sheet_name")
+    engine = create_engine(DB_URL)
+    with engine.begin() as conn:
+        row = conn.execute(text("""
+            SELECT v.id AS view_id
+            FROM views v
+            JOIN projects p ON v.project_id = p.id
+            WHERE v.project_id = :pid
+              AND LOWER(CONCAT('materialized_', v.name, '_', p.name)) = :sname
+        """), {"pid": int(project_id), "sname": sheet_name.lower()}).fetchone()
+        if not row:
+            raise HTTPException(404, "Sheet/View not found")
+        return {"view_id": row.view_id}
+
+@router.get("/views")
+async def list_views(request: Request):
+    project_id = request.query_params.get("project_id")
+    if not project_id:
+        raise HTTPException(400, "Missing project_id")
+    engine = create_engine(DB_URL)
+    with engine.begin() as conn:
+        rows = conn.execute(text("""
+            SELECT v.id, v.name
+            FROM views v
+            WHERE v.project_id = :pid
+        """), {"pid": int(project_id)}).fetchall()
+        return [{"id": row.id, "name": row.name} for row in rows]
 
 @router.post("/views/soft_delete")
 async def soft_delete_view(request: Request):
