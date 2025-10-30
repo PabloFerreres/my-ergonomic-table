@@ -6,8 +6,8 @@
   "Status": "status",
   "Relevance E-Tech.": "relevance_etech",
   "Kommentar": "kommentar",
-  "RI-Char.": "richar",
-  "MSR / ANSI Char.": "msr_ansi_char",
+  "RI Char.": "ri_char",
+  "ANSI Char.": "ansi_char",
   "ID": "id_technisch",
   "Weitere Funktionen Verschaltung":"weitere_funktionen_verschaltung",
   "EMSR No.": "emsr_no",
@@ -76,6 +76,7 @@
   "Not-Aus /PLd": "not_aus_pld",
   "Notleistung": "notleistung",
   "Leistung Not": "leistung_not",
-  "Freigegeben": "freigegeben"
+  "Freigegeben": "freigegeben",
+  "BMK No.": "bmk_no"
 
 }

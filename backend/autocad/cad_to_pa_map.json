@@ -1,0 +1,12 @@
+{
+    "article_id": "article_id",
+    "EinbauortID": "einbauort",
+    "Ri_Char": "ri_char",
+    "ANSI_Char": "ansi_char",
+    "EMSR_No": "emsr_no",
+    "BMK_No": "bmk_no",
+    "Medium": "medium",
+    "Function": "funktion",
+    "Einstellung": "isteinstellung_inbetriebnahme",
+    "GUID": "pnpguid"
+}
