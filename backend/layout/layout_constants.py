@@ -13,7 +13,7 @@ HORIZONTAL_HEADER_LAYOUT = {
 }
 
 CELL_LAYOUT = {
-    "cell_char_width": 12,
+    "cell_char_width": 9,
     "padding": 5,
     "line_height": 20,
     "min_placeholder_chars": 3,

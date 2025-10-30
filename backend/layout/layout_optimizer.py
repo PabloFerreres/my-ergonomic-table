@@ -46,7 +46,11 @@ def optimize_table_layout(
     for col_index, header in enumerate(headers):
         max_cell_width = max(cell_widths_by_col[col_index])
         header_width = estimate_rotated_header_width(header)
-        column_widths[header] = max(max_cell_width, header_width)
+        width = max(max_cell_width, header_width)
+        # Ensure Kommentar column has a minimal width of 50px
+        if header.strip() == "Kommentar":
+            width = max(width, 70)
+        column_widths[header] = width
 
         if DEBUG_FLAGS.get("layout_optimizer"):
             if header.strip() == "Kommentar":
