@@ -74,11 +74,17 @@ function TableGrid({
     [baseCellProps]
   );
 
+  // Only these columns are editable
+  const editableColumns = ["Status", "Lieferumfang"];
+
   const columnDefs = columnDefsRaw.map((def, index) => {
     const header = colHeaders[index];
     return {
       ...def,
-      readOnly: header === "project_article_id" ? true : def.readOnly,
+      readOnly:
+        header === "project_article_id"
+          ? true
+          : !editableColumns.includes(header),
     };
   });
 
