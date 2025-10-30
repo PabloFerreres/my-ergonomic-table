@@ -100,11 +100,26 @@ def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_t
 def map_cad_properties_to_pa(obj):
     """
     Maps a CAD object dictionary to a dict of project_articles columns using cad_to_pa_map.json.
+    Ensures einbauort is always an integer if present. emsr_no is left as-is (can be string).
     """
     mapping_path = os.path.join(os.path.dirname(__file__), "cad_to_pa_map.json")
     with open(mapping_path, "r", encoding="utf-8") as f:
         mapping = json.load(f)
-    return {pa_col: obj.get(cad_prop) for cad_prop, pa_col in mapping.items() if pa_col}
+    result = {}
+    for cad_prop, pa_col in mapping.items():
+        if pa_col:
+            val = obj.get(cad_prop)
+            if pa_col == "einbauort":
+                # Convert to integer if possible
+                if val is not None:
+                    try:
+                        if isinstance(val, str) and val.endswith(".0"):
+                            val = val[:-2]
+                        val = int(float(val))
+                    except Exception:
+                        val = None
+            result[pa_col] = val
+    return result
 
 def upsert_project_article(pg_conn, project_id, view_id, mapped_props):
     """
