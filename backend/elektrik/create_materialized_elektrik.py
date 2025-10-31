@@ -202,10 +202,10 @@ def create_materialized_elektrik(project_id:int):
             FROM inserted_rows ir
             WHERE ir.project_article_id = ANY(%s) AND ir.relevance_etech IN ('E','ES')
             UNION
-            SELECT pa.id AS project_article_id, a.relevance_etech, pa.article_id
+            SELECT pa.id AS project_article_id, pa.relevance_etech, pa.article_id
             FROM project_articles pa
             JOIN articles a ON pa.article_id = a.id
-            WHERE pa.id = ANY(%s) AND a.relevance_etech IN ('E','ES')
+            WHERE pa.id = ANY(%s) AND pa.relevance_etech IN ('E','ES')
         ),
         base_rows AS (
             SELECT

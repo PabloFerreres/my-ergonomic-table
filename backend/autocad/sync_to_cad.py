@@ -100,17 +100,23 @@ def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_t
 def map_cad_properties_to_pa(obj):
     """
     Maps a CAD object dictionary to a dict of project_articles columns using cad_to_pa_map.json.
-    Ensures einbauort is always an integer if present. emsr_no is left as-is (can be string).
+    Uses logical variable names for intermediate mapping and logic.
+    Computes relevance_etech from E1 (Relevanz E Tech) and E2 (Safety), then maps E3 to relevance_etech.
     """
     mapping_path = os.path.join(os.path.dirname(__file__), "cad_to_pa_map.json")
     with open(mapping_path, "r", encoding="utf-8") as f:
-        mapping = json.load(f)
+        mapping_json = json.load(f)
+    property_map = mapping_json.get("property_map", {})
+    logical_vars = mapping_json.get("logical_vars", {})
+    computed_vars = mapping_json.get("computed_vars", {})
+
+    # Step 1: Map CAD properties to Postgres columns (direct mapping)
     result = {}
-    for cad_prop, pa_col in mapping.items():
-        if pa_col:
+    debug_log = []
+    for cad_prop, pg_col in property_map.items():
+        if pg_col:
             val = obj.get(cad_prop)
-            if pa_col == "einbauort":
-                # Convert to integer if possible
+            if cad_prop == "EinbauortID":
                 if val is not None:
                     try:
                         if isinstance(val, str) and val.endswith(".0"):
@@ -118,7 +124,40 @@ def map_cad_properties_to_pa(obj):
                         val = int(float(val))
                     except Exception:
                         val = None
-            result[pa_col] = val
+            result[pg_col] = val
+    debug_log.append(f"Direct property mapping result: {result}")
+
+    # Step 2: Extract logical variables (E1, E2)
+    E1_cad = logical_vars.get("E1")
+    E2_cad = logical_vars.get("E2")
+    E1 = obj.get(E1_cad)
+    E2 = obj.get(E2_cad)
+    debug_log.append(f"E1_cad: {E1_cad}, E1: {E1}")
+    debug_log.append(f"E2_cad: {E2_cad}, E2: {E2}")
+    E1_bool = bool(E1) and E1 != 0
+    E2_bool = bool(E2) and E2 != 0
+    E3 = ""
+    if E1_bool and E2_bool:
+        E3 = "ES"
+    elif E1_bool and not E2_bool:
+        E3 = "E"
+    debug_log.append(f"Computed E3: {E3}")
+
+    # Step 3: Map computed E3 to its Postgres column
+    e3_pg_col = None
+    if "computed_vars" in mapping_json:
+        e3_pg_col = mapping_json["computed_vars"].get("E3")
+    debug_log.append(f"e3_pg_col: {e3_pg_col}")
+    if e3_pg_col:
+        result[e3_pg_col] = E3
+    debug_log.append(f"Final result mapping: {result}")
+
+    # Write debug log to file
+    debug_path = os.path.join(os.path.dirname(__file__), "sync_debug.txt")
+    with open(debug_path, "a", encoding="utf-8") as f:
+        for line in debug_log:
+            f.write(line + "\n")
+
     return result
 
 def upsert_project_article(pg_conn, project_id, view_id, mapped_props):

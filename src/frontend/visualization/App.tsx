@@ -618,6 +618,25 @@ function App() {
                   },
                 ]);
                 alert(`✅ Sync erfolgreich für view_id ${viewId}`);
+
+                // Step 2: Rematerialize all
+                const rematRes = await fetch(
+                  `${API_PREFIX}/api/rematerializeAll?project_id=${selectedProject.id}`,
+                  { method: "POST" }
+                );
+                if (!rematRes.ok)
+                  throw new Error(`Rematerialize-Fehler: ${rematRes.status}`);
+                const rematResult = await rematRes.json();
+                console.log("[Sync] Rematerialize result:", rematResult);
+                setLogs((prev) => [
+                  ...prev,
+                  {
+                    text: `⚡️ Rematerialize erfolgreich: ${
+                      rematResult.log || "OK"
+                    }`,
+                    time: new Date().toLocaleTimeString(),
+                  },
+                ]);
               } catch (err) {
                 const errorMsg =
                   "❌ Advanced Sync fehlgeschlagen: " + String(err);
