@@ -1,5 +1,5 @@
 {
-  "DB_URL": "postgresql://myuser:1999@localhost:5432/CAD_prototype",
+  "DB_URL": "postgresql://myuser:1999@localhost:5432/CAD_prototype_2",
   "BACKEND_URL": "http://localhost:8000",
   "FRONTEND_ORIGINS": ["http://localhost:5173", "http://127.0.0.1:5173"]
 }
