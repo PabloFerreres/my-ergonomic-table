@@ -1,0 +1,581 @@
+Table "materialized_einbauorte" {
+  "id" int4
+  "project_id" int4
+  "name" text
+  "full_name" text
+}
+
+Table "dropdown_meta" {
+  "id" int4
+  "column_id" int4
+  "dropdown_content" jsonb
+}
+
+Table "materialized_random_tessa" {
+  "project_article_id" int4
+  "article_id" text
+  "BMK" text
+  "Status" text
+  "Relevance E-Tech." text
+  "Kommentar" text
+  "RI Char." text
+  "ANSI Char." text
+  "EMSR No." text
+  "Beschreibung" text
+  "Hersteller" text
+  "Bestellbezeichnung" text
+  "Einbauort" text
+  "Lieferumfang" text
+  "Medium" text
+  "T. Daten Betriebspunkt" text
+  "T. Daten Nennweite DN" text
+  "T. Daten Druckklasse PN" text
+  "T. Daten Anschluss Eingang" text
+  "T. Daten Anschluss Ausgang" text
+  "DI" text
+  "DO" text
+  "AI" text
+  "AO" text
+  "PN" text
+  "Spannung [V]" text
+  "Strom [A]" text
+  "Leistung [kW]" text
+  "Ansteuerung" text
+  "Stecker" text
+  "SPS 1-Band 2-Behandlung 3-Kunde" text
+  "Elektr. Daten" text
+  "Weitere technische Daten" text
+  "Weitere Funktionen Verschaltung" text
+  "Ist-Einstellung Inbetriebnahme" text
+  "Grenzwerte" text
+  "Safety Kommentar" text
+  "Beschreibung für Stromlaufplan" text
+  "Anforderer" text
+  "Anlagekategorie Vault" text
+  "Kommentar zur Revision" text
+  "Änderungs-Index Vault" text
+  "REVISION" text
+  "order_key" numeric
+}
+
+Table "article_drafts" {
+  "id" int4
+  "project_article_id" int4
+  "t_daten_nennweite_dn" text
+  "t_daten_druckklasse_pn" text
+  "t_daten_anschluss_eingang" text
+  "t_daten_anschluss_ausgang" text
+  "di" text
+  "do" text
+  "ai" text
+  "ao" text
+  "pn" text
+  "spannung_v" text
+  "strom_a" text
+  "leistung_kw" text
+  "ansteuerung" text
+  "stecker" text
+  "elektr_daten" text
+  "hersteller" text
+  "bestellbezeichnung" text
+  "weitere_funktionen_verschaltung" text
+  "anlagekategorie_vault" text
+  "aenderungs_index_vault" text
+  "beschreibung" varchar
+  "weitere_technische_daten" varchar
+  "getriebe_r" text
+  "nenndrehmoment_nm" text
+  "encoder_r" text
+  "antriebs_cliq" text
+  "encoder_typ" text
+  "bremse_r" text
+  "motorschutz" text
+  "sto_r" text
+  "ups_r_kw" text
+  "wirkungsgrad" text
+  "bauteil_index_vault" varchar
+  "drehzahl" varchar
+  "grenzwerte" varchar
+}
+
+Table "base_views" {
+  "id" int4
+  "name" text
+  "beschreibung" text
+  "name_display" varchar
+}
+
+Table "multiproject_meta_datas" {
+  "id" int4
+  "view_id" int4
+  "position_meta_id" int4
+  "project_id" int4
+}
+
+Table "elektrik_meta" {
+  "id" int4
+  "project_articles_live" jsonb
+  "project_id" int4
+}
+
+Table "column_groups" {
+  "id" int4
+  "name" varchar
+  "color" varchar
+}
+
+Table "projects" {
+  "id" int4
+  "name" text
+  "revision" text
+  "created_at" text
+  "project_materialized_name" text
+  "deleted_at" timestamptz
+  "project_cad_db_path" varchar
+}
+
+Table "articles" {
+  "id" int4
+  "t_daten_nennweite_dn" text
+  "t_daten_druckklasse_pn" text
+  "t_daten_anschluss_eingang" text
+  "t_daten_anschluss_ausgang" text
+  "di" text
+  "do" text
+  "ai" text
+  "ao" text
+  "pn" text
+  "spannung_v" text
+  "strom_a" text
+  "leistung_kw" text
+  "ansteuerung" text
+  "stecker" text
+  "elektr_daten" text
+  "hersteller" text
+  "bestellbezeichnung" text
+  "weitere_funktionen_verschaltung" text
+  "anlagekategorie_vault" text
+  "aenderungs_index_vault" text
+  "beschreibung" varchar
+  "weitere_technische_daten" varchar
+  "getriebe_r" text
+  "nenndrehmoment_nm" text
+  "encoder_r" text
+  "antriebs_cliq" text
+  "encoder_typ" text
+  "bremse_r" text
+  "motorschutz" text
+  "sto_r" text
+  "ups_r_kw" text
+  "wirkungsgrad" text
+  "bauteil_index_vault" varchar
+  "drehzahl" varchar
+  "grenzwerte" varchar
+}
+
+Table "import_article_meta" {
+  "id" int4
+  "meta_column" text
+  "last_import_article_id" int4
+  "last_article_id" int4
+}
+
+Table "article_revisions" {
+  "id" int4
+  "t_daten_nennweite_dn" text
+  "t_daten_druckklasse_pn" text
+  "t_daten_anschluss_eingang" text
+  "t_daten_anschluss_ausgang" text
+  "di" text
+  "do" text
+  "ai" text
+  "ao" text
+  "pn" text
+  "spannung_v" text
+  "strom_a" text
+  "leistung_kw" text
+  "ansteuerung" text
+  "stecker" text
+  "elektr_daten" text
+  "hersteller" text
+  "bestellbezeichnung" text
+  "weitere_funktionen_verschaltung" text
+  "anlagekategorie_vault" text
+  "aenderungs_index_vault" text
+  "beschreibung" varchar
+  "weitere_technische_daten" varchar
+  "getriebe_r" text
+  "nenndrehmoment_nm" text
+  "encoder_r" text
+  "antriebs_cliq" text
+  "encoder_typ" text
+  "bremse_r" text
+  "motorschutz" text
+  "sto_r" text
+  "ups_r_kw" text
+  "wirkungsgrad" text
+  "bauteil_index_vault" varchar
+  "drehzahl" varchar
+  "grenzwerte" varchar
+}
+
+Table "stair_element_einbauorte" {
+  "id" int4
+  "project_id" int4
+  "name" text
+  "parent_id" int4
+  "sort_order" int4
+}
+
+Table "views_columns" {
+  "id" int4
+  "view_id" int4
+  "base_view_id" int4
+  "project_id" int4
+  "column_id" int4
+  "visible" bool
+  "editable" bool
+  "position" float4
+  "label_override" text
+  "source" text
+}
+
+Table "columns" {
+  "table_catalog" name
+  "table_schema" name
+  "table_name" name
+  "column_name" name
+  "ordinal_position" int4
+  "column_default" varchar
+  "is_nullable" varchar
+  "data_type" varchar
+  "character_maximum_length" int4
+  "character_octet_length" int4
+  "numeric_precision" int4
+  "numeric_precision_radix" int4
+  "numeric_scale" int4
+  "datetime_precision" int4
+  "interval_type" varchar
+  "interval_precision" int4
+  "character_set_catalog" name
+  "character_set_schema" name
+  "character_set_name" name
+  "collation_catalog" name
+  "collation_schema" name
+  "collation_name" name
+  "domain_catalog" name
+  "domain_schema" name
+  "domain_name" name
+  "udt_catalog" name
+  "udt_schema" name
+  "udt_name" name
+  "scope_catalog" name
+  "scope_schema" name
+  "scope_name" name
+  "maximum_cardinality" int4
+  "dtd_identifier" name
+  "is_self_referencing" varchar
+  "is_identity" varchar
+  "identity_generation" varchar
+  "identity_start" varchar
+  "identity_increment" varchar
+  "identity_maximum" varchar
+  "identity_minimum" varchar
+  "identity_cycle" varchar
+  "is_generated" varchar
+  "generation_expression" varchar
+  "is_updatable" varchar
+  "id" int4
+  "name" text
+  "name_external_german" text
+  "source_table" text
+  "unit" text
+  "default_width" int4
+  "editable" bool
+  "enum_values" text
+  "editor_type" text
+  "category" text
+  "type" text
+  "dropdown_source" varchar
+  "name_external_english" varchar
+  "column_group_id" int4
+}
+
+Table "views" {
+  "table_catalog" name
+  "table_schema" name
+  "table_name" name
+  "view_definition" varchar
+  "check_option" varchar
+  "is_updatable" varchar
+  "is_insertable_into" varchar
+  "is_trigger_updatable" varchar
+  "is_trigger_deletable" varchar
+  "is_trigger_insertable_into" varchar
+  "id" int4
+  "name" text
+  "base_view_id" int4
+  "row_counts" int4
+  "display_name" varchar
+  "project_id" int4
+  "deleted_at" timestamptz
+  "header_rows" bool
+  "cad_drawing_guid" varchar
+  "position_meta_id" int4
+}
+
+Table "saved table" {
+  "project_article_id" int4
+  "position" text
+  "lfd.Nr. aufsteigend!" text
+  "Status" text
+  "Relevance E-Tech." text
+  "Kommentar" text
+  "RI-Char." text
+  "MSR / ANSI Char." text
+  "ID" text
+  "EMSR No." text
+  "Beschreibung" text
+  "Einbauort" text
+  "Lieferumfang" text
+  "beschreibung eng" text
+  "Medium" text
+  "T. Daten Betriebspunkt" text
+  "T. Daten Nennweite DN" text
+  "T. Daten Druckklasse PN" text
+  "T. Daten Anschluss Eingang" text
+  "T. Daten Anschluss Ausgang" text
+  "DI" text
+  "DO" text
+  "AI" text
+  "AO" text
+  "PN" text
+  "Spannung / V" text
+  "Strom / A" text
+  "Leistung / kW" text
+  "Geschwindigkeit / rpm" text
+  "Stecker" text
+  "SPS 1-Band 2-Behandlung 3-Kunde" text
+  "Elektr. Daten" text
+  "Hersteller" text
+  "Bestellbezeichnung" text
+  "More Information" text
+  "Funktion" text
+  "Funktions-Kurzbeschreibung für Stromlaufplan" text
+  "Isteinstellung Inbetriebnahme" text
+  "Grenzwerte" text
+  "Safety" text
+  "Beschreibung für Stromlaufplan" text
+  "Anforderer" text
+  "Anzahl" text
+  "Einzelpreis" text
+  "Rabatt [%]" text
+  "Gesamtpreis" text
+  "Lieferzeit (Wochen)" text
+  "Bestelldatum" text
+  "Liefertermin laut AB (KW)" text
+  "Auftragsbestätigung" text
+  "Geliefert" text
+  "Zeichnungs-Nr." text
+  "Konstruktion verbaut / Änderung verarbeitet" text
+  "Kommentar Konstruktion" text
+  "Schildertexte (automatisch generiert)" text
+  "Schildertexte Bestellvorlage (manuell kopiert)" text
+  "Schildmaterial" text
+  "Schildbefestigung" text
+  "Anlagekategorie in Vault" text
+  "Bauteil-ID" text
+  "Kommentar zur Äanderung" text
+  "Änderungsindex" text
+  "REVISION" text
+}
+
+Table "project_articles" {
+  "project_id" int4
+  "view_id" int4
+  "article_id" int4
+  "status" text
+  "kommentar" text
+  "emsr_no" text
+  "einbauort" text
+  "medium" text
+  "beschreibung_stromlaufplan" text
+  "anforderer" text
+  "anzahl" text
+  "einzelpreis" text
+  "rabatt" text
+  "gesamtpreis" text
+  "lieferzeit_wochen" text
+  "bestelldatum" text
+  "liefertermin_laut_ab_kw" text
+  "geliefert" text
+  "kommentar_konstruktion" text
+  "schildertexte_automatisch_generiert" text
+  "schildertexte_bestellvorlage_manuell_kopiert" text
+  "schildmaterial" text
+  "schildbefestigung" text
+  "zeichnungs_nr" text
+  "konstruktion_verbaut_aenderung_verarbeitet" text
+  "sps" text
+  "safety_kommentar" text
+  "ist_einstellung_inbetriebnahme" text
+  "t_daten_betriebspunkt" text
+  "grenzwerte" text
+  "funktion" text
+  "freigegeben" text
+  "kommentar_zur_aenderung" varchar
+  "pnpguid" uuid
+  "bmk" varchar
+  "ansi_char" varchar
+  "ri_char" varchar
+  "id" int4
+  "relevance_e_tech" varchar
+}
+
+Table "position_meta" {
+  "id" int4
+  "sheet_name" text
+  "position_map" jsonb
+  "updated_at" timestamp
+}
+
+Table "inserted_id_meta" {
+  "last_id" int4
+  "id" int4
+}
+
+Table "materialized_elektrik_tessa" {
+  "project_article_id" int4
+  "article_id" text
+  "Von Sheet" text
+  "Relevance E-Tech." text
+  "EMSR No." text
+  "Einbauort" text
+  "Hersteller" text
+  "Bestellbezeichnung" text
+  "DI" text
+  "DO" text
+  "AI" text
+  "AO" text
+  "PN" text
+  "Spannung [V]" text
+  "Strom [A]" text
+  "Leistung [kW]" text
+  "Ansteuerung" text
+  "Stecker" text
+  "SPS 1-Band 2-Behandlung 3-Kunde" text
+  "Elektr. Daten" text
+  "Weitere technische Daten" text
+  "Beschreibung" text
+  "Lieferumfang" text
+  "Beschreibung für Stromlaufplan" text
+  "Kommentar" text
+  "Safety Kommentar" text
+  "REVISION" text
+  "Kommentar zur Revision" text
+  "order_key" numeric
+}
+
+Table "inserted_rows" {
+  "id" int4
+  "project_article_id" int4
+  "lfd_nr_aufsteigend" text
+  "status" text
+  "relevance_etech" text
+  "kommentar" text
+  "richar" text
+  "msr_ansi_char" text
+  "emsr_no" text
+  "beschreibung" text
+  "einbauort" text
+  "lieferumfang" text
+  "beschreibung_eng" text
+  "medium" text
+  "t_daten_betriebspunkt" text
+  "t_daten_nennweite_dn" text
+  "t_daten_druckklasse_pn" text
+  "t_daten_anschluss_eingang" text
+  "t_daten_anschluss_ausgang" text
+  "di" text
+  "do" text
+  "ai" text
+  "ao" text
+  "pn" text
+  "spannung_v" text
+  "strom_a" text
+  "leistung_kw" text
+  "geschwindigkeit_rpm_steuerung" text
+  "stecker" text
+  "sps_1band_2behandlung_3kunde" text
+  "elektr_daten" text
+  "hersteller" text
+  "bestellbezeichnung" text
+  "weitere_funktionen_verschaltung" text
+  "funktion" text
+  "funktionskurzbeschreibung_fuer_stromlaufplan" text
+  "isteinstellung_inbetriebnahme" text
+  "grenzwerte" text
+  "safety" text
+  "beschreibung_fuer_stromlaufplan" text
+  "anforderer" text
+  "anzahl" text
+  "einzelpreis" text
+  "rabatt" text
+  "gesamtpreis" text
+  "lieferzeit_wochen" text
+  "bestelldatum" text
+  "liefertermin_laut_ab_kw" text
+  "auftragsbestaetigung" text
+  "geliefert" text
+  "zeichnungs_nr" text
+  "konstruktion_verbaut_aenderung_verarbeitet" text
+  "kommentar_konstruktion" text
+  "schildertexte_automatisch_generiert" text
+  "schildertexte_bestellvorlage_manuell_kopiert" text
+  "schildmaterial" text
+  "schildbefestigung" text
+  "anlagekategorie_in_vault" text
+  "kommentar_zur_aenderung" text
+  "aenderungsindex" text
+  "revision" text
+  "article_id" int4
+  "weitere_technische_daten" varchar
+  "getriebe" text
+  "nenndreahmoment_nm" text
+  "ventilator" text
+  "encoder" text
+  "antriebs_cliq" text
+  "encoder_typ" text
+  "bremse" text
+  "motorschutz" text
+  "not_aus_pld" text
+  "notleistung" text
+  "leistung_not" text
+  "freigegeben" text
+  "wirkungsgrad" text
+}
+
+Ref "materialized_einbauorte_project_id_fkey":"projects"."id" < "materialized_einbauorte"."project_id"
+Ref "dropdown_meta_column_id_fkey":"columns"."id" < "dropdown_meta"."column_id"
+Ref "materialized_random_tessa_project_article_id_fkey":"project_articles"."id" < "materialized_random_tessa"."project_article_id"
+Ref "materialized_random_tessa_article_id_fkey":"articles"."id" < "materialized_random_tessa"."article_id"
+Ref "article_drafts_project_article_id_fkey":"project_articles"."id" < "article_drafts"."project_article_id"
+Ref "multiproject_meta_datas_view_id_fkey":"views"."id" < "multiproject_meta_datas"."view_id"
+Ref "multiproject_meta_datas_project_id_fkey":"projects"."id" < "multiproject_meta_datas"."project_id"
+Ref "elektrik_meta_project_id_fkey":"projects"."id" < "elektrik_meta"."project_id"
+Ref "stair_element_einbauorte_project_id_fkey":"projects"."id" < "stair_element_einbauorte"."project_id"
+Ref "views_columns_view_id_fkey":"views"."id" < "views_columns"."view_id"
+Ref "views_columns_base_view_id_fkey":"base_views"."id" < "views_columns"."base_view_id"
+Ref "views_columns_project_id_fkey":"projects"."id" < "views_columns"."project_id"
+Ref "views_columns_column_id_fkey":"columns"."id" < "views_columns"."column_id"
+Ref "columns_column_group_id_fkey":"column_groups"."id" < "columns"."column_group_id"
+Ref "views_base_view_id_fkey":"base_views"."id" < "views"."base_view_id"
+Ref "views_project_id_fkey":"projects"."id" < "views"."project_id"
+Ref "saved table_project_article_id_fkey":"project_articles"."id" < "saved table"."project_article_id"
+Ref "project_articles_project_id_fkey":"projects"."id" < "project_articles"."project_id"
+Ref "project_articles_view_id_fkey":"views"."id" < "project_articles"."view_id"
+Ref "project_articles_article_id_fkey":"articles"."id" < "project_articles"."article_id"
+Ref "materialized_elektrik_tessa_project_article_id_fkey":"project_articles"."id" < "materialized_elektrik_tessa"."project_article_id"
+Ref "materialized_elektrik_tessa_article_id_fkey":"articles"."id" < "materialized_elektrik_tessa"."article_id"
+Ref "inserted_rows_project_article_id_fkey":"project_articles"."id" < "inserted_rows"."project_article_id"
+Ref "inserted_rows_article_id_fkey":"articles"."id" < "inserted_rows"."article_id"
