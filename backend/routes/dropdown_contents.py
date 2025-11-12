@@ -46,12 +46,12 @@ def get_dropdown_options_by_headers(
             SELECT
               c.id,
               c.name,
-              COALESCE(c.display_name, c.name) AS display_name,
-              TRIM(COALESCE(c.display_name, c.name)) AS display_name_trim,
+              c.name_external_german AS display_name,
+              TRIM(COALESCE(c.name_external_german, c.name)) AS display_name_trim,
               TRIM(COALESCE(c.editor_type, '')) AS editor_type,
               TRIM(COALESCE(c.dropdown_source, '')) AS dropdown_source
             FROM columns c
-            WHERE LOWER(TRIM(COALESCE(c.display_name, c.name))) = ANY(%s)
+            WHERE LOWER(TRIM(COALESCE(c.name_external_german, c.name))) = ANY(%s)
         """, (headers_norm,))
         cols = cur.fetchall()
         dbg("matched columns:", len(cols))
@@ -85,7 +85,6 @@ def get_dropdown_options_by_headers(
                 r = cur.fetchone()
                 raw = r[0] if r else None
                 labels = _parse_labels(raw)
-                # Rohdaten fürs Debug ggf. kürzen
                 raw_preview = (raw[:120] + "...") if isinstance(raw, str) and len(raw) > 120 else raw
                 dbg(f"dropdown_meta column_id={col_id} raw={raw_preview!r} → parsed {len(labels)} labels")
                 result[display_name_trim] = labels
