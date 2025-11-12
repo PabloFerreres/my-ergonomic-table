@@ -4,6 +4,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import asyncpg
+from typing import Optional
 
 from backend.db_to_hot_table import fetch_table_as_hotarray
 from backend.api import router as api_router
@@ -72,8 +73,9 @@ async def get_tabledata(
     table: str = Query(...),
     limit: int = Query(500),
     project_id: int = Query(...),
+    view_id: Optional[int] = Query(None),
 ):
     if DEBUG:
-        print(f"[DEBUG] Abfrage tabledata für Tabelle: {table}, Limit: {limit}, Project: {project_id}")
-    headers, data = await fetch_table_as_hotarray(DB_URL, table, limit, project_id)
+        print(f"[DEBUG] Abfrage tabledata für Tabelle: {table}, Limit: {limit}, Project: {project_id}, View: {view_id}")
+    headers, data = await fetch_table_as_hotarray(DB_URL, table, limit, project_id, view_id)
     return {"headers": headers, "data": data}

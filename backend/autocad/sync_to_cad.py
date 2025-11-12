@@ -2,6 +2,8 @@ import psycopg2
 import sqlite3
 import os
 import json
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_txt: bool = True):
     """
@@ -97,26 +99,25 @@ def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_t
     cad_conn.close()
     return results
 
-def map_cad_properties_to_pa(obj):
+def map_cad_properties_to_pa(obj, pg_conn):
     """
-    Maps a CAD object dictionary to a dict of project_articles columns using cad_to_pa_map.json.
-    Uses logical variable names for intermediate mapping and logic.
-    Computes relevance_etech from E1 (Relevanz E Tech) and E2 (Safety), then maps E3 to relevance_etech.
+    Maps a CAD object dictionary to a dict of project_articles columns using the columns table in the DB.
+    Only properties present in columns.name are mapped (case-insensitive).
+    Special logic for relevance_e_tech and soll_eigenschaften.
     """
-    mapping_path = os.path.join(os.path.dirname(__file__), "cad_to_pa_map.json")
-    with open(mapping_path, "r", encoding="utf-8") as f:
-        mapping_json = json.load(f)
-    property_map = mapping_json.get("property_map", {})
-    logical_vars = mapping_json.get("logical_vars", {})
-    computed_vars = mapping_json.get("computed_vars", {})
+    cur = pg_conn.cursor()
+    cur.execute("SELECT name FROM columns")
+    db_columns = set(row[0].lower() for row in cur.fetchall())
 
-    # Step 1: Map CAD properties to Postgres columns (direct mapping)
     result = {}
     debug_log = []
-    for cad_prop, pg_col in property_map.items():
-        if pg_col:
-            val = obj.get(cad_prop)
-            if cad_prop == "EinbauortID":
+    # Map only CAD properties that exist in columns.name (case-insensitive)
+    for cad_prop, val in obj.items():
+        col_name = cad_prop.lower()
+        # Skip special columns, handle below
+        if col_name in db_columns and col_name not in ["relevance_e_tech", "soll_eigenschaften"]:
+            # Special handling for EinbauortID if needed
+            if col_name == "einbauortid":
                 if val is not None:
                     try:
                         if isinstance(val, str) and val.endswith(".0"):
@@ -124,16 +125,12 @@ def map_cad_properties_to_pa(obj):
                         val = int(float(val))
                     except Exception:
                         val = None
-            result[pg_col] = val
+            result[col_name] = val
     debug_log.append(f"Direct property mapping result: {result}")
 
-    # Step 2: Extract logical variables (E1, E2)
-    E1_cad = logical_vars.get("E1")
-    E2_cad = logical_vars.get("E2")
-    E1 = obj.get(E1_cad)
-    E2 = obj.get(E2_cad)
-    debug_log.append(f"E1_cad: {E1_cad}, E1: {E1}")
-    debug_log.append(f"E2_cad: {E2_cad}, E2: {E2}")
+    # Special logic for relevance_e_tech (E1/E2 boolean logic)
+    E1 = obj.get('relevanz_e_tech')
+    E2 = obj.get('safety')
     E1_bool = bool(E1) and E1 != 0
     E2_bool = bool(E2) and E2 != 0
     E3 = ""
@@ -141,15 +138,17 @@ def map_cad_properties_to_pa(obj):
         E3 = "ES"
     elif E1_bool and not E2_bool:
         E3 = "E"
-    debug_log.append(f"Computed E3: {E3}")
+    result['relevance_e_tech'] = E3
+    debug_log.append(f"Computed relevance_e_tech: {E3}")
 
-    # Step 3: Map computed E3 to its Postgres column
-    e3_pg_col = None
-    if "computed_vars" in mapping_json:
-        e3_pg_col = mapping_json["computed_vars"].get("E3")
-    debug_log.append(f"e3_pg_col: {e3_pg_col}")
-    if e3_pg_col:
-        result[e3_pg_col] = E3
+    # Special logic for soll_eigenschaften: join soll_einstellung and soll_einstellung_einheit
+    soll_einstellung = obj.get('soll_einstellung')
+    soll_einstellung_einheit = obj.get('soll_einstellung_einheit')
+    if soll_einstellung is not None or soll_einstellung_einheit is not None:
+        joined = f"{soll_einstellung or ''} {soll_einstellung_einheit or ''}".strip()
+        result['soll_eigenschaften'] = joined
+        debug_log.append(f"Set soll_eigenschaften: {joined}")
+
     debug_log.append(f"Final result mapping: {result}")
 
     # Write debug log to file
@@ -226,3 +225,42 @@ def update_position_meta(pg_conn, view_id, position_map):
     cur.execute("UPDATE position_meta SET position_map = %s WHERE id = %s", (json.dumps(position_map), position_meta_id))
     pg_conn.commit()
     print(f"Updated position_meta.position_map for view_id={view_id}, position_meta_id={position_meta_id}")
+
+def debug_cad_to_db_properties(cad_obj, pg_conn):
+    """
+    Debug utility: Print all property names from CAD (all keys, lowercased), all DB property names (columns.name), and the intersection (those we will use).
+    For CAD, show all keys in the object (lowercased). For DB, show all columns.name. Intersection: those present in both.
+    """
+    cur = pg_conn.cursor()
+    cur.execute("SELECT name FROM columns")
+    db_names = set([row[0] for row in cur.fetchall()])
+    cad_names = set([k.strip().lower() for k in cad_obj.keys()])
+    print("All property names from CAD (lowercased):")
+    for k in cad_obj.keys():
+        print(f"  - {k.strip().lower()}")
+    print("\nAll property names from DB (columns.name):")
+    for name in db_names:
+        print(f"  - {name}")
+    print("\nProperties that will be used (intersection):")
+    for cad_name in cad_names:
+        if cad_name in db_names:
+            print(f"  - CAD: '{cad_name}' -> DB column: '{cad_name}'")
+    return
+
+if __name__ == "__main__":
+    from backend.settings.connection_points import DB_URL
+    # Connect to Postgres using DB_URL from config
+    pg_conn = psycopg2.connect(DB_URL)
+
+    # Get real CAD data from WSPCustomPNID columns
+    # We'll use fetch_smart_objects_for_view to get the first CAD object
+    # You may want to adjust project_id and view_id for your test
+    project_id = 16  # TODO: set your real project_id
+    view_id = 54     # TODO: set your real view_id
+    smart_objects = fetch_smart_objects_for_view(pg_conn, project_id, view_id, debug_txt=False)
+    if smart_objects:
+        print("\n--- DEBUGGING WITH REAL CAD OBJECT ---")
+        debug_cad_to_db_properties(smart_objects[0], pg_conn)
+    else:
+        print("No CAD objects found for the given project/view.")
+    pg_conn.close()
