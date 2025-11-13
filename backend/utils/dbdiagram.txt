@@ -11,53 +11,6 @@ Table "dropdown_meta" {
   "dropdown_content" jsonb
 }
 
-Table "materialized_random_tessa" {
-  "project_article_id" int4
-  "article_id" text
-  "BMK" text
-  "Status" text
-  "Relevance E-Tech." text
-  "Kommentar" text
-  "RI Char." text
-  "ANSI Char." text
-  "EMSR No." text
-  "Beschreibung" text
-  "Hersteller" text
-  "Bestellbezeichnung" text
-  "Einbauort" text
-  "Lieferumfang" text
-  "Medium" text
-  "T. Daten Betriebspunkt" text
-  "T. Daten Nennweite DN" text
-  "T. Daten Druckklasse PN" text
-  "T. Daten Anschluss Eingang" text
-  "T. Daten Anschluss Ausgang" text
-  "DI" text
-  "DO" text
-  "AI" text
-  "AO" text
-  "PN" text
-  "Spannung [V]" text
-  "Strom [A]" text
-  "Leistung [kW]" text
-  "Ansteuerung" text
-  "Stecker" text
-  "SPS 1-Band 2-Behandlung 3-Kunde" text
-  "Elektr. Daten" text
-  "Weitere technische Daten" text
-  "Weitere Funktionen Verschaltung" text
-  "Ist-Einstellung Inbetriebnahme" text
-  "Grenzwerte" text
-  "Safety Kommentar" text
-  "Beschreibung für Stromlaufplan" text
-  "Anforderer" text
-  "Anlagekategorie Vault" text
-  "Kommentar zur Revision" text
-  "Änderungs-Index Vault" text
-  "REVISION" text
-  "order_key" numeric
-}
-
 Table "article_drafts" {
   "id" int4
   "project_article_id" int4
@@ -217,6 +170,11 @@ Table "article_revisions" {
   "bauteil_index_vault" varchar
   "drehzahl" varchar
   "grenzwerte" varchar
+}
+
+Table "materialized_random_tessa" {
+  "project_article_id" int4
+  "order_key" numeric
 }
 
 Table "stair_element_einbauorte" {
@@ -390,48 +348,6 @@ Table "saved table" {
   "REVISION" text
 }
 
-Table "project_articles" {
-  "project_id" int4
-  "view_id" int4
-  "article_id" int4
-  "status" text
-  "kommentar" text
-  "emsr_no" text
-  "einbauort" text
-  "medium" text
-  "beschreibung_stromlaufplan" text
-  "anforderer" text
-  "anzahl" text
-  "einzelpreis" text
-  "rabatt" text
-  "gesamtpreis" text
-  "lieferzeit_wochen" text
-  "bestelldatum" text
-  "liefertermin_laut_ab_kw" text
-  "geliefert" text
-  "kommentar_konstruktion" text
-  "schildertexte_automatisch_generiert" text
-  "schildertexte_bestellvorlage_manuell_kopiert" text
-  "schildmaterial" text
-  "schildbefestigung" text
-  "zeichnungs_nr" text
-  "konstruktion_verbaut_aenderung_verarbeitet" text
-  "sps" text
-  "safety_kommentar" text
-  "ist_einstellung_inbetriebnahme" text
-  "t_daten_betriebspunkt" text
-  "grenzwerte" text
-  "funktion" text
-  "freigegeben" text
-  "kommentar_zur_aenderung" varchar
-  "pnpguid" uuid
-  "bmk" varchar
-  "ansi_char" varchar
-  "ri_char" varchar
-  "id" int4
-  "relevance_e_tech" varchar
-}
-
 Table "position_meta" {
   "id" int4
   "sheet_name" text
@@ -555,14 +471,57 @@ Table "inserted_rows" {
   "wirkungsgrad" text
 }
 
+Table "project_articles" {
+  "project_id" int4
+  "view_id" int4
+  "article_id" int4
+  "status" text
+  "kommentar" text
+  "emsr_no" text
+  "einbauort" text
+  "medium" text
+  "beschreibung_stromlaufplan" text
+  "anforderer" text
+  "anzahl" text
+  "einzelpreis" text
+  "rabatt" text
+  "gesamtpreis" text
+  "lieferzeit_wochen" text
+  "bestelldatum" text
+  "liefertermin_laut_ab_kw" text
+  "geliefert" text
+  "kommentar_konstruktion" text
+  "schildertexte_automatisch_generiert" text
+  "schildertexte_bestellvorlage_manuell_kopiert" text
+  "schildmaterial" text
+  "schildbefestigung" text
+  "zeichnungs_nr" text
+  "konstruktion_verbaut_aenderung_verarbeitet" text
+  "sps" text
+  "safety_kommentar" text
+  "ist_einstellung_inbetriebnahme" text
+  "t_daten_betriebspunkt" text
+  "grenzwerte" text
+  "funktion" text
+  "freigegeben" text
+  "kommentar_revision" varchar
+  "pnpguid" uuid
+  "bmk" varchar
+  "ansi_char" varchar
+  "ri_char" varchar
+  "id" int4
+  "relevance_e_tech" varchar
+  "lieferumfang" varchar
+  "revision" varchar
+}
+
 Ref "materialized_einbauorte_project_id_fkey":"projects"."id" < "materialized_einbauorte"."project_id"
 Ref "dropdown_meta_column_id_fkey":"columns"."id" < "dropdown_meta"."column_id"
-Ref "materialized_random_tessa_project_article_id_fkey":"project_articles"."id" < "materialized_random_tessa"."project_article_id"
-Ref "materialized_random_tessa_article_id_fkey":"articles"."id" < "materialized_random_tessa"."article_id"
 Ref "article_drafts_project_article_id_fkey":"project_articles"."id" < "article_drafts"."project_article_id"
 Ref "multiproject_meta_datas_view_id_fkey":"views"."id" < "multiproject_meta_datas"."view_id"
 Ref "multiproject_meta_datas_project_id_fkey":"projects"."id" < "multiproject_meta_datas"."project_id"
 Ref "elektrik_meta_project_id_fkey":"projects"."id" < "elektrik_meta"."project_id"
+Ref "materialized_random_tessa_project_article_id_fkey":"project_articles"."id" < "materialized_random_tessa"."project_article_id"
 Ref "stair_element_einbauorte_project_id_fkey":"projects"."id" < "stair_element_einbauorte"."project_id"
 Ref "views_columns_view_id_fkey":"views"."id" < "views_columns"."view_id"
 Ref "views_columns_base_view_id_fkey":"base_views"."id" < "views_columns"."base_view_id"
@@ -572,10 +531,10 @@ Ref "columns_column_group_id_fkey":"column_groups"."id" < "columns"."column_grou
 Ref "views_base_view_id_fkey":"base_views"."id" < "views"."base_view_id"
 Ref "views_project_id_fkey":"projects"."id" < "views"."project_id"
 Ref "saved table_project_article_id_fkey":"project_articles"."id" < "saved table"."project_article_id"
-Ref "project_articles_project_id_fkey":"projects"."id" < "project_articles"."project_id"
-Ref "project_articles_view_id_fkey":"views"."id" < "project_articles"."view_id"
-Ref "project_articles_article_id_fkey":"articles"."id" < "project_articles"."article_id"
 Ref "materialized_elektrik_tessa_project_article_id_fkey":"project_articles"."id" < "materialized_elektrik_tessa"."project_article_id"
 Ref "materialized_elektrik_tessa_article_id_fkey":"articles"."id" < "materialized_elektrik_tessa"."article_id"
 Ref "inserted_rows_project_article_id_fkey":"project_articles"."id" < "inserted_rows"."project_article_id"
 Ref "inserted_rows_article_id_fkey":"articles"."id" < "inserted_rows"."article_id"
+Ref "project_articles_project_id_fkey":"projects"."id" < "project_articles"."project_id"
+Ref "project_articles_view_id_fkey":"views"."id" < "project_articles"."view_id"
+Ref "project_articles_article_id_fkey":"articles"."id" < "project_articles"."article_id"

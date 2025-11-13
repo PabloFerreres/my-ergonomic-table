@@ -1,5 +1,10 @@
 # backend/loading/create_materialized_tables.py
 
+import sys
+import os
+if __name__ == "__main__":
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
 import psycopg2
 from backend.settings.connection_points import DB_URL, get_views_to_show, DEBUG
 
@@ -58,7 +63,7 @@ def create_materialized_table(project_id: int, view_id, base_view_id):
 
     # 1. Fetch visible layout columns
     cursor.execute("""
-        SELECT c.name, c.display_name, vc.position
+        SELECT c.name, c.name_external_german, vc.position
         FROM views_columns vc
         JOIN columns c ON vc.column_id = c.id
         WHERE vc.base_view_id = %s
@@ -69,26 +74,16 @@ def create_materialized_table(project_id: int, view_id, base_view_id):
     if DEBUG:
         print(f"[DEBUG] Layout columns for base_view_id={base_view_id}: {layout_columns}")
 
-    # Map lowercase layout name -> display name
+    # Map layout name -> external german name (no lower/strip, must match exactly)
     layout_name_map = {}
-    for name, display_name, _ in layout_columns:
+    for name, name_external_german, _ in layout_columns:
         if name:
-            layout_name_map[name.strip().lower()] = (display_name or name).strip()
+            if name in layout_name_map:
+                print(f"[WARNING] Duplicate column name in layout: {name}")
+            layout_name_map[name] = (name_external_german or name)
 
-    # Load HEADER_MAP
-    HEADER_MAP = json.loads(Path("backend/utils/header_name_map.json").read_text(encoding="utf-8"))
-    if DEBUG:
-        print(f"[DEBUG] Loaded HEADER_MAP: {HEADER_MAP}")
-
-    # 2. Get all column names in inserted_rows
-    cursor.execute("""
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_name = 'inserted_rows'
-    """)
-    inserted_col_set = {r[0].strip() for r in cursor.fetchall()}
-    if DEBUG:
-        print(f"[DEBUG] inserted_rows columns: {inserted_col_set}")
+    # No need to load HEADER_MAP anymore, as external names come from columns.name_external_german
+    # Remove loading and usage of HEADER_MAP
 
     # 3. Get all available columns from all layout sources
     cursor.execute("""
@@ -96,106 +91,52 @@ def create_materialized_table(project_id: int, view_id, base_view_id):
         FROM information_schema.columns
         WHERE table_name IN (
             'project_articles',
-            'draft_project_articles',
-            'articles',
-            'inserted_rows'
+            'article_drafts',
+            'articles'
         )
     """)
-    colmap = {"d": set(), "p": set(), "a": set(), "i": set()}
+    colmap = {"p": set(), "ad": set(), "a": set()}
     for table, col in cursor.fetchall():
         key = {
             "project_articles": "p",
-            "draft_project_articles": "d",
-            "articles": "a",
-            "inserted_rows": "i"
+            "article_drafts": "ad",
+            "articles": "a"
         }[table]
         colmap[key].add(col)
-    colmap["ai"] = colmap["a"]  # ai wie a
     if DEBUG:
         print(f"[DEBUG] colmap: {colmap}")
 
     # 4. Build column expressions from layout
     col_exprs = []
-    output_cols = []  # Reihenfolge der finalen Output-Spalten
+    output_cols = []
     col_exprs.append("(pd.data->>'project_article_id')::int AS project_article_id")
     output_cols.append("project_article_id")
-
     kommentar_display = layout_name_map.get("kommentar", "Kommentar")
     einbauort_display = layout_name_map.get("einbauort", "Einbauort")
-
-    # Einbauort-ID-Expr (als TEXT) für Gruppenerkennung (Header)
     einbauort_id_text_expr = None
+
+    einbauort_in_layout = "einbauort" in layout_name_map
 
     for layout_col, materialized_col in layout_name_map.items():
         if layout_col == "project_article_id":
             continue
-
-        in_i = layout_col in colmap["i"]
-        in_d = layout_col in colmap["d"]
         in_p = layout_col in colmap["p"]
+        in_ad = layout_col in colmap["ad"]
         in_a = layout_col in colmap["a"]
-        in_ai = layout_col in colmap["ai"]
-
         sources = []
-        if in_i:
-            sources.append(f'ins."{layout_col}"')
-        if in_d:
-            sources.append(f'dpa."{layout_col}"')
         if in_p:
             sources.append(f'pa."{layout_col}"')
         if in_a:
             sources.append(f'a."{layout_col}"')
-
-        layout_expr = f"COALESCE({', '.join(sources)})" if sources else "NULL"
-
-        mapped_inserted_col = HEADER_MAP.get(layout_col, layout_col)
-        in_inserted = mapped_inserted_col in colmap["i"]
-        inserted_expr = f'ins."{mapped_inserted_col}"' if in_inserted else "NULL"
-        ai_expr = f'ai."{layout_col}"' if in_ai else "NULL"
-        coalesce_inserted_ai = f"COALESCE({inserted_expr}, {ai_expr})"
-
+        if in_ad:
+            sources.append(f'ad."{layout_col}"')
+        # Special handling for einbauort: output display name from materialized_einbauorte
         if layout_col == "einbauort":
-            # TEXT-Varianten für ID (als Text), später rechts gecastet -> indexfreundlich
-            to_txt_layout   = f"NULLIF(TRIM(({layout_expr})::text), '')"
-            to_txt_inserted = f"NULLIF(TRIM(({inserted_expr})::text), '')"
-            to_txt_coalesce = f"NULLIF(TRIM(({coalesce_inserted_ai})::text), '')"
-
-            id_text_expr = f"""
-                CASE
-                    WHEN (pd.data->>'project_article_id')::int > 0 THEN {to_txt_layout}
-                    WHEN (pd.data->>'project_article_id')::int < 0 THEN 
-                        CASE
-                            WHEN ins.article_id IS NOT NULL THEN {to_txt_coalesce}
-                            ELSE {to_txt_inserted}
-                        END
-                    ELSE NULL
-                END
-            """.strip()
-
-            einbauort_id_text_expr = id_text_expr
-
-            # sichtbarer Wert = full_name; ACHTUNG: id nicht casten, rechte Seite casten!
-            expr = f"""
-                (
-                    SELECT me.full_name
-                    FROM materialized_einbauorte me
-                    WHERE me.project_id = {project_id}
-                      AND me.id = ({id_text_expr})::int
-                ) AS "{materialized_col}"
-            """.strip()
+            expr = f"me.name AS \"{materialized_col}\""
+            einbauort_id_text_expr = "me.name"
         else:
-            expr = f"""
-                CASE
-                    WHEN (pd.data->>'project_article_id')::int > 0 THEN ({layout_expr})::text
-                    WHEN (pd.data->>'project_article_id')::int < 0 THEN 
-                        CASE
-                            WHEN ins.article_id IS NOT NULL THEN {coalesce_inserted_ai}::text
-                            ELSE {inserted_expr}::text
-                        END
-                    ELSE NULL
-                END AS "{materialized_col}"
-            """.strip()
-
+            # If article_id exists, use articles; else use article_drafts
+            expr = f"CASE\n            WHEN pa.article_id IS NOT NULL THEN a.\"{layout_col}\"\n            ELSE ad.\"{layout_col}\"\n        END AS \"{materialized_col}\"" if in_a or in_ad else f"pa.\"{layout_col}\" AS \"{materialized_col}\""
         col_exprs.append(expr)
         output_cols.append(materialized_col)
 
@@ -203,35 +144,54 @@ def create_materialized_table(project_id: int, view_id, base_view_id):
     if DEBUG:
         print(f"[DEBUG] Column expressions:\n{col_exprs_sql}")
 
-    # 5. Final SQL (Header-Teil wird unten per Flag ein-/ausgeschaltet)
-    quoted_cols = [f"\"{c}\"" for c in output_cols]
+    # Build a map of column types for header row casting, always fresh from information_schema
+    col_type_map = {}
+    for table in ["project_articles", "articles", "article_drafts"]:
+        cursor.execute("""
+            SELECT column_name, data_type FROM information_schema.columns WHERE table_name = %s
+        """, (table,))
+        for col, typ in cursor.fetchall():
+            if col not in col_type_map:
+                # Map Postgres types to SQL types for casting
+                if typ.startswith("character") or typ == "text" or typ == "varchar":
+                    col_type_map[col] = "text"
+                elif typ.startswith("int") or typ == "integer" or typ == "bigint" or typ == "smallint":
+                    col_type_map[col] = "int"
+                elif typ == "numeric":
+                    col_type_map[col] = "numeric"
+                elif typ == "boolean":
+                    col_type_map[col] = "bool"
+                else:
+                    col_type_map[col] = typ
 
     # Header-Select-Zeile für Alias b
     header_row_select_parts = []
     for c in output_cols:
+        coltype = col_type_map.get(c, "text")
         if c == "project_article_id":
-            header_row_select_parts.append("NULL::int AS \"project_article_id\"")
+            header_row_select_parts.append(f"NULL::{coltype} AS \"project_article_id\"")
         elif c == kommentar_display:
             header_row_select_parts.append(f"'HEADER'::text AS \"{c}\"")
         elif c == einbauort_display:
             header_row_select_parts.append(f"b.\"{c}\" AS \"{c}\"")
         else:
-            header_row_select_parts.append(f"NULL::text AS \"{c}\"")
+            header_row_select_parts.append(f"NULL::{coltype} AS \"{c}\"")
     header_row_select_sql = ",\n            ".join(header_row_select_parts)
 
     # gleiche Select-Zeile, aber für Alias hb (headers_base)
     header_row_select_sql_hb = header_row_select_sql.replace('b."', 'hb."')
 
+    quoted_cols = [f'"{c}"' for c in output_cols]
     body_row_select_sql = ", ".join([f"b.{qc}" for qc in quoted_cols])
     eid_sql = einbauort_id_text_expr if einbauort_id_text_expr else "NULL"
 
-    # ---- Header-Schalter lesen
-    header_on = _get_header_rows_flag(cursor, view_id)
-    if DEBUG:
-        print(f"[DEBUG] header_rows={header_on} for view_id={view_id}; __eid present={einbauort_id_text_expr is not None}")
-
-    print(f"🧱 Creating table: {table_name}")
-    cursor.execute(f'DROP TABLE IF EXISTS "{table_name}";')
+    # Add LEFT JOIN to materialized_einbauorte as me only if einbauort is in layout
+    if einbauort_in_layout:
+        me_join = f'LEFT JOIN materialized_einbauorte me ON me.id = pa."einbauort"::int AND me.project_id = {project_id}'
+        einbauort_eid_select = 'pa."einbauort" AS __eid'
+    else:
+        me_join = ''
+        einbauort_eid_select = 'NULL AS __eid'
 
     ctes_base = f'''
         WITH position_data AS (
@@ -244,15 +204,22 @@ def create_materialized_table(project_id: int, view_id, base_view_id):
             SELECT
                 {col_exprs_sql},
                 (pd.data->>'position')::int AS __pos,
-                {eid_sql} AS __eid
+                {einbauort_eid_select}
             FROM position_data pd
             LEFT JOIN project_articles pa ON pa.id = (pd.data->>'project_article_id')::int
-            LEFT JOIN draft_project_articles dpa ON dpa.project_article_id = pa.id
             LEFT JOIN articles a ON pa.article_id = a.id
-            LEFT JOIN inserted_rows ins ON ins.project_article_id = (pd.data->>'project_article_id')::int
-            LEFT JOIN articles ai ON ins.article_id = ai.id
+            LEFT JOIN article_drafts ad ON ad.project_article_id = pa.id
+            {me_join}
         )
     '''
+
+    # ---- Header-Schalter lesen
+    header_on = _get_header_rows_flag(cursor, view_id)
+    if DEBUG:
+        print(f"[DEBUG] header_rows={header_on} for view_id={view_id}; __eid present={einbauort_id_text_expr is not None}")
+
+    print(f"🧱 Creating table: {table_name}")
+    cursor.execute(f'DROP TABLE IF EXISTS "{table_name}";')
 
     if header_on:
         sql = f'''
@@ -340,4 +307,9 @@ def refresh_all_materialized(project_id: int):
 
 
 if __name__ == "__main__":
-    refresh_all_materialized(1)
+    # Debug function: rematerialize for project_id=16, view_id=54, base_view_id=1
+    print("[DEBUG] Rematerializing for project_id=16, view_id=54, base_view_id=1...")
+    create_materialized_table(16, 54, 1)
+    print("[DEBUG] Done.")
+    # Optionally, you can still call refresh_all_materialized(1) for legacy/debug
+    # refresh_all_materialized(1)
