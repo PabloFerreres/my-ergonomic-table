@@ -82,7 +82,7 @@ function TableGrid({
   );
 
   // Only these columns are editable
-  const editableColumns = ["Status", "Lieferumfang"];
+  // const editableColumns = ["Status", "Lieferumfang"];
 
   // Use traitsMap for columnDefs
   const columnDefs = buildColumnDefs(colHeaders, traitsMap);

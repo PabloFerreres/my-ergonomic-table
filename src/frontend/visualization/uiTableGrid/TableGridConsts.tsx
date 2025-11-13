@@ -1,17 +1,21 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Handsontable from "handsontable";
 import { GetColumnTraits } from "../Formating/ColumnTraits";
 import { WrappedTraitsRenderer } from "../Formating/WrappedTraitsRenderer";
-import { traitColors } from "../Formating/TraitColorsHeaders";
 
 // Helper to get traits for all headers (async)
 export function useHeaderTraits(colHeaders: string[]) {
-  const [traitsMap, setTraitsMap] = useState<Record<string, Awaited<ReturnType<typeof GetColumnTraits>>>>({});
+  const [traitsMap, setTraitsMap] = useState<
+    Record<string, Awaited<ReturnType<typeof GetColumnTraits>>>
+  >({});
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const entries = await Promise.all(
-        colHeaders.map(async (header) => [header, await GetColumnTraits(header)])
+        colHeaders.map(async (header) => [
+          header,
+          await GetColumnTraits(header),
+        ])
       );
       if (!cancelled) {
         setTraitsMap(Object.fromEntries(entries));
@@ -20,7 +24,7 @@ export function useHeaderTraits(colHeaders: string[]) {
     return () => {
       cancelled = true;
     };
-  }, [colHeaders.join(",")]);
+  }, [colHeaders]);
   return traitsMap;
 }
 
@@ -36,10 +40,9 @@ export function buildColumnDefs(
       type: traits.type,
       renderer: WrappedTraitsRenderer,
       wordWrap: true,
-      className: [
-        "htWrap",
-        traits.colorName ? traits.colorName : ""
-      ].filter(Boolean).join(" "),
+      className: ["htWrap", traits.colorName ? traits.colorName : ""]
+        .filter(Boolean)
+        .join(" "),
       filter: true,
       readOnly: false,
       allowInvalid: true,

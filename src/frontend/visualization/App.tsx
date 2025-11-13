@@ -261,7 +261,9 @@ function App() {
               .then((res) => res.json())
               .then((result) => {
                 if (result.error) {
-                  console.error(`Failed to load table '${name}': ${result.error}`);
+                  console.error(
+                    `Failed to load table '${name}': ${result.error}`
+                  );
                   // Optionally, show a user notification here
                   // Return empty sheet to avoid crash
                   return {
@@ -355,8 +357,10 @@ function App() {
     const [, force] = useState(0);
 
     useEffect(() => {
-        const unsubscribe = subscribe(() => force((x) => x + 1));
-        return () => { unsubscribe(); };
+      const unsubscribe = subscribe(() => force((x) => x + 1));
+      return () => {
+        unsubscribe();
+      };
     }, []);
 
     const enabled = getHeaderRows(sheetKey);
