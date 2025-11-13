@@ -1,33 +1,37 @@
+import columnStyleMap from "./ColumnStyleMap.json";
+
 export type ColumnTrait = {
     header: string;
-    color?: string; // hex color from backend
+    color?: string; // hex color from static map
+    colorName?: string; // color class name from static map
     editable?: boolean;
     type?: "text" | "dropdown" | "numeric";
 };
 
-let headerColorMap: Record<string, string> | null = null;
+type StyleMapEntry = {
+    color: string;
+    headers: string[];
+    used_for?: string[];
+};
 
-export async function fetchHeaderColorMap(): Promise<Record<string, string>> {
-    if (headerColorMap !== null) {
-        return headerColorMap;
+const styleMap = columnStyleMap as Record<string, StyleMapEntry>;
+
+export const GetColumnTraits = (header: string): ColumnTrait => {
+    let color: string | undefined = undefined;
+    let colorName: string | undefined = undefined;
+    for (const [className, entry] of Object.entries(styleMap)) {
+        if (entry.headers && entry.headers.includes(header)) {
+            color = entry.color;
+            colorName = className;
+            break;
+        }
     }
-    const resp = await fetch("/api/column-header-colors");
-    if (!resp.ok) throw new Error("Failed to fetch header color map");
-    const data = await resp.json();
-    const result: Record<string, string> = data && typeof data === 'object' ? data : {};
-    headerColorMap = result;
-    return result;
-}
-
-export const GetColumnTraits = async (header: string): Promise<ColumnTrait> => {
-    const colorMap = await fetchHeaderColorMap();
-    // Type logic (keep as before)
     let type: "text" | "dropdown" | "numeric" = "text";
     if (header === "EMSR No.") type = "numeric";
-    // TODO: Add dropdown detection if needed (from backend or a static list)
     return {
         header,
-        color: colorMap[header],
+        color,
+        colorName,
         type,
     };
 };

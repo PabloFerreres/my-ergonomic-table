@@ -13,17 +13,17 @@
   "header-green": {
     "color": "#99CC00",
     "headers": [
-      "Lfd.Nr. aufsteigend!",
       "Status",
       "Relevance E-Tech.",
       "Kommentar",
-      "RI-Char.",
-      "MSR / ANSI Char.",
-      "EMSR No.",
+      "RI Char.",
+      "ANSI Char.",
       "ID",
+      "EMSR No.",
       "Beschreibung",
-      "beschreibung eng",
-      "Einbauort"
+      "Einbauort",
+      "BMK",
+      "Freigegeben"
     ]
   },
   "header-blue": {
@@ -40,9 +40,9 @@
       "Hersteller",
       "Bestellbezeichnung",
       "Funktion",
-      "More Information",
-      "Funktions-Kurzbeschreibung für Stromlaufplan",
-      "Isteinstellung Inbetriebnahme",
+      "Weitere Funktionen Verschaltung",
+      "Besschreibung für Stromplan",
+      "Ist-Einstellung Inbetriebnahme",
       "Grenzwerte",
       "Anforderer",
       "Anzahl",
@@ -55,7 +55,10 @@
       "Auftragsbestätigung",
       "Geliefert",
       "Weitere technische Daten",
-      "Weitere Funktionen Verschaltung"
+      "Einstellung",
+      "Einstellung-Einheit",
+      "Betriebspunk",
+      "Soll-Einstellung"
     ]
   },
   "header-yellow": {
@@ -66,13 +69,13 @@
       "AI",
       "AO",
       "PN",
-      "Spannung / V",
-      "Strom / A",
-      "Leistung / kW",
-      "Geschwindigkeit / rpm //Steuerung",
+      "Spannung [V]",
+      "Strom [A]",
+      "Leistung [kW]",
+      "Ansteuerung",
       "Stecker",
       "Elektr. Daten",
-      "Safety",
+      "Safety Kommentar",
       "Beschreibung für Stromlaufplan"
     ]
   },
@@ -96,10 +99,10 @@
   "header-bright-yellow": {
     "color": "#FFFF00",
     "headers": [
-      "Anlagekategorie in Vault",
-      "Bauteil-ID",
-      "Änderungsindex",
-      "Kommentar zur Änderung"
+      "Anlagekategorie Vault",
+      "Bauteil-Index Vault",
+      "Änderungs-Index Vault",
+      "Kommentar zur Revision"
     ]
   },
   "header-orange": {
@@ -113,18 +116,16 @@
     "color": "#A3B5B3",
     "headers": [
       "Wirkungsgrad",
-      "Getriebe", 
-      "Nenndrehmoment / Nm",
-      "Ventilator",
-      "Encoder",
+      "Getriebe.r",
+      "Nenndrehmoment [Nm]",
+      "Drehzahl",
+      "Encoder.r",
       "Antriebs-CLIQ",
       "Encoder-Typ",
-      "Bremse",
+      "Bremse.r",
       "Motorschutz",
-      "Not-Aus /PLd",
-      "Notleistung",
-      "Leistung Not",
-      "Freigegeben"
+      "STO.r",
+      "UPS.r [kW]"
     ]
   },
 

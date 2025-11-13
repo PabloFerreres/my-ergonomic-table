@@ -259,19 +259,30 @@ function App() {
               `${API_PREFIX}/api/tabledata?table=${name}&limit=700&project_id=${selectedProject.id}`
             )
               .then((res) => res.json())
-              .then(
-                ({ headers, data }) =>
-                  new Promise<{
-                    name: string;
-                    headers: string[];
-                    data: (string | number)[][];
-                    layout: SheetData["layout"];
-                  }>((resolve) => {
-                    triggerLayoutCalculation(headers, data, (layout) => {
-                      resolve({ name, headers, data, layout });
-                    });
-                  })
-              )
+              .then((result) => {
+                if (result.error) {
+                  console.error(`Failed to load table '${name}': ${result.error}`);
+                  // Optionally, show a user notification here
+                  // Return empty sheet to avoid crash
+                  return {
+                    name,
+                    headers: [],
+                    data: [],
+                    layout: { columnWidths: {}, rowHeights: {} },
+                  };
+                }
+                const { headers, data } = result;
+                return new Promise<{
+                  name: string;
+                  headers: string[];
+                  data: (string | number)[][];
+                  layout: SheetData["layout"];
+                }>((resolve) => {
+                  triggerLayoutCalculation(headers, data, (layout) => {
+                    resolve({ name, headers, data, layout });
+                  });
+                });
+              })
           )
         );
       })

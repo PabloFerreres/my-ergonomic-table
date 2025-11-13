@@ -5,7 +5,11 @@ import { registerAllModules } from "handsontable/registry";
 registerAllModules();
 
 import "./TableGrid.css";
-import { afterGetColHeader } from "./uiTableGrid/TableGridConsts";
+import {
+  afterGetColHeader,
+  useHeaderTraits,
+  buildColumnDefs,
+} from "./uiTableGrid/TableGridConsts";
 import { useDropdownColumns, useDropdownOptions } from "../hooks/useDropdowns";
 import { useCellProperties } from "../hooks/useCellProperties";
 import { useAfterChange } from "../hooks/useAfterChange";
@@ -58,6 +62,9 @@ function TableGrid({
     return data;
   }, [data, colCount]);
 
+  // --- Header traits for color ---
+  const traitsMap = useHeaderTraits(colHeaders);
+
   const rowIdIndex = colHeaders.indexOf("project_article_id");
 
   const { dropdowns } = useDropdownOptions(selectedProject.id, colHeaders);
@@ -77,16 +84,8 @@ function TableGrid({
   // Only these columns are editable
   const editableColumns = ["Status", "Lieferumfang"];
 
-  const columnDefs = columnDefsRaw.map((def, index) => {
-    const header = colHeaders[index];
-    return {
-      ...def,
-      readOnly:
-        header === "project_article_id"
-          ? true
-          : !editableColumns.includes(header),
-    };
-  });
+  // Use traitsMap for columnDefs
+  const columnDefs = buildColumnDefs(colHeaders, traitsMap);
 
   const onChange = useAfterChange(
     safeData,
@@ -278,7 +277,9 @@ function TableGrid({
           }
         }}
         beforeKeyDown={handleGridKeys}
-        afterGetColHeader={(col, TH) => afterGetColHeader(col, TH, colHeaders)}
+        afterGetColHeader={(col, TH) =>
+          afterGetColHeader(col, TH, colHeaders, traitsMap)
+        }
         afterFilter={() => {
           const hot = hotRef?.current?.hotInstance ?? null;
           if (!hot) return;

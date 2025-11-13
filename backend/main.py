@@ -78,4 +78,7 @@ async def get_tabledata(
     if DEBUG:
         print(f"[DEBUG] Abfrage tabledata für Tabelle: {table}, Limit: {limit}, Project: {project_id}, View: {view_id}")
     headers, data = await fetch_table_as_hotarray(DB_URL, table, limit, project_id)
+    # If headers are empty and data contains a DB error, return 404
+    if not headers and data and data[0][0].startswith("DB-Error:"):
+        return JSONResponse(status_code=404, content={"error": data[0][0]})
     return {"headers": headers, "data": data}
