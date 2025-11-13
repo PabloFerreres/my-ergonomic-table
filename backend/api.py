@@ -27,6 +27,7 @@ from backend.routes.export_excel import router as export_excel_router
 from backend.routes.event_routes import router as sse_router
 from backend.routes.views_routes import router as views_router
 from backend.routes.sync_to_cad_routes import router as sync_to_cad_router
+from backend.routes.header_colors import router as header_colors_router
 
 router = APIRouter(prefix="/api")
 router.include_router(views_router)
@@ -42,6 +43,7 @@ router.include_router(baseviews_router)
 router.include_router(elektrik_router)
 router.include_router(export_excel_router)
 router.include_router(sync_to_cad_router)
+router.include_router(header_colors_router)
 
 HEADER_MAP = json.loads(Path("backend/utils/header_name_map.json").read_text(encoding="utf-8"))
 
