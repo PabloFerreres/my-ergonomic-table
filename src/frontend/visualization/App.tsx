@@ -343,7 +343,10 @@ function App() {
     const sheetKey = sheet.toLowerCase();
     const [, force] = useState(0);
 
-    useEffect(() => subscribe(() => force((x) => x + 1)), []);
+    useEffect(() => {
+        const unsubscribe = subscribe(() => force((x) => x + 1));
+        return () => { unsubscribe(); };
+    }, []);
 
     const enabled = getHeaderRows(sheetKey);
     const pending = isPending(sheetKey);

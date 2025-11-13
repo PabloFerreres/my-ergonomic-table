@@ -8,12 +8,15 @@ export type ColumnTrait = {
 let headerColorMap: Record<string, string> | null = null;
 
 export async function fetchHeaderColorMap(): Promise<Record<string, string>> {
-    if (headerColorMap !== null) return headerColorMap;
+    if (headerColorMap !== null) {
+        return headerColorMap;
+    }
     const resp = await fetch("/api/column-header-colors");
     if (!resp.ok) throw new Error("Failed to fetch header color map");
     const data = await resp.json();
-    headerColorMap = data && typeof data === 'object' ? data : {};
-    return headerColorMap;
+    const result: Record<string, string> = data && typeof data === 'object' ? data : {};
+    headerColorMap = result;
+    return result;
 }
 
 export const GetColumnTraits = async (header: string): Promise<ColumnTrait> => {

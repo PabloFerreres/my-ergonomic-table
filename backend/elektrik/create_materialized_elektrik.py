@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 import psycopg2
 import json
 from pathlib import Path
@@ -15,6 +19,7 @@ def get_elektrik_article_ids(cursor, project_id):
     # jsonb → Python-Liste, manchmal ist es schon eine Liste
     return list(set(row[0] if isinstance(row[0], list) else json.loads(row[0])))
 
+
 def get_project_name(cursor, project_id):
     cursor.execute("SELECT name FROM projects WHERE id = %s", (project_id,))
     row = cursor.fetchone()
@@ -22,7 +27,11 @@ def get_project_name(cursor, project_id):
         raise Exception("Kein project_name gefunden!")
     return row[0].lower()
 
-def create_materialized_elektrik(project_id:int):
+
+def create_materialized_elektrik(project_id: int, debug: bool = False):
+    global DEBUG
+    old_debug = DEBUG
+    DEBUG = debug
 
     get_active_project_articles(project_id)
 
@@ -36,15 +45,21 @@ def create_materialized_elektrik(project_id:int):
 
     # 2. Liste relevanter project_article_id
     ids = get_elektrik_article_ids(cursor, project_id)
+    if DEBUG:
+        print(f"[DEBUG] Elektrik IDs read from elektrik_meta for project {project_id}: {ids}")
     if not ids:
         print("[ELEKTRIK] Keine Artikel gefunden – Abbruch.")
         cursor.close()
         conn.close()
+        DEBUG = old_debug
         return
+
+    if DEBUG:
+        print(f"[DEBUG] Elektrik IDs passed to materialized table: {ids}")
 
     # 3. Hole Layout-Spalten
     cursor.execute("""
-        SELECT c.name, c.display_name, vc.position
+        SELECT c.name, c.name_external_german, vc.position
         FROM views_columns vc
         JOIN columns c ON vc.column_id = c.id
         WHERE vc.base_view_id = %s AND vc.visible = TRUE
@@ -52,29 +67,29 @@ def create_materialized_elektrik(project_id:int):
     """, (base_view_id,))
     layout_columns = cursor.fetchall()
     layout_name_map = {}
-    for name, display_name, _ in layout_columns:
+    for name, name_external_german, _ in layout_columns:
         if name:
-            layout_name_map[name.strip().lower()] = (display_name or name).strip()
+            layout_name_map[name.strip().lower()] = (name_external_german or name).strip()
 
-    HEADER_MAP = json.loads(Path("backend/utils/header_name_map.json").read_text(encoding="utf-8"))
+    HEADER_MAP = json.loads(
+        Path("backend/utils/header_name_map.json").read_text(encoding="utf-8")
+    )
 
     # 4. Hole alle verfügbaren Spalten aus den Tabellen
     cursor.execute("""
         SELECT table_name, column_name
         FROM information_schema.columns
         WHERE table_name IN (
-            'inserted_rows',
-            'draft_project_articles',
             'project_articles',
+            'article_drafts',
             'articles'
         )
     """)
-    colmap = {"i": set(), "d": set(), "p": set(), "a": set()}
+    colmap = {"p": set(), "ad": set(), "a": set()}
     for table, col in cursor.fetchall():
         key = {
-            "inserted_rows": "i",
-            "draft_project_articles": "d",
             "project_articles": "p",
+            "article_drafts": "ad",
             "articles": "a"
         }[table]
         colmap[key].add(col)
@@ -85,35 +100,25 @@ def create_materialized_elektrik(project_id:int):
     col_exprs.append("main.project_article_id AS project_article_id")
     output_cols.append("project_article_id")
 
-    # Display-Namen merken (für Header-Zeilen)
     kommentar_display = layout_name_map.get("kommentar", "Kommentar")
     einbauort_display = layout_name_map.get("einbauort", "Einbauort")
-
-    # Merker für Einbauort-ID-Expr (Gruppierung)
     einbauort_id_txt = None
     einbauort_raw = None
 
     for layout_col, materialized_col in layout_name_map.items():
         if layout_col == "project_article_id":
             continue
-
         sources = []
-        if layout_col in colmap["i"]:
-            sources.append(f'ins."{layout_col}"')
-        if layout_col in colmap["d"]:
-            sources.append(f'dpa."{layout_col}"')
         if layout_col in colmap["p"]:
             sources.append(f'pa."{layout_col}"')
+        if layout_col in colmap["ad"]:
+            sources.append(f'ad."{layout_col}"')
         if layout_col in colmap["a"]:
             sources.append(f'a."{layout_col}"')
-
         if not sources:
             continue  # keine Quelle
-
         layout_expr = f"COALESCE({', '.join(sources)})"
-
         if layout_col == "einbauort":
-            # robust: '', '123', '... [123] ...'
             raw_txt = f"NULLIF(TRIM(({layout_expr})::text), '')"
             id_txt = f"""
                 CASE
@@ -122,25 +127,22 @@ def create_materialized_elektrik(project_id:int):
                 ELSE NULL
                 END
             """.strip()
-
             expr = f"""
                 COALESCE(
-                (
-                    SELECT me.full_name
-                    FROM materialized_einbauorte me
-                    WHERE me.project_id = {project_id}
-                    AND me.id::text = ({id_txt})
-                    LIMIT 1
-                ),
-                {raw_txt}
+                    (
+                        SELECT me.full_name
+                        FROM materialized_einbauorte me
+                        WHERE me.project_id = {project_id}
+                          AND me.id::text = ({id_txt})
+                        LIMIT 1
+                    ),
+                    {raw_txt}
                 ) AS "{materialized_col}"
             """.strip()
-
             einbauort_id_txt = id_txt
             einbauort_raw = raw_txt
         else:
-            expr = f"{layout_expr} AS \"{materialized_col}\""
-
+            expr = f'{layout_expr} AS "{materialized_col}"'
         col_exprs.append(expr)
         output_cols.append(materialized_col)
 
@@ -148,14 +150,19 @@ def create_materialized_elektrik(project_id:int):
 
     # Fallbacks falls 'einbauort' nicht im Layout ist
     if einbauort_id_txt is None:
-        einbauort_raw = """NULLIF(TRIM((COALESCE(ins."einbauort", dpa."einbauort", pa."einbauort"))::text), '')"""
-        einbauort_id_txt = f"""
-            CASE
-                WHEN {einbauort_raw} ~ '^[0-9]+$' THEN {einbauort_raw}
-                WHEN {einbauort_raw} ~ '\\[[0-9]+\\]' THEN regexp_replace({einbauort_raw}, '.*\\[([0-9]+)\\].*', '\\1')
-                ELSE NULL
-            END
-        """.strip()
+        einbauort_id_txt = (
+            'CASE '
+            f"WHEN NULLIF(TRIM((COALESCE(pa.\"einbauort\", ad.\"einbauort\", a.\"einbauort\"))::text), '') ~ '^[0-9]+$' "
+            f"THEN NULLIF(TRIM((COALESCE(pa.\"einbauort\", ad.\"einbauort\", a.\"einbauort\"))::text), '') "
+            f"WHEN NULLIF(TRIM((COALESCE(pa.\"einbauort\", ad.\"einbauort\", a.\"einbauort\"))::text), '') ~ '\\[[0-9]+\\]' "
+            f"THEN regexp_replace(NULLIF(TRIM((COALESCE(pa.\"einbauort\", ad.\"einbauort\", a.\"einbauort\"))::text), ''), '.*\\[([0-9]+)\\].*', '\\1') "
+            'ELSE NULL END'
+        )
+        einbauort_fallback_sql = (
+            'NULLIF(TRIM((COALESCE(pa."einbauort", ad."einbauort", a."einbauort"))::text), \'\')'
+        )
+    else:
+        einbauort_fallback_sql = 'NULL'
 
     einbauort_full_expr = f"""
         COALESCE(
@@ -164,33 +171,33 @@ def create_materialized_elektrik(project_id:int):
              WHERE me.project_id = {project_id}
                AND me.id::text = ({einbauort_id_txt})
              LIMIT 1),
-            {einbauort_raw}
+            {einbauort_fallback_sql}
         )
     """.strip()
 
-    order_secondary_expr = 'COALESCE(ins."emsr_no", dpa."emsr_no", pa."emsr_no")'
+    order_secondary_expr = 'pa."emsr_no"'
 
     # Header-Select bauen (Kommentar='HEADER', Einbauort kopieren, Rest NULL::text)
-    quoted_cols = [f"\"{c}\"" for c in output_cols]
+    quoted_cols = [f'"{c}"' for c in output_cols]
     header_row_select_parts = []
     for c in output_cols:
         if c == "project_article_id":
-            header_row_select_parts.append("NULL::int AS \"project_article_id\"")
+            header_row_select_parts.append('NULL::int AS "project_article_id"')
         elif c == kommentar_display:
             header_row_select_parts.append(f"'HEADER'::text AS \"{c}\"")
         elif c == einbauort_display:
             header_row_select_parts.append(f"hb.\"{c}\" AS \"{c}\"")
         else:
-            header_row_select_parts.append(f"NULL::text AS \"{c}\"")
+            header_row_select_parts.append(f'NULL::text AS "{c}"')
     header_row_select_sql_hb = ",\n                ".join(header_row_select_parts)
 
     # Body-Select: alle Nicht-ID-Spalten auf ::text casten (vereinheitlicht die UNION-Typen)
     body_row_select_casted = []
     for c in output_cols:
         if c == "project_article_id":
-            body_row_select_casted.append(f"b.\"{c}\"")  # int
+            body_row_select_casted.append(f'b."{c}"')  # int
         else:
-            body_row_select_casted.append(f"(b.\"{c}\")::text AS \"{c}\"")
+            body_row_select_casted.append(f'(b."{c}")::text AS "{c}"')
     body_row_select_sql = ", ".join(body_row_select_casted)
 
     # 6. Drop und CREATE TABLE – mit Header-Injektion
@@ -198,14 +205,9 @@ def create_materialized_elektrik(project_id:int):
     sql = rf'''
         CREATE TABLE "{table_name}" AS
         WITH main AS (
-            SELECT ir.project_article_id, ir.relevance_etech, ir.article_id
-            FROM inserted_rows ir
-            WHERE ir.project_article_id = ANY(%s) AND ir.relevance_etech IN ('E','ES')
-            UNION
-            SELECT pa.id AS project_article_id, pa.relevance_etech, pa.article_id
+            SELECT pa.id AS project_article_id, pa.relevance_e_tech, pa.article_id
             FROM project_articles pa
-            JOIN articles a ON pa.article_id = a.id
-            WHERE pa.id = ANY(%s) AND pa.relevance_etech IN ('E','ES')
+            WHERE pa.id = ANY(%s) AND pa.relevance_e_tech IN ('E','ES')
         ),
         base_rows AS (
             SELECT
@@ -213,9 +215,8 @@ def create_materialized_elektrik(project_id:int):
                 row_number() OVER (ORDER BY {einbauort_full_expr}, {order_secondary_expr}) AS __ord,
                 {einbauort_id_txt} AS __eid
             FROM main
-            LEFT JOIN inserted_rows ins ON ins.project_article_id = main.project_article_id
-            LEFT JOIN draft_project_articles dpa ON dpa.project_article_id = main.project_article_id
             LEFT JOIN project_articles pa ON pa.id = main.project_article_id
+            LEFT JOIN article_drafts ad ON ad.project_article_id = main.project_article_id
             LEFT JOIN articles a ON pa.article_id = a.id
         ),
         body AS (
@@ -249,14 +250,26 @@ def create_materialized_elektrik(project_id:int):
 
     if DEBUG:
         print("[ELEKTRIK] CREATE SQL:\n", sql)
-    cursor.execute(sql, (ids, ids))
+    cursor.execute(sql, (ids,))
     conn.commit()
     print(f"✅ Materialized Elektrik erzeugt: {table_name}")
 
+    # Print the project_article_ids that were actually used in the materialized table
+    if DEBUG:
+        cursor.execute(f'SELECT DISTINCT project_article_id FROM "{table_name}" ORDER BY project_article_id')
+        used_ids = [row[0] for row in cursor.fetchall()]
+        if DEBUG:
+            print(f"[DEBUG] project_article_id used in {table_name}: {used_ids}")
+
     cursor.close()
     conn.close()
+    DEBUG = old_debug
+
 
 if __name__ == "__main__":
-    create_materialized_elektrik(1)
+    # Debug function: rematerialize for project_id=16
+    print("[DEBUG] Rematerializing Elektrik for project_id=16...")
+    create_materialized_elektrik(16, debug=True)
+    print("[DEBUG] Done.")
 
 # TODO: create the logic for von_sheet, to set the origin of the data

@@ -77,5 +77,5 @@ async def get_tabledata(
 ):
     if DEBUG:
         print(f"[DEBUG] Abfrage tabledata für Tabelle: {table}, Limit: {limit}, Project: {project_id}, View: {view_id}")
-    headers, data = await fetch_table_as_hotarray(DB_URL, table, limit, project_id, view_id)
+    headers, data = await fetch_table_as_hotarray(DB_URL, table, limit, project_id)
     return {"headers": headers, "data": data}

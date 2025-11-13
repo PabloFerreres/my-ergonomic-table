@@ -1,5 +1,6 @@
 import sys
 import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
 import psycopg2
@@ -48,6 +49,14 @@ def get_active_project_articles(project_id: int):
         except Exception as e:
             print(f"⚠️ Fehler beim Parsen: {e}")
 
+    # Filter article_ids to only those with relevance_e_tech in ('E', 'ES')
+    if article_ids:
+        cur.execute("""
+            SELECT id FROM project_articles WHERE id = ANY(%s) AND relevance_e_tech IN ('E', 'ES')
+        """, (list(set(article_ids)),))
+        filtered_ids = [row[0] for row in cur.fetchall()]
+        article_ids = filtered_ids
+
     # 3. Schreibe als JSONB in elektrik_meta
     if not article_ids:
         print(f"⚠️ Keine project_article_id gefunden für project_id={project_id}")
@@ -66,4 +75,6 @@ def get_active_project_articles(project_id: int):
     conn.close()
 
 if __name__ == "__main__":
-    get_active_project_articles(1)
+    print("[DEBUG] Running get_active_project_articles for project_id=16...")
+    get_active_project_articles(16)
+    print("[DEBUG] Done.")
