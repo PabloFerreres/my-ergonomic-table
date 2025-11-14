@@ -12,10 +12,10 @@
     "GUID": "pnpguid"
   },
   "logical_vars": {
-    "E1": "RelevanzETech",
-    "E2": "Safety"
+    "E1": "relevance_e_tech",
+    "E2": "safety"
   },
   "computed_vars": {
-    "E3": "relevance_etech"
+    "E3": "relevance_e_tech"
   }
 }

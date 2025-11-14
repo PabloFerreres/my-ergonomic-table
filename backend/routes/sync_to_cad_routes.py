@@ -18,7 +18,7 @@ async def sync_to_cad(request: Request):
         smart_objects = fetch_smart_objects_for_view(pg_conn, project_id, view_id, debug_txt=True)
         pa_ids = []
         for obj in smart_objects:
-            mapped = map_cad_properties_to_pa(obj)
+            mapped = map_cad_properties_to_pa(obj, pg_conn)
             pa_id = upsert_project_article(pg_conn, project_id, view_id, mapped_props=mapped)
             pa_ids.append(pa_id)
         pg_conn.close()

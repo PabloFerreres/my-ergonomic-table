@@ -4,19 +4,15 @@ import os
 import json
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from backend.autocad.fetch_smart_objects import fetch_smart_objects_for_drawing
 
 def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_txt: bool = True):
     """
-    Fetch smart objects from Plant 3D DB for a given project/view.
-    1. Get CAD DB path from projects.project_cad_db_path
-    2. Get drawing guid from views.cad_drawing_guid
-    3. Connect to Plant 3D DB (sqlite)
-    4. Find PnPID in PnPDrawings using the guid
-    5. Get all object RowIds in the target drawing from PnPDataLinks (DwgId = PnPID)
-    6. Get all relevant objects from WSPCustomPNID for the project (filter by RowId)
-    7. Get GUIDs from PnPBase for these objects
-    8. Get drawing info from PnPDrawings
-    9. Combine all data
+    Uses fetch_smart_objects_for_drawing as the core logic for fetching smart objects from CAD DB.
+    1. Get CAD DB path and drawing guid from Postgres
+    2. Find PnPID for the drawing guid
+    3. Use fetch_smart_objects_for_drawing to get objects
+    4. Optionally write debug output
     """
     cur = pg_conn.cursor()
     cur.execute("""
@@ -34,103 +30,72 @@ def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_t
         drawing_guid = '{' + drawing_guid
     if not drawing_guid.endswith('}'):
         drawing_guid = drawing_guid + '}'
-    print(f"[DEBUG] CAD DB path: {db_path}")
-    print(f"[DEBUG] Drawing guid used for query: {drawing_guid}")
     if not os.path.exists(db_path):
         raise Exception(f"CAD DB file does not exist: {db_path}")
+    # Find PnPID for the drawing guid
     cad_conn = sqlite3.connect(db_path)
     cursor = cad_conn.cursor()
-
-    # Step 1: Find PnPID for the drawing guid
     cursor.execute("SELECT PnPID FROM PnPDrawings WHERE PnPDrawingGuid = ?", (drawing_guid,))
     pnp_row = cursor.fetchone()
+    cad_conn.close()
     if not pnp_row:
         raise Exception("Drawing guid not found in Plant 3D DB")
     pnpid = pnp_row[0]
-
-    # Step 2: Get all object RowIds in the target drawing from PnPDataLinks
-    cursor.execute("SELECT RowId FROM PnPDataLinks WHERE DwgId = ?", (pnpid,))
-    row_ids = [row[0] for row in cursor.fetchall()]
-    if not row_ids:
-        print(f"No objects found for drawing PnPID={pnpid}")
-        cad_conn.close()
-        return []
-
-    # Step 3: Get all relevant objects from WSPCustomPNID for the project (filter by RowId)
-    format_ids = ','.join(['?'] * len(row_ids))
-    cursor.execute(f"SELECT * FROM WSPCustomPNID WHERE PnPID IN ({format_ids})", row_ids)
-    wsp_objects = cursor.fetchall()
-    wsp_columns = [desc[0] for desc in cursor.description]
-
-    # Step 4: Get GUIDs from PnPBase for these objects
-    cursor.execute(f"SELECT PnPID, PnPGuid FROM PnPBase WHERE PnPID IN ({format_ids})", row_ids)
-    guid_map = {row[0]: row[1] for row in cursor.fetchall()}
-
-    # Step 5: Get drawing info from PnPDrawings
-    cursor.execute("SELECT * FROM PnPDrawings WHERE PnPID = ?", (pnpid,))
-    drawing_info = cursor.fetchone()
-    drawing_columns = [desc[0] for desc in cursor.description]
-
-    # Step 6: Combine all data
-    results = []
-    for obj in wsp_objects:
-        obj_dict = dict(zip(wsp_columns, obj))
-        for k, v in obj_dict.items():
-            if isinstance(v, bytes):
-                obj_dict[k] = v.hex()
-        guid_bytes = guid_map.get(obj_dict['PnPID'])
-        if guid_bytes is not None:
-            obj_dict['GUID'] = guid_bytes.hex() if isinstance(guid_bytes, bytes) else str(guid_bytes)
-        else:
-            obj_dict['GUID'] = None
-        if drawing_info:
-            drawing_info_dict = {k: (v.hex() if isinstance(v, bytes) else v) for k, v in zip(drawing_columns, drawing_info)}
-            obj_dict['DrawingInfo'] = drawing_info_dict
-        else:
-            obj_dict['DrawingInfo'] = None
-        results.append(obj_dict)
-
+    # Use fetch_smart_objects_for_drawing to get objects
+    # Patch DB_PATH for fetch_smart_objects_for_drawing
+    import backend.autocad.fetch_smart_objects as fso
+    fso.DB_PATH = db_path
+    results = fetch_smart_objects_for_drawing(pnpid)
     if debug_txt:
-        import json
         debug_path = os.path.join(os.path.dirname(__file__), "smart_objects_debug.txt")
         with open(debug_path, "w", encoding="utf-8") as f:
             f.write(json.dumps(results, indent=2, ensure_ascii=False))
-
-    cad_conn.close()
     return results
 
 def map_cad_properties_to_pa(obj, pg_conn):
     """
-    Maps a CAD object dictionary to a dict of project_articles columns using the columns table in the DB.
-    Only properties present in columns.name are mapped (case-insensitive).
-    Special logic for relevance_e_tech and soll_eigenschaften.
+    Maps a CAD object dictionary to a dict of project_articles columns using the actual columns of the project_articles table.
+    Only properties present in both CAD object and project_articles columns are mapped (case-insensitive).
+    Special logic for relevance_e_tech, soll_eigenschaften, and always sets pnpguid from GUID if present.
     """
     cur = pg_conn.cursor()
-    cur.execute("SELECT name FROM columns")
-    db_columns = set(row[0].lower() for row in cur.fetchall())
+    # Get column names from project_articles table
+    cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'project_articles'")
+    pa_columns = set(row[0].lower() for row in cur.fetchall())
+    cad_keys = set(k.lower() for k in obj.keys())
+    intersect_keys = cad_keys & pa_columns
 
     result = {}
     debug_log = []
-    # Map only CAD properties that exist in columns.name (case-insensitive)
+    # Map only CAD properties that exist in both CAD and project_articles columns (case-insensitive)
     for cad_prop, val in obj.items():
         col_name = cad_prop.lower()
-        # Skip special columns, handle below
-        if col_name in db_columns and col_name not in ["relevance_e_tech", "soll_eigenschaften"]:
-            # Special handling for EinbauortID if needed
-            if col_name == "einbauortid":
+        # Only map if in intersection and not a special column
+        if col_name in intersect_keys and col_name not in ["relevance_e_tech", "soll_eigenschaften", "pnpguid"]:
+            # Special handling for EinbauortID and Einbauort
+            if col_name == "einbauortid" or col_name == "einbauort":
                 if val is not None:
                     try:
-                        if isinstance(val, str) and val.endswith(".0"):
-                            val = val[:-2]
-                        val = int(float(val))
+                        # If it's a string and represents a number, convert to int
+                        if isinstance(val, str):
+                            num_val = val[:-2] if val.endswith(".0") else val
+                            if num_val.replace('.', '', 1).isdigit():
+                                val = int(float(num_val))
+                        elif isinstance(val, float):
+                            val = int(val)
                     except Exception:
-                        val = None
+                        pass  # If conversion fails, keep original value
             result[col_name] = val
+    # Always set pnpguid from GUID if present
+    if "pnpguid" in pa_columns and "GUID" in obj:
+        result["pnpguid"] = obj["GUID"]
     debug_log.append(f"Direct property mapping result: {result}")
 
     # Special logic for relevance_e_tech (E1/E2 boolean logic)
-    E1 = obj.get('relevanz_e_tech')
-    E2 = obj.get('safety')
+    # Use 'relevance_e_tech' and 'Safety' (capital S) from CAD object
+    E1 = obj.get('relevance_e_tech')
+    E2 = obj.get('Safety')
+    debug_log.append(f"Incoming CAD data: relevance_e_tech={E1}, Safety={E2}")
     E1_bool = bool(E1) and E1 != 0
     E2_bool = bool(E2) and E2 != 0
     E3 = ""
@@ -138,13 +103,16 @@ def map_cad_properties_to_pa(obj, pg_conn):
         E3 = "ES"
     elif E1_bool and not E2_bool:
         E3 = "E"
+    elif not E1_bool and not E2_bool:
+        E3 = ""
     result['relevance_e_tech'] = E3
-    debug_log.append(f"Computed relevance_e_tech: {E3}")
+    debug_log.append(f"Injected relevance_e_tech value: {E3}")
+    debug_log.append(f"Final result mapping: {result}")
 
     # Special logic for soll_eigenschaften: join soll_einstellung and soll_einstellung_einheit
     soll_einstellung = obj.get('soll_einstellung')
     soll_einstellung_einheit = obj.get('soll_einstellung_einheit')
-    if soll_einstellung is not None or soll_einstellung_einheit is not None:
+    if (soll_einstellung is not None or soll_einstellung_einheit is not None) and "soll_eigenschaften" in pa_columns:
         joined = f"{soll_einstellung or ''} {soll_einstellung_einheit or ''}".strip()
         result['soll_eigenschaften'] = joined
         debug_log.append(f"Set soll_eigenschaften: {joined}")
@@ -158,6 +126,14 @@ def map_cad_properties_to_pa(obj, pg_conn):
             f.write(line + "\n")
 
     return result
+
+def debug_sync_payload(mapped_props):
+    """
+    Debug utility: Write the payload that will be sent to upsert_project_article to a file for inspection.
+    """
+    debug_path = os.path.join(os.path.dirname(__file__), "sync_payload_debug.txt")
+    with open(debug_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(mapped_props, indent=2, ensure_ascii=False) + "\n")
 
 def upsert_project_article(pg_conn, project_id, view_id, mapped_props):
     """
@@ -228,17 +204,17 @@ def update_position_meta(pg_conn, view_id, position_map):
 
 def debug_cad_to_db_properties(cad_obj, pg_conn):
     """
-    Debug utility: Print all property names from CAD (all keys, lowercased), all DB property names (columns.name), and the intersection (those we will use).
-    For CAD, show all keys in the object (lowercased). For DB, show all columns.name. Intersection: those present in both.
+    Debug utility: Print all property names from CAD (all keys, lowercased), all DB property names (project_articles columns), and the intersection (those we will use).
+    For CAD, show all keys in the object (lowercased). For DB, show all project_articles columns. Intersection: those present in both.
     """
     cur = pg_conn.cursor()
-    cur.execute("SELECT name FROM columns")
-    db_names = set([row[0] for row in cur.fetchall()])
+    cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'project_articles'")
+    db_names = set([row[0].lower() for row in cur.fetchall()])
     cad_names = set([k.strip().lower() for k in cad_obj.keys()])
     print("All property names from CAD (lowercased):")
     for k in cad_obj.keys():
         print(f"  - {k.strip().lower()}")
-    print("\nAll property names from DB (columns.name):")
+    print("\nAll property names from DB (project_articles columns):")
     for name in db_names:
         print(f"  - {name}")
     print("\nProperties that will be used (intersection):")
@@ -258,9 +234,15 @@ if __name__ == "__main__":
     project_id = 16  # TODO: set your real project_id
     view_id = 54     # TODO: set your real view_id
     smart_objects = fetch_smart_objects_for_view(pg_conn, project_id, view_id, debug_txt=False)
-    if smart_objects:
+    if (smart_objects):
         print("\n--- DEBUGGING WITH REAL CAD OBJECT ---")
         debug_cad_to_db_properties(smart_objects[0], pg_conn)
+        # Sync all smart objects to project_articles
+        for obj in smart_objects:
+            mapped_props = map_cad_properties_to_pa(obj, pg_conn)
+            debug_sync_payload(mapped_props)
+            pa_id = upsert_project_article(pg_conn, project_id, view_id, mapped_props)
+            print(f"Upserted project_article with id: {pa_id}")
     else:
         print("No CAD objects found for the given project/view.")
     pg_conn.close()
