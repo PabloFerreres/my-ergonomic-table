@@ -165,43 +165,6 @@ def upsert_project_article(pg_conn, project_id, view_id, mapped_props):
     pg_conn.commit()
     return pa_id
 
-def create_position_map(pg_conn, pa_ids):
-    """
-    Creates a position_map JSON for the given list of pa_ids, sorted by project_articles.emsr_no ascending.
-    Each entry: {"position": n, "project_article_id": pa_id}
-    """
-    cur = pg_conn.cursor()
-    # Fetch emsr_no for all pa_ids
-    format_ids = ','.join(['%s'] * len(pa_ids))
-    cur.execute(f"SELECT id, emsr_no FROM project_articles WHERE id IN ({format_ids})", pa_ids)
-    rows = cur.fetchall()
-    # Map pa_id to emsr_no
-    emsr_map = {row[0]: row[1] for row in rows}
-    # Sort pa_ids by emsr_no (None values last)
-    sorted_pa_ids = sorted(pa_ids, key=lambda pid: (emsr_map.get(pid) is None, emsr_map.get(pid)))
-    # Build position_map
-    position_map = []
-    for idx, pa_id in enumerate(sorted_pa_ids, start=1):
-        position_map.append({"position": idx, "project_article_id": pa_id})
-    return position_map
-
-def update_position_meta(pg_conn, view_id, position_map):
-    """
-    Updates the position_map in position_meta for the given view_id.
-    Finds position_meta_id from views, then updates position_meta.position_map.
-    """
-    cur = pg_conn.cursor()
-    # Get position_meta_id for the view
-    cur.execute("SELECT position_meta_id FROM views WHERE id = %s", (view_id,))
-    row = cur.fetchone()
-    if not row:
-        raise Exception(f"No position_meta_id found for view_id={view_id}")
-    position_meta_id = row[0]
-    # Update position_map
-    cur.execute("UPDATE position_meta SET position_map = %s WHERE id = %s", (json.dumps(position_map), position_meta_id))
-    pg_conn.commit()
-    print(f"Updated position_meta.position_map for view_id={view_id}, position_meta_id={position_meta_id}")
-
 def debug_cad_to_db_properties(cad_obj, pg_conn):
     """
     Debug utility: Print all property names from CAD (all keys, lowercased), all DB property names (project_articles columns), and the intersection (those we will use).
@@ -223,6 +186,42 @@ def debug_cad_to_db_properties(cad_obj, pg_conn):
             print(f"  - CAD: '{cad_name}' -> DB column: '{cad_name}'")
     return
 
+def upsert_position_map(pg_conn, view_id, pa_ids):
+    """
+    Creates or updates the position_map in position_meta for the given view_id.
+    Only uses the pa_ids from the current sync request, ordered by emsr_no.
+    """
+    cur = pg_conn.cursor()
+    # Get position_meta_id for the view
+    cur.execute("SELECT position_meta_id FROM views WHERE id = %s", (view_id,))
+    row = cur.fetchone()
+    if not row:
+        raise Exception(f"No position_meta_id found for view_id={view_id}")
+    position_meta_id = row[0]
+    # Build position_map
+    format_ids = ','.join(['%s'] * len(pa_ids))
+    cur.execute(f"SELECT id, emsr_no FROM project_articles WHERE id IN ({format_ids})", pa_ids)
+    rows = cur.fetchall()
+    emsr_map = {row[0]: row[1] for row in rows}
+    sorted_pa_ids = sorted(pa_ids, key=lambda pid: (emsr_map.get(pid) is None, emsr_map.get(pid)))
+    position_map = []
+    for idx, pa_id in enumerate(sorted_pa_ids, start=1):
+        position_map.append({"position": idx, "project_article_id": pa_id})
+    # Check if position_map already exists
+    cur.execute("SELECT position_map FROM position_meta WHERE id = %s", (position_meta_id,))
+    existing = cur.fetchone()
+    if existing is None or existing[0] is None:
+        # Create new position_map
+        cur.execute("UPDATE position_meta SET position_map = %s WHERE id = %s", (json.dumps(position_map), position_meta_id))
+        pg_conn.commit()
+        print(f"Created new position_map for view_id={view_id}, position_meta_id={position_meta_id}")
+    else:
+        # Update existing position_map
+        cur.execute("UPDATE position_meta SET position_map = %s WHERE id = %s", (json.dumps(position_map), position_meta_id))
+        pg_conn.commit()
+        print(f"Updated position_map for view_id={view_id}, position_meta_id={position_meta_id}")
+    return position_map
+
 if __name__ == "__main__":
     from backend.settings.connection_points import DB_URL
     # Connect to Postgres using DB_URL from config
@@ -237,12 +236,16 @@ if __name__ == "__main__":
     if (smart_objects):
         print("\n--- DEBUGGING WITH REAL CAD OBJECT ---")
         debug_cad_to_db_properties(smart_objects[0], pg_conn)
+        pa_ids = []
         # Sync all smart objects to project_articles
         for obj in smart_objects:
             mapped_props = map_cad_properties_to_pa(obj, pg_conn)
             debug_sync_payload(mapped_props)
             pa_id = upsert_project_article(pg_conn, project_id, view_id, mapped_props)
             print(f"Upserted project_article with id: {pa_id}")
+            pa_ids.append(pa_id)
+        # Update position_map with all pa_ids from this sync
+        upsert_position_map(pg_conn, view_id, pa_ids)
     else:
         print("No CAD objects found for the given project/view.")
     pg_conn.close()
