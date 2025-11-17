@@ -97,7 +97,8 @@ function TableGrid({
               name !== "Status" &&
               name !== "Lieferumfang"
           );
-        setReadonlyCols(new Set(paCols));
+        // Always add 'project_article_id' and 'order_key' to readonly columns
+        setReadonlyCols(new Set([...paCols, "project_article_id", "order_key"]));
       });
   }, []);
 
