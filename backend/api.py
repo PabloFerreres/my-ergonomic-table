@@ -47,8 +47,6 @@ router.include_router(sync_to_cad_router)
 router.include_router(header_colors_router)
 router.include_router(columns_names_origin_router)
 
-HEADER_MAP = json.loads(Path("backend/utils/header_name_map.json").read_text(encoding="utf-8"))
-
 
 @router.post("/updatePosition")
 async def update_position(request: Request, project_id: int = Query(...)):
@@ -99,139 +97,110 @@ async def update_position(request: Request, project_id: int = Query(...)):
 async def update_edits(request: Request, project_id: int = Query(...)):
     payload = await request.json()
     edits = payload.get("edits", [])
-    sheet_name = payload.get("sheet")  # kommt vom Frontend (sendEdits)
+    sheet_name = payload.get("sheet")
 
     if DEBUG:
         print(f"📥 Eingehende Edits: {len(edits)} auf Sheet={sheet_name}")
 
     conn = await asyncpg.connect(DB_URL)
-    updated_count = 0
-    edits_by_row: dict[int, dict] = {}
+    # Fetch columns_map from DB (with table origin)
+    columns_map_result = await conn.fetch("""
+        SELECT c.name, c.name_external_german,
+        CASE
+            WHEN c.name IN (SELECT column_name FROM information_schema.columns WHERE table_name = 'project_articles') THEN 'project_articles'
+            WHEN c.name IN (SELECT column_name FROM information_schema.columns WHERE table_name = 'articles') THEN 'articles'
+            ELSE NULL
+        END AS table_origin
+        FROM columns c
+        WHERE c.name_external_german IS NOT NULL
+    """)
+    ext_to_int = {row["name_external_german"]: row["name"] for row in columns_map_result}
+    ext_to_table = {row["name_external_german"]: row["table_origin"] for row in columns_map_result}
 
+    updated_count = 0
+    edits_by_row_pa = {}  # project_articles edits
+    edits_by_row_ad = {}  # article_drafts edits
     int_fields = {"project_article_id", "position", "article_id"}
 
     for edit in edits:
         row_id = int(edit["rowId"])
         col = edit["colName"]
         val = edit["newValue"]
-
-        mapped_col = HEADER_MAP.get(col, col)
+        mapped_col = ext_to_int.get(col, col)
+        table_origin = ext_to_table.get(col, None)
         if mapped_col in int_fields:
             if val == '' or val is None:
                 val = None
             else:
                 val = int(val)
+        if table_origin == "project_articles":
+            if row_id not in edits_by_row_pa:
+                edits_by_row_pa[row_id] = {}
+            edits_by_row_pa[row_id][mapped_col] = val
+        elif table_origin == "articles":
+            if row_id not in edits_by_row_ad:
+                edits_by_row_ad[row_id] = {}
+            edits_by_row_ad[row_id][mapped_col] = val
 
-        if row_id not in edits_by_row:
-            edits_by_row[row_id] = {}
-        edits_by_row[row_id][col] = val
-
-    existing_ids_result = await conn.fetch("SELECT project_article_id FROM inserted_rows")
-    existing_inserted_ids = {r["project_article_id"] for r in existing_ids_result}
-    if DEBUG:
-        print(f"📋 Inserted IDs (aus DB): {sorted(existing_inserted_ids)}")
-
-    for row_id, updates in edits_by_row.items():
+    # --- Update project_articles ---
+    for row_id, updates in edits_by_row_pa.items():
+        columns = list(updates.keys())
+        values = list(updates.values())
+        set_clause = ", ".join([f'"{col}" = ${i+1}' for i, col in enumerate(columns)])
+        sql = f"""
+            UPDATE project_articles
+            SET {set_clause}
+            WHERE id = ${len(columns)+1}
+        """
         if DEBUG:
-            print(f"\n🔄 Bearbeite row_id = {row_id}, Updates: {updates}")
+            print(f"✏️ UPDATE project_articles SQL: {sql}")
+            print(f"✏️ VALUES: {values + [row_id]}")
+        await conn.execute(sql, *values, row_id)
+        updated_count += 1
 
-        if row_id < 0:
-            mapped_updates = {}
-            for c, v in updates.items():
-                mc = HEADER_MAP.get(c, c)
-                if mc in int_fields:
-                    if v == '':
-                        v = None
-                    else:
-                        v = int(v)
-                mapped_updates[mc] = v
-
-            if row_id in existing_inserted_ids:
-                set_clause = ", ".join([f'"{col}" = ${i+1}' for i, col in enumerate(mapped_updates.keys())])
-                sql = f"""
-                    UPDATE inserted_rows
-                    SET {set_clause}
-                    WHERE project_article_id = ${len(mapped_updates) + 1}
-                """
-                values = list(mapped_updates.values())
-                if DEBUG:
-                    print("✏️ UPDATE inserted_rows SQL:", sql)
-                    print("✏️ VALUES:", values + [row_id])
-                await conn.execute(sql, *values, row_id)
-            else:
-                columns = list(mapped_updates.keys())
-                values = list(mapped_updates.values())
-                if "project_article_id" not in columns:
-                    columns.insert(0, "project_article_id")
-                    values.insert(0, row_id)
-                placeholders = ", ".join([f"${i+1}" for i in range(len(columns))])
-                sql = f"""
-                    INSERT INTO inserted_rows ({', '.join(f'"{c}"' for c in columns)})
-                    VALUES ({placeholders})
-                """
-                if DEBUG:
-                    print("➕ INSERT inserted_rows SQL:", sql)
-                    print("➕ VALUES:", values)
-                await conn.execute(sql, *values)
-
+    # --- Update or insert into article_drafts ---
+    for row_id, updates in edits_by_row_ad.items():
+        columns = list(updates.keys())
+        values = list(updates.values())
+        # Check if row exists
+        row = await conn.fetchrow(
+            "SELECT 1 FROM article_drafts WHERE project_article_id = $1", row_id
+        )
+        if row:
+            set_clause = ", ".join([f'"{col}" = ${i+1}' for i, col in enumerate(columns)])
+            sql = f"""
+                UPDATE article_drafts
+                SET {set_clause}
+                WHERE project_article_id = ${len(columns)+1}
+            """
+            if DEBUG:
+                print(f"✏️ UPDATE article_drafts SQL: {sql}")
+                print(f"✏️ VALUES: {values + [row_id]}")
+            await conn.execute(sql, *values, row_id)
         else:
-            columns, values = [], []
-            for c in updates.keys():
-                mc = HEADER_MAP.get(c)
-                if mc:
-                    columns.append(mc)
-                    v = updates[c]
-                    if mc in int_fields:
-                        if v == '':
-                            v = None
-                        else:
-                            v = int(v)
-                    values.append(v)
-
-            if not columns:
-                if DEBUG:
-                    print(f"⚠️ Keine gültigen Mappings für: {updates.keys()}")
-                continue
-
-            row = await conn.fetchrow(
-                "SELECT 1 FROM draft_project_articles WHERE project_article_id = $1", row_id
-            )
-            if row:
-                set_clause = ", ".join([f"{col} = ${i+1}" for i, col in enumerate(columns)])
-                sql = f"""
-                    UPDATE draft_project_articles
-                    SET {set_clause}
-                    WHERE project_article_id = ${len(columns)+1}
-                """
-                if DEBUG:
-                    print("✏️ UPDATE draft_project_articles SQL:", sql)
-                    print("✏️ VALUES:", values + [row_id])
-                await conn.execute(sql, *values, row_id)
-            else:
-                insert_columns = list(columns)
-                insert_values = values
-                if "project_article_id" not in insert_columns:
-                    insert_columns.insert(0, "project_article_id")
-                    insert_values.insert(0, row_id)
-                placeholders = ", ".join([f"${i+1}" for i in range(len(insert_columns))])
-                sql = f"""
-                    INSERT INTO draft_project_articles ({', '.join(insert_columns)})
-                    VALUES ({placeholders})
-                """
-                if DEBUG:
-                    print("➕ INSERT draft_project_articles SQL:", sql)
-                    print("➕ VALUES:", insert_values)
-                await conn.execute(sql, *insert_values)
-
+            insert_columns = list(columns)
+            insert_values = values
+            if "project_article_id" not in insert_columns:
+                insert_columns.insert(0, "project_article_id")
+                insert_values.insert(0, row_id)
+            placeholders = ", ".join([f"${i+1}" for i in range(len(insert_columns))])
+            sql = f"""
+                INSERT INTO article_drafts ({', '.join(insert_columns)})
+                VALUES ({placeholders})
+            """
+            if DEBUG:
+                print(f"➕ INSERT article_drafts SQL: {sql}")
+                print(f"➕ VALUES: {insert_values}")
+            await conn.execute(sql, *insert_values)
         updated_count += 1
 
     await conn.close()
 
-    # 🔔 EIN Remat-Trigger nach den DB-Writes:
+    # 🔔 Remat-Trigger nach den DB-Writes
     if sheet_name and str(sheet_name).startswith("materialized_elektrik_"):
-        schedule_all_rematerialize(project_id)  # Elektrik-Edits ⇒ ALL (+Elektrik) ⇒ 1 Publish
+        schedule_all_rematerialize(project_id)
     elif sheet_name:
-        schedule_sheet_and_elektrik_rematerialize(project_id, sheet_name)  # Sheet+Elektrik ⇒ 1 Publish
+        schedule_sheet_and_elektrik_rematerialize(project_id, sheet_name)
 
     if DEBUG:
         print(f"✅ Edits gespeichert: {updated_count} Änderungen")
