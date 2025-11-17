@@ -109,12 +109,15 @@ def create_materialized_elektrik(project_id: int, debug: bool = False):
         if layout_col == "project_article_id":
             continue
         sources = []
-        if layout_col in colmap["p"]:
+        in_p = layout_col in colmap["p"]
+        in_ad = layout_col in colmap["ad"]
+        in_a = layout_col in colmap["a"]
+        # Prioritize: if article_id exists, use articles; else use article_drafts
+        if in_p:
             sources.append(f'pa."{layout_col}"')
-        if layout_col in colmap["ad"]:
-            sources.append(f'ad."{layout_col}"')
-        if layout_col in colmap["a"]:
-            sources.append(f'a."{layout_col}"')
+        if in_a or in_ad:
+            expr = f"CASE\n                WHEN pa.article_id IS NOT NULL THEN a.\"{layout_col}\"\n                ELSE ad.\"{layout_col}\"\n            END"
+            sources.append(expr)
         if not sources:
             continue  # keine Quelle
         layout_expr = f"COALESCE({', '.join(sources)})"
@@ -137,7 +140,7 @@ def create_materialized_elektrik(project_id: int, debug: bool = False):
                         LIMIT 1
                     ),
                     {raw_txt}
-                ) AS "{materialized_col}"
+                ) AS \"{materialized_col}\"
             """.strip()
             einbauort_id_txt = id_txt
             einbauort_raw = raw_txt
