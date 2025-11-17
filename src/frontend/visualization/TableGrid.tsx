@@ -84,6 +84,7 @@ function TableGrid({
 
   // --- ReadOnly columns logic ---
   const [readonlyCols, setReadonlyCols] = useState<Set<string>>(new Set());
+  const [articlesCols, setArticlesCols] = useState<Set<string>>(new Set());
   useEffect(() => {
     fetch(`${API_PREFIX}/api/columns_map`)
       .then((res) => res.json())
@@ -93,26 +94,48 @@ function TableGrid({
           .map((c) => c.name_external_german)
           .filter(
             (name) =>
-              Boolean(name) &&
-              name !== "Status" &&
-              name !== "Lieferumfang"
+              Boolean(name) && name !== "Status" && name !== "Lieferumfang"
           );
-        // Always add 'project_article_id' and 'order_key' to readonly columns
-        setReadonlyCols(new Set([...paCols, "project_article_id", "order_key"]));
+        setReadonlyCols(
+          new Set([...paCols, "project_article_id", "order_key"])
+        );
+        const aCols = cols
+          .filter((c) => c.tables.includes("articles"))
+          .map((c) => c.name_external_german)
+          .filter(Boolean);
+        setArticlesCols(new Set(aCols));
       });
   }, []);
 
-  // Custom cell properties to set readOnly for project_articles columns
+  // Custom cell properties to set readOnly for project_articles and articles columns
   const getCellProps = useCallback(
     (row: number, col: number) => {
       const props = baseCellProps(row, col) as Handsontable.CellProperties;
       const header = colHeaders[col];
+      // Project_articles columns logic
       if (readonlyCols.has(header)) {
         props.readOnly = true;
       }
+      // Articles columns dynamic logic
+      if (articlesCols.has(header)) {
+        // Find article_id for this row
+        const articleIdColIdx = colHeaders.indexOf("article_id");
+        const articleId =
+          articleIdColIdx >= 0 ? safeData[row]?.[articleIdColIdx] : undefined;
+        if (
+          articleId !== undefined &&
+          articleId !== null &&
+          articleId !== "" &&
+          !isNaN(Number(articleId))
+        ) {
+          props.readOnly = true;
+        } else {
+          props.readOnly = false;
+        }
+      }
       return props;
     },
-    [baseCellProps, colHeaders, readonlyCols]
+    [baseCellProps, colHeaders, readonlyCols, articlesCols, safeData]
   );
 
   // Only these columns are editable
