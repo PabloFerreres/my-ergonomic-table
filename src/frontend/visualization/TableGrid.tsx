@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from "react";
+import React, { useMemo, useCallback, useEffect, useState } from "react";
 import { HotTable, HotTableClass } from "@handsontable/react";
 import "handsontable/dist/handsontable.full.min.css";
 import { registerAllModules } from "handsontable/registry";
@@ -40,6 +40,12 @@ interface TableGridProps {
   onStatusChange?: (s: { isFiltered: boolean; isSorted: boolean }) => void;
 }
 
+interface ColumnMapEntry {
+  name: string;
+  name_external_german: string;
+  tables: string[];
+}
+
 function TableGrid({
   data,
   colHeaders,
@@ -75,10 +81,37 @@ function TableGrid({
   );
 
   const baseCellProps = useCellProperties(safeData, rowIdIndex, sheetName);
+
+  // --- ReadOnly columns logic ---
+  const [readonlyCols, setReadonlyCols] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    fetch(`${API_PREFIX}/api/columns_map`)
+      .then((res) => res.json())
+      .then((cols: ColumnMapEntry[]) => {
+        const paCols = cols
+          .filter((c) => c.tables.includes("project_articles"))
+          .map((c) => c.name_external_german)
+          .filter(
+            (name) =>
+              Boolean(name) &&
+              name !== "Status" &&
+              name !== "Lieferumfang"
+          );
+        setReadonlyCols(new Set(paCols));
+      });
+  }, []);
+
+  // Custom cell properties to set readOnly for project_articles columns
   const getCellProps = useCallback(
-    (row: number, col: number) =>
-      baseCellProps(row, col) as Handsontable.CellProperties,
-    [baseCellProps]
+    (row: number, col: number) => {
+      const props = baseCellProps(row, col) as Handsontable.CellProperties;
+      const header = colHeaders[col];
+      if (readonlyCols.has(header)) {
+        props.readOnly = true;
+      }
+      return props;
+    },
+    [baseCellProps, colHeaders, readonlyCols]
   );
 
   // Only these columns are editable
