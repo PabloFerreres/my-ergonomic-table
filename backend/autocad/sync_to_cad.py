@@ -207,6 +207,9 @@ def upsert_position_map(pg_conn, view_id, pa_ids):
         raise Exception(f"No position_meta_id found for view_id={view_id}")
     position_meta_id = row[0]
     # Build position_map
+    debug_path = os.path.join(os.path.dirname(__file__), "sync_debug.txt")
+    with open(debug_path, "a", encoding="utf-8") as f:
+        f.write(f"upsert_position_map input pa_ids: {pa_ids}\n")
     format_ids = ','.join(['%s'] * len(pa_ids))
     cur.execute(f"SELECT id, emsr_no FROM project_articles WHERE id IN ({format_ids})", pa_ids)
     rows = cur.fetchall()
@@ -215,6 +218,8 @@ def upsert_position_map(pg_conn, view_id, pa_ids):
     position_map = []
     for idx, pa_id in enumerate(sorted_pa_ids, start=1):
         position_map.append({"position": idx, "project_article_id": pa_id})
+    with open(debug_path, "a", encoding="utf-8") as f:
+        f.write(f"upsert_position_map result position_map: {json.dumps(position_map, ensure_ascii=False)}\n")
     # Check if position_map already exists
     cur.execute("SELECT position_map FROM position_meta WHERE id = %s", (position_meta_id,))
     existing = cur.fetchone()

@@ -1,6 +1,6 @@
 # backend/routes/sync_to_cad_routes.py
 from fastapi import APIRouter, Request
-from backend.autocad.sync_to_cad import fetch_smart_objects_for_view, map_cad_properties_to_pa, upsert_project_article
+from backend.autocad.sync_to_cad import fetch_smart_objects_for_view, map_cad_properties_to_pa, upsert_project_article, upsert_position_map
 from backend.settings.connection_points import DB_URL
 import psycopg2
 from backend.SSE.event_bus import publish
@@ -21,6 +21,8 @@ async def sync_to_cad(request: Request):
             mapped = map_cad_properties_to_pa(obj, pg_conn)
             pa_id = upsert_project_article(pg_conn, project_id, view_id, mapped_props=mapped)
             pa_ids.append(pa_id)
+        # Update position_map
+        upsert_position_map(pg_conn, view_id, pa_ids)
         pg_conn.close()
         # 2. Trigger SSE for rematerialize and refresh
         publish(project_id, {"type": "remat_done", "scope": "all", "project_id": project_id})
