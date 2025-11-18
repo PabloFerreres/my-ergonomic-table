@@ -135,6 +135,48 @@ def map_cad_properties_to_pa(obj, pg_conn):
 
     return result
 
+def map_cad_properties_to_draft(obj, pg_conn):
+    """
+    Maps a CAD object dictionary to a dict of article_drafts columns using the actual columns of the article_drafts table.
+    Only properties present in both CAD object and article_drafts columns are mapped (case-insensitive).
+    """
+    cur = pg_conn.cursor()
+    cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'article_drafts'")
+    draft_columns = set(row[0].lower() for row in cur.fetchall())
+    cad_keys = set(k.lower() for k in obj.keys())
+    intersect_keys = cad_keys & draft_columns
+    result = {}
+    for cad_prop, val in obj.items():
+        col_name = cad_prop.lower()
+        if col_name in intersect_keys:
+            result[col_name] = val
+    return result
+
+def upsert_article_draft(pg_conn, pa_id, mapped_props):
+    """
+    Upserts a row in article_drafts for the given project_article_id (pa_id).
+    If a row exists, update it. If not, insert a new row.
+    """
+    cur = pg_conn.cursor()
+    # Remove 'id' from mapped_props if present
+    mapped_props = {k: v for k, v in mapped_props.items() if k != 'id'}
+    # Check for existing row
+    cur.execute("SELECT id FROM article_drafts WHERE project_article_id = %s", (pa_id,))
+    row = cur.fetchone()
+    if row:
+        draft_id = row[0]
+        set_clause = ', '.join([f"{col} = %s" for col in mapped_props.keys()])
+        values = list(mapped_props.values())
+        cur.execute(f"UPDATE article_drafts SET {set_clause} WHERE id = %s", values + [draft_id])
+    else:
+        cols = ["project_article_id"] + list(mapped_props.keys())
+        vals = [pa_id] + list(mapped_props.values())
+        placeholders = ', '.join(['%s'] * len(vals))
+        cur.execute(f"INSERT INTO article_drafts ({', '.join(cols)}) VALUES ({placeholders}) RETURNING id", vals)
+        draft_id = cur.fetchone()[0]
+    pg_conn.commit()
+    return draft_id
+
 def debug_sync_payload(mapped_props):
     """
     Debug utility: Write the payload that will be sent to upsert_project_article to a file for inspection.
@@ -250,6 +292,11 @@ if __name__ == "__main__":
         print("\n--- DEBUGGING WITH REAL CAD OBJECT ---")
         debug_cad_to_db_properties(smart_objects[0], pg_conn)
         pa_ids = []
+        # Get base_view_id for conditional draft sync
+        cur = pg_conn.cursor()
+        cur.execute("SELECT base_view_id FROM views WHERE id = %s", (view_id,))
+        base_view_row = cur.fetchone()
+        base_view_id = base_view_row[0] if base_view_row else None
         # Sync all smart objects to project_articles
         for obj in smart_objects:
             mapped_props = map_cad_properties_to_pa(obj, pg_conn)
@@ -257,6 +304,10 @@ if __name__ == "__main__":
             pa_id = upsert_project_article(pg_conn, project_id, view_id, mapped_props)
             print(f"Upserted project_article with id: {pa_id}")
             pa_ids.append(pa_id)
+            # If base_view_id == 3, also sync to article_drafts
+            if base_view_id == 3:
+                draft_props = map_cad_properties_to_draft(obj, pg_conn)
+                upsert_article_draft(pg_conn, pa_id, draft_props)
         # Update position_map with all pa_ids from this sync
         upsert_position_map(pg_conn, view_id, pa_ids)
     else:

@@ -8147,3 +8147,15 @@ Final result mapping: {'emsr_no': '20005.M', 'ri_char': '', 'sps': '3', 'einbauo
 Final result mapping: {'emsr_no': '20005.M', 'ri_char': '', 'sps': '3', 'einbauort': 199, 'kommentar': '', 'freigegeben': None, 'anforderer': None, 'article_id': None, 'pnpguid': 'df4ecf5ab3daff4d823f49a46e8860c7', 'relevance_e_tech': 'E'}
 upsert_position_map input pa_ids: [41, 42, 44]
 upsert_position_map result position_map: [{"position": 1, "project_article_id": 44}, {"position": 2, "project_article_id": 42}, {"position": 3, "project_article_id": 41}]
+Direct property mapping result: {'emsr_no': '24015.M', 'ri_char': None, 'sps': '2', 'einbauort': 200, 'kommentar': None, 'freigegeben': None, 'anforderer': None, 'article_id': None, 'pnpguid': 'f9cb9e13357294418eb7e65fd01f683b'}
+Incoming CAD data: relevance_e_tech=1, Safety=None
+Injected relevance_e_tech value: E
+Final result mapping: {'emsr_no': '24015.M', 'ri_char': None, 'sps': '2', 'einbauort': 200, 'kommentar': None, 'freigegeben': None, 'anforderer': None, 'article_id': None, 'pnpguid': 'f9cb9e13357294418eb7e65fd01f683b', 'relevance_e_tech': 'E'}
+Final result mapping: {'emsr_no': '24015.M', 'ri_char': None, 'sps': '2', 'einbauort': 200, 'kommentar': None, 'freigegeben': None, 'anforderer': None, 'article_id': None, 'pnpguid': 'f9cb9e13357294418eb7e65fd01f683b', 'relevance_e_tech': 'E'}
+Direct property mapping result: {'emsr_no': '20005.M', 'ri_char': '', 'sps': '3', 'einbauort': 199, 'kommentar': '', 'freigegeben': None, 'anforderer': None, 'article_id': None, 'pnpguid': 'df4ecf5ab3daff4d823f49a46e8860c7'}
+Incoming CAD data: relevance_e_tech=1, Safety=None
+Injected relevance_e_tech value: E
+Final result mapping: {'emsr_no': '20005.M', 'ri_char': '', 'sps': '3', 'einbauort': 199, 'kommentar': '', 'freigegeben': None, 'anforderer': None, 'article_id': None, 'pnpguid': 'df4ecf5ab3daff4d823f49a46e8860c7', 'relevance_e_tech': 'E'}
+Final result mapping: {'emsr_no': '20005.M', 'ri_char': '', 'sps': '3', 'einbauort': 199, 'kommentar': '', 'freigegeben': None, 'anforderer': None, 'article_id': None, 'pnpguid': 'df4ecf5ab3daff4d823f49a46e8860c7', 'relevance_e_tech': 'E'}
+upsert_position_map input pa_ids: [42, 44]
+upsert_position_map result position_map: [{"position": 1, "project_article_id": 44}, {"position": 2, "project_article_id": 42}]
