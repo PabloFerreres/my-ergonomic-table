@@ -7,7 +7,7 @@ DB_PATH = r"C:\Users\ferreres\Documents\GeneralTemplate1\ProcessPower.dcf"
 # Drawing PnPID to target
 TARGET_PNPID = 1223
 
-def fetch_smart_objects_for_drawing(pnpid: int):
+def fetch_smart_objects_for_drawing(pnpid: int, source_table: str):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
@@ -22,11 +22,11 @@ def fetch_smart_objects_for_drawing(pnpid: int):
         print(f"No objects found for drawing PnPID={pnpid}")
         return []
 
-    # 2. Get all relevant objects from WSPCustomPNID for the project (filter by RowId)
+    # 2. Get all relevant objects from the dynamic source table for the project (filter by RowId)
     format_ids = ','.join(['?'] * len(row_ids))
     cursor.execute(f"""
         SELECT *
-        FROM WSPCustomPNID
+        FROM {source_table}
         WHERE PnPID IN ({format_ids})
     """, row_ids)
     wsp_objects = cursor.fetchall()
@@ -69,5 +69,5 @@ def fetch_smart_objects_for_drawing(pnpid: int):
     return results
 
 if __name__ == "__main__":
-    data = fetch_smart_objects_for_drawing(TARGET_PNPID)
+    data = fetch_smart_objects_for_drawing(TARGET_PNPID, "WSPCustomPNID")
     print(json.dumps(data, indent=2, ensure_ascii=False))

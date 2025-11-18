@@ -16,7 +16,7 @@ def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_t
     """
     cur = pg_conn.cursor()
     cur.execute("""
-        SELECT p.project_cad_db_path, v.cad_drawing_guid
+        SELECT p.project_cad_db_path, v.cad_drawing_guid, v.base_view_id
         FROM projects p
         JOIN views v ON v.project_id = p.id
         WHERE p.id = %s AND v.id = %s
@@ -24,7 +24,8 @@ def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_t
     row = cur.fetchone()
     if not row:
         raise Exception("Project or view not found, or missing CAD DB path/guid")
-    db_path, drawing_guid = row
+    db_path, drawing_guid, base_view_id = row
+    print(f"[DEBUG] base_view_id: {base_view_id}")
     db_path = db_path.strip('"')
     if not drawing_guid.startswith('{'):
         drawing_guid = '{' + drawing_guid
@@ -41,11 +42,18 @@ def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_t
     if not pnp_row:
         raise Exception("Drawing guid not found in Plant 3D DB")
     pnpid = pnp_row[0]
-    # Use fetch_smart_objects_for_drawing to get objects
+    # Get source table name from base_views
+    cur.execute("SELECT cad_object_overclass_name FROM base_views WHERE id = %s", (base_view_id,))
+    source_row = cur.fetchone()
+    print(f"[DEBUG] source_row: {source_row}")
+    if not source_row:
+        raise Exception(f"base_view_id {base_view_id} not found in base_views")
+    source_table = source_row[0]
+    print(f"[DEBUG] source_table: {source_table}")
     # Patch DB_PATH for fetch_smart_objects_for_drawing
     import backend.autocad.fetch_smart_objects as fso
     fso.DB_PATH = db_path
-    results = fetch_smart_objects_for_drawing(pnpid)
+    results = fetch_smart_objects_for_drawing(pnpid, source_table)
     if debug_txt:
         debug_path = os.path.join(os.path.dirname(__file__), "smart_objects_debug.txt")
         with open(debug_path, "w", encoding="utf-8") as f:
@@ -231,7 +239,7 @@ if __name__ == "__main__":
     # We'll use fetch_smart_objects_for_view to get the first CAD object
     # You may want to adjust project_id and view_id for your test
     project_id = 16  # TODO: set your real project_id
-    view_id = 54     # TODO: set your real view_id
+    view_id = 56     # TODO: set your real view_id
     smart_objects = fetch_smart_objects_for_view(pg_conn, project_id, view_id, debug_txt=False)
     if (smart_objects):
         print("\n--- DEBUGGING WITH REAL CAD OBJECT ---")
