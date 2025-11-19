@@ -1,0 +1,112 @@
+# Main Python requirements for backend
+# === BACKEND PYTHON DEPENDENCIES ===
+fastapi
+asyncpg
+sqlalchemy
+psycopg2
+openpyxl
+
+# Other standard libraries used (no need to install):
+# json, os, sys, re, typing, collections, pathlib, logging, unicodedata
+
+# === FRONTEND NODE/JS DEPENDENCIES ===
+# Add these to your package.json dependencies and devDependencies:
+# (Already present in your package.json, but listed here for reference)
+
+# --- dependencies ---
+# @handsontable/react
+# handsontable
+# react
+# react-data-grid
+# react-dom
+# react-rnd
+
+# --- devDependencies ---
+# @chromatic-com/storybook
+# @eslint/js
+# @storybook/addon-a11y
+# @storybook/addon-docs
+# @storybook/addon-onboarding
+# @storybook/addon-vitest
+# @storybook/react-vite
+# @types/react
+# @types/react-dom
+# @vitejs/plugin-react
+# eslint
+# eslint-plugin-react-hooks
+# eslint-plugin-react-refresh
+# eslint-plugin-storybook
+# globals
+# storybook
+# typescript
+# typescript-eslint
+# vite
+# vitest
+# @vitest/browser
+# playwright
+# @vitest/coverage-v8
+
+# === INSTALLATION & RUN INSTRUCTIONS ===
+
+# 1. Install backend dependencies:
+pip install -r requirements.txt
+
+# 2. Install frontend dependencies:
+npm install
+
+# 3. Start the backend (example, if using FastAPI):
+# (You may need to adjust the command based on your entrypoint)
+uvicorn backend.main:app --reload
+
+# 4. Start the frontend (Vite):
+npm run dev
+
+# 5. (Optional) Start Storybook for UI components:
+npm run storybook
+
+# 6. Build frontend for production:
+npm run build
+
+# 7. Run frontend preview:
+npm run preview
+
+# 8. Run tests (if needed):
+npm run test
+
+# Make sure to configure environment variables and database connections as needed for your setup.
+# For more details, see README.md or project documentation.
+
+# === VITE REACT APP WORKFLOW & INSTRUCTIONS ===
+
+# Vite is a fast frontend build tool and dev server for modern web projects.
+# Your React app is set up to use Vite for development, building, and previewing.
+
+# Typical workflow:
+# 1. Install all frontend dependencies:
+#    npm install
+#
+# 2. Start the development server (hot reload):
+#    npm run dev
+#    # This will start Vite and serve your app at http://localhost:5173 (default)
+#
+# 3. Build the app for production:
+#    npm run build
+#    # This creates an optimized build in the 'dist' folder
+#
+# 4. Preview the production build locally:
+#    npm run preview
+#    # Serves the built app locally for final testing
+#
+# 5. (Optional) Run Storybook for UI component development:
+#    npm run storybook
+#
+# 6. (Optional) Run tests:
+#    npm run test
+#
+# If you want to replicate the project on another machine:
+# - Copy the repository
+# - Run 'npm install' in the project root
+# - Use the commands above to develop, build, and preview
+#
+# For more details, see the Vite documentation: https://vitejs.dev/guide/
+# And your README.md for any project-specific notes.

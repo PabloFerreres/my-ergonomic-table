@@ -1,0 +1,5 @@
+fastapi
+asyncpg
+sqlalchemy
+psycopg2
+openpyxl
