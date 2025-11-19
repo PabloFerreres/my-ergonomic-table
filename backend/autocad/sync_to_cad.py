@@ -1,6 +1,6 @@
 import psycopg2
 import sqlite3
-import pyodbc
+import pymssql
 import os
 import json
 import sys
@@ -9,12 +9,24 @@ from backend.autocad.fetch_smart_objects import fetch_smart_objects_for_drawing
 
 def get_cad_connection(db_path):
     """
-    Returns a DB connection for either SQLite or SQL Server, depending on db_path format.
+    Returns a DB connection and type for either SQLite or SQL Server, depending on db_path format.
+    Uses pymssql for SQL Server.
     """
-    if isinstance(db_path, str) and db_path.strip().startswith("DRIVER="):
-        return pyodbc.connect(db_path)
+    if isinstance(db_path, str) and db_path.strip().startswith("SERVER="):
+        # Parse connection string for pymssql
+        # Example: SERVER=SERVER-VAULT-23\AUTODESKVAULT;DATABASE=_plant_3d_project_2_PnId;UID=dev_extern_dbCreator;PWD=dev_für_wsp_2025
+        parts = dict(
+            part.split("=", 1) for part in db_path.split(";") if "=" in part
+        )
+        server = parts.get("SERVER")
+        database = parts.get("DATABASE")
+        user = parts.get("UID")
+        password = parts.get("PWD")
+        if not all([server, database, user, password]):
+            raise ValueError(f"Missing required SQL Server connection info in db_path: {db_path}")
+        return pymssql.connect(server=str(server), user=str(user), password=str(password), database=str(database)), 'mssql'
     else:
-        return sqlite3.connect(db_path)
+        return sqlite3.connect(db_path), 'sqlite'
 
 def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_txt: bool = True):
     """
@@ -42,9 +54,11 @@ def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_t
     if not drawing_guid.endswith('}'):
         drawing_guid = drawing_guid + '}'
     # Connect to CAD DB (SQLite or SQL Server)
-    cad_conn = get_cad_connection(db_path)
+    cad_conn, db_type = get_cad_connection(db_path)
     cursor = cad_conn.cursor()
-    cursor.execute("SELECT PnPID FROM PnPDrawings WHERE PnPDrawingGuid = ?", (drawing_guid,))
+    placeholder = '%s' if db_type == 'mssql' else '?'
+    query = f"SELECT PnPID FROM PnPDrawings WHERE PnPDrawingGuid = {placeholder}"
+    cursor.execute(query, (drawing_guid,))
     pnp_row = cursor.fetchone()
     cad_conn.close()
     if not pnp_row:
