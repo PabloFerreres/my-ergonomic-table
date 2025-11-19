@@ -1,10 +1,20 @@
 import psycopg2
 import sqlite3
+import pyodbc
 import os
 import json
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from backend.autocad.fetch_smart_objects import fetch_smart_objects_for_drawing
+
+def get_cad_connection(db_path):
+    """
+    Returns a DB connection for either SQLite or SQL Server, depending on db_path format.
+    """
+    if isinstance(db_path, str) and db_path.strip().startswith("DRIVER="):
+        return pyodbc.connect(db_path)
+    else:
+        return sqlite3.connect(db_path)
 
 def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_txt: bool = True):
     """
@@ -31,10 +41,8 @@ def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_t
         drawing_guid = '{' + drawing_guid
     if not drawing_guid.endswith('}'):
         drawing_guid = drawing_guid + '}'
-    if not os.path.exists(db_path):
-        raise Exception(f"CAD DB file does not exist: {db_path}")
-    # Find PnPID for the drawing guid
-    cad_conn = sqlite3.connect(db_path)
+    # Connect to CAD DB (SQLite or SQL Server)
+    cad_conn = get_cad_connection(db_path)
     cursor = cad_conn.cursor()
     cursor.execute("SELECT PnPID FROM PnPDrawings WHERE PnPDrawingGuid = ?", (drawing_guid,))
     pnp_row = cursor.fetchone()
@@ -53,7 +61,7 @@ def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_t
     # Patch DB_PATH for fetch_smart_objects_for_drawing
     import backend.autocad.fetch_smart_objects as fso
     fso.DB_PATH = db_path
-    results = fetch_smart_objects_for_drawing(pnpid, source_table)
+    results = fetch_smart_objects_for_drawing(pnpid, source_table, db_path=db_path)
     if debug_txt:
         debug_path = os.path.join(os.path.dirname(__file__), "smart_objects_debug.txt")
         with open(debug_path, "w", encoding="utf-8") as f:

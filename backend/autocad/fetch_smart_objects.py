@@ -1,47 +1,60 @@
 import sqlite3
 import json
+import pyodbc
+import re
 
-# Path to AutoCAD Plant3D database
+# Path to AutoCAD Plant3D database (can be SQLite file path or SQL Server connection string)
 DB_PATH = r"C:\Users\ferreres\Documents\GeneralTemplate1\ProcessPower.dcf"
 
 # Drawing PnPID to target
 TARGET_PNPID = 1223
 
-def fetch_smart_objects_for_drawing(pnpid: int, source_table: str):
-    conn = sqlite3.connect(DB_PATH)
+def get_cad_connection(db_path):
+    """
+    Returns a DB connection for either SQLite or SQL Server, depending on db_path format.
+    Ensures read-only access for both.
+    """
+    if isinstance(db_path, str) and db_path.strip().startswith("DRIVER="):
+        # SQL Server via pyodbc, add ApplicationIntent=ReadOnly if not present
+        if "ApplicationIntent=ReadOnly" not in db_path:
+            db_path += ";ApplicationIntent=ReadOnly"
+        return pyodbc.connect(db_path, autocommit=True)
+    else:
+        # SQLite, open in read-only mode using URI
+        if db_path.startswith("file:"):
+            return sqlite3.connect(db_path, uri=True)
+        else:
+            return sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+
+def fetch_smart_objects_for_drawing(pnpid: int, source_table: str, db_path = None):
+    db_path = db_path or DB_PATH
+    conn = get_cad_connection(db_path)
     cursor = conn.cursor()
 
     # 1. Get all object RowIds in the target drawing from PnPDataLinks
-    cursor.execute("""
-        SELECT RowId
-        FROM PnPDataLinks
-        WHERE DwgId = ?
-    """, (pnpid,))
+    query1 = "SELECT RowId FROM PnPDataLinks WHERE DwgId = ?"
+    cursor.execute(query1, (pnpid,))
     row_ids = [row[0] for row in cursor.fetchall()]
     if not row_ids:
         print(f"No objects found for drawing PnPID={pnpid}")
+        conn.close()
         return []
 
     # 2. Get all relevant objects from the dynamic source table for the project (filter by RowId)
     format_ids = ','.join(['?'] * len(row_ids))
-    cursor.execute(f"""
-        SELECT *
-        FROM {source_table}
-        WHERE PnPID IN ({format_ids})
-    """, row_ids)
+    query2 = f"SELECT * FROM {source_table} WHERE PnPID IN ({format_ids})"
+    cursor.execute(query2, row_ids)
     wsp_objects = cursor.fetchall()
     wsp_columns = [desc[0] for desc in cursor.description]
 
     # 3. Get GUIDs from PnPBase for these objects
-    cursor.execute(f"""
-        SELECT PnPID, PnPGuid
-        FROM PnPBase
-        WHERE PnPID IN ({format_ids})
-    """, row_ids)
+    query3 = f"SELECT PnPID, PnPGuid FROM PnPBase WHERE PnPID IN ({format_ids})"
+    cursor.execute(query3, row_ids)
     guid_map = {row[0]: row[1] for row in cursor.fetchall()}
 
     # 4. Get drawing info from PnPDrawings
-    cursor.execute("SELECT * FROM PnPDrawings WHERE PnPID = ?", (pnpid,))
+    query4 = "SELECT * FROM PnPDrawings WHERE PnPID = ?"
+    cursor.execute(query4, (pnpid,))
     drawing_info = cursor.fetchone()
     drawing_columns = [desc[0] for desc in cursor.description]
 
