@@ -47,6 +47,13 @@ def create_materialized_table(project_id: int, view_id, base_view_id):
     conn = psycopg2.connect(DB_URL)
     cursor = conn.cursor()
 
+    # Only allow Elektrik materialization via create_materialized_elektrik
+    if base_view_id == 2:
+        print(f"[SKIP] Elektrik table (base_view_id=2) will only be materialized via create_materialized_elektrik.")
+        cursor.close()
+        conn.close()
+        return
+
     # 0) Index für schnellen Lookup (id ohne Cast nutzbar)
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_me_pid_id
