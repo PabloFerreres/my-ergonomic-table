@@ -33,6 +33,12 @@ def create_materialized_elektrik(project_id: int, debug: bool = False):
     old_debug = DEBUG
     DEBUG = debug
 
+    # Debug file path
+    debug_path = os.path.join(os.path.dirname(__file__), "debug_elektrik.txt")
+    with open(debug_path, "a", encoding="utf-8") as dbg:
+        dbg.write(f"\n--- Rematerialize Elektrik ---\n")
+        dbg.write(f"project_id: {project_id}\n")
+
     get_active_project_articles(project_id)
 
     conn = psycopg2.connect(DB_URL)
@@ -47,8 +53,12 @@ def create_materialized_elektrik(project_id: int, debug: bool = False):
     ids = get_elektrik_article_ids(cursor, project_id)
     if DEBUG:
         print(f"[DEBUG] Elektrik IDs read from elektrik_meta for project {project_id}: {ids}")
+    with open(debug_path, "a", encoding="utf-8") as dbg:
+        dbg.write(f"project_articles_live: {ids}\n")
     if not ids:
         print("[ELEKTRIK] Keine Artikel gefunden – Abbruch.")
+        with open(debug_path, "a", encoding="utf-8") as dbg:
+            dbg.write("No IDs found, aborting.\n")
         cursor.close()
         conn.close()
         DEBUG = old_debug
@@ -263,6 +273,20 @@ def create_materialized_elektrik(project_id: int, debug: bool = False):
         used_ids = [row[0] for row in cursor.fetchall()]
         if DEBUG:
             print(f"[DEBUG] project_article_id used in {table_name}: {used_ids}")
+
+    # After table creation, print output row count and sample
+    try:
+        cursor.execute(f'SELECT COUNT(*) FROM "{table_name}"')
+        out_count_row = cursor.fetchone()
+        out_count = out_count_row[0] if out_count_row else 0
+        cursor.execute(f'SELECT * FROM "{table_name}" LIMIT 5')
+        out_sample = cursor.fetchall() or []
+    except Exception as e:
+        out_count = 'ERROR'
+        out_sample = f'ERROR: {e}'
+    with open(debug_path, "a", encoding="utf-8") as dbg:
+        dbg.write(f"Output row count: {out_count}\n")
+        dbg.write(f"Output sample: {out_sample}\n")
 
     cursor.close()
     conn.close()
