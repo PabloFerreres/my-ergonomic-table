@@ -4,6 +4,7 @@ from sqlalchemy import create_engine, text
 from backend.settings.connection_points import DB_URL
 from backend.loading.create_materialized_tables import create_materialized_table
 from backend.SSE.event_bus import publish
+import pymssql
 
 router = APIRouter()
 
@@ -153,3 +154,65 @@ async def soft_delete_view(request: Request):
             raise HTTPException(status_code=404, detail="Sheet not found for this project")
 
         return {"success": True, "view_id": row[0], "sheet_name": sheet_name}
+
+@router.post("/views/{view_id}/connect_drawing")
+async def connect_drawing_to_view(view_id: int, request: Request):
+    body = await request.json()
+    drawing_title = body.get("drawing_title")
+    if not drawing_title:
+        raise HTTPException(status_code=400, detail="Missing drawing_title")
+    # Get the CAD DB path for the project
+    engine = create_engine(DB_URL)
+    with engine.begin() as conn:
+        # Get project_id for the view
+        project_row = conn.execute(text("SELECT project_id FROM views WHERE id = :vid"), {"vid": view_id}).fetchone()
+        if not project_row:
+            raise HTTPException(status_code=404, detail="View not found")
+        project_id = project_row.project_id
+        # Get CAD DB path
+        project_db_row = conn.execute(text("SELECT project_cad_db_path FROM projects WHERE id = :pid"), {"pid": project_id}).fetchone()
+        if not project_db_row or not project_db_row.project_cad_db_path:
+            raise HTTPException(status_code=404, detail="Project CAD DB path not set")
+        cad_db_path = project_db_row.project_cad_db_path
+    # Detect DB type and query for drawing guid
+    row = None
+    if isinstance(cad_db_path, str) and cad_db_path.strip().startswith("SERVER="):
+        # SQL Server via pymssql
+        parts = dict(part.split("=", 1) for part in cad_db_path.split(";") if "=" in part)
+        server = parts.get("SERVER")
+        database = parts.get("DATABASE")
+        user = parts.get("UID")
+        password = parts.get("PWD")
+        if not all([server, database, user, password]):
+            raise HTTPException(status_code=400, detail=f"Missing required SQL Server connection info in db_path: {cad_db_path}")
+        # Cast to str to satisfy type checker
+        server = str(server)
+        database = str(database)
+        user = str(user)
+        password = str(password)
+        try:
+            conn = pymssql.connect(server=server, user=user, password=password, database=database)
+            cursor = conn.cursor()
+            cursor.execute("SELECT PnPDrawingGuid FROM PnPDrawings WHERE Title = %s", (drawing_title,))
+            row = cursor.fetchone()
+            conn.close()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"SQL Server CAD DB error: {e}")
+    else:
+        # SQLite
+        import sqlite3
+        try:
+            cad_conn = sqlite3.connect(cad_db_path)
+            cad_cursor = cad_conn.cursor()
+            cad_cursor.execute("SELECT PnPDrawingGuid FROM PnPDrawings WHERE Title = ?", (drawing_title,))
+            row = cad_cursor.fetchone()
+            cad_conn.close()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"SQLite CAD DB error: {e}")
+    if not row:
+        return {"success": False, "error": "Drawing title not found in CAD DB"}
+    guid = row[0]
+    # Update the view's cad_drawing_guid
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE views SET cad_drawing_guid = :guid, cad_drawing_title = :title WHERE id = :vid"), {"guid": guid, "title": drawing_title, "vid": view_id})
+    return {"success": True, "cad_drawing_guid": guid}

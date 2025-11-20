@@ -6,6 +6,20 @@ import "./WelcomeScreen.css";
 
 const API_PREFIX = config.BACKEND_URL;
 
+type ProjectView = {
+  id: number;
+  name: string;
+  cad_drawing_title: string | null;
+  cad_drawing_guid: string | null;
+  base_view_id?: number;
+};
+type ProjectInfo = {
+  id: number;
+  name: string;
+  project_cad_db_path: string | null;
+  views: ProjectView[];
+};
+
 export default function WelcomeScreen({
   onSelect,
 }: {
@@ -28,6 +42,18 @@ export default function WelcomeScreen({
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
 
+  // --- Project Settings & Views ---
+  const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null);
+  const [projPath, setProjPath] = useState("");
+  const [projPathEdit, setProjPathEdit] = useState(false);
+  const [projPathBusy, setProjPathBusy] = useState(false);
+  const [projPathMsg, setProjPathMsg] = useState("");
+  const [viewEdits, setViewEdits] = useState<{ [id: number]: string }>({});
+  const [viewBusy, setViewBusy] = useState<{ [id: number]: boolean }>({});
+  const [viewMsg, setViewMsg] = useState<{ [id: number]: string }>({});
+
+  const [showSettings, setShowSettings] = useState(false);
+
   useEffect(() => {
     fetch(`${API_PREFIX}/api/projects`)
       .then((r) => r.json())
@@ -45,6 +71,24 @@ export default function WelcomeScreen({
       .catch(() => setBaseViews([]));
   }, [creating]);
 
+  useEffect(() => {
+    if (!selectedId) {
+      setProjectInfo(null);
+      return;
+    }
+    setProjectInfo(null);
+    fetch(`${API_PREFIX}/api/projects/${selectedId}/info`)
+      .then((r) => r.json())
+      .then((info: ProjectInfo) => {
+        setProjectInfo(info);
+        setProjPath(info.project_cad_db_path || "");
+        setViewEdits(
+          Object.fromEntries((info.views || []).map((v) => [v.id, v.cad_drawing_title || ""]))
+        );
+      })
+      .catch(() => setProjectInfo(null));
+  }, [selectedId]);
+
   async function waitForSheets(projectId: number, tries = 20, delayMs = 250) {
     for (let i = 0; i < tries; i++) {
       try {
@@ -52,7 +96,9 @@ export default function WelcomeScreen({
           `${API_PREFIX}/api/sheetnames?project_id=${projectId}`
         ).then((r) => r.json());
         if (Array.isArray(names) && names.length > 0) return names;
-      } catch {}
+      } catch {
+        // ignore error, will retry
+      }
       await new Promise((res) => setTimeout(res, delayMs));
     }
     return [];
@@ -140,6 +186,58 @@ export default function WelcomeScreen({
     }
   }
 
+  async function updateProjPath() {
+    setProjPathBusy(true);
+    setProjPathMsg("");
+    try {
+      const res = await fetch(`${API_PREFIX}/api/projects/${selectedId}/cad_db_path`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cad_db_path: projPath })
+      });
+      const j = await res.json();
+      if (j.success) {
+        setProjPathMsg("Saved!");
+        setProjPathEdit(false);
+      } else {
+        setProjPathMsg(j.error || "Error");
+      }
+    } catch {
+      setProjPathMsg("Error");
+    }
+    setProjPathBusy(false);
+  }
+
+  async function updateViewDrawing(viewId: number) {
+    setViewBusy((b) => ({ ...b, [viewId]: true }));
+    setViewMsg((m) => ({ ...m, [viewId]: "" }));
+    try {
+      const res = await fetch(`${API_PREFIX}/api/views/${viewId}/connect_drawing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ drawing_title: viewEdits[viewId] })
+      });
+      const j = await res.json();
+      if (j.success) {
+        setViewMsg((m) => ({ ...m, [viewId]: "Saved!" }));
+        // Refresh project info
+        fetch(`${API_PREFIX}/api/projects/${selectedId}/info`)
+          .then((r) => r.json())
+          .then((info: ProjectInfo) => {
+            setProjectInfo(info);
+            setViewEdits(
+              Object.fromEntries((info.views || []).map((v) => [v.id, v.cad_drawing_title || ""]))
+            );
+          });
+      } else {
+        setViewMsg((m) => ({ ...m, [viewId]: j.error || "Error" }));
+      }
+    } catch {
+      setViewMsg((m) => ({ ...m, [viewId]: "Error" }));
+    }
+    setViewBusy((b) => ({ ...b, [viewId]: false }));
+  }
+
   if (loading) return <div className="wel-root center">Lade Projekte…</div>;
 
   const selectedProject = selectedId
@@ -215,6 +313,14 @@ export default function WelcomeScreen({
               disabled={!selectedProject || busy}
             >
               Open Project
+            </button>
+
+            <button
+              className="wel-btn wel-btn--muted"
+              onClick={() => setShowSettings((v) => !v)}
+              disabled={!selectedProject || busy}
+            >
+              ⚙️ Project Settings
             </button>
 
             {!creating ? (
@@ -293,6 +399,76 @@ export default function WelcomeScreen({
           </div>
         </div>
       </div>
+
+      {showSettings && selectedProject && projectInfo && (
+        <div className="wel-settings-panel">
+          <h2>Project Settings</h2>
+          <div className="wel-row">
+            <span className="wel-label">CAD DB Path:</span>
+            {projPathEdit ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8, maxWidth: 320 }}>
+                <textarea
+                  className="wel-input"
+                  value={projPath}
+                  onChange={(e) => setProjPath(e.target.value)}
+                  disabled={projPathBusy}
+                  style={{ width: 320, minHeight: 48, resize: 'vertical', wordBreak: 'break-all', whiteSpace: 'pre-line' }}
+                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="wel-btn wel-btn--primary" onClick={updateProjPath} disabled={projPathBusy}>
+                    Save
+                  </button>
+                  <button className="wel-btn wel-btn--muted" onClick={() => setProjPathEdit(false)} disabled={projPathBusy}>
+                    Cancel
+                  </button>
+                </div>
+                {projPathMsg && <span className="wel-msg">{projPathMsg}</span>}
+              </div>
+            ) : (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', maxWidth: 320 }}>
+                <span style={{ marginLeft: 8, wordBreak: 'break-all', whiteSpace: 'pre-line' }}>
+                  {projectInfo.project_cad_db_path
+                    ? projectInfo.project_cad_db_path.split(/(?=\\|\/)/g).map((seg, i) => (
+                        <span key={i}>
+                          {seg}
+                          <br />
+                        </span>
+                      ))
+                    : <i>Not set</i>}
+                </span>
+                <button className="wel-btn wel-btn--muted" onClick={() => setProjPathEdit(true)}>
+                  Edit
+                </button>
+              </div>
+            )}
+          </div>
+          <h3>Views</h3>
+          <div className="wel-views">
+            {(projectInfo.views || []).filter(v => v.base_view_id !== 2).map((v) => (
+              <div key={v.id} className="wel-row wel-view-row">
+                <span className="wel-label">{v.name}</span>
+                <input
+                  className="wel-input"
+                  value={viewEdits[v.id] ?? ""}
+                  onChange={(e) => setViewEdits((ed) => ({ ...ed, [v.id]: e.target.value }))}
+                  style={{ width: 180 }}
+                  disabled={viewBusy[v.id]}
+                />
+                <button
+                  className="wel-btn wel-btn--primary"
+                  onClick={() => updateViewDrawing(v.id)}
+                  disabled={viewBusy[v.id]}
+                >
+                  Set Drawing
+                </button>
+                <span className="wel-label" style={{ marginLeft: 12 }}>GUID:</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 13 }}>{v.cad_drawing_guid || <i>Not set</i>}</span>
+                {viewMsg[v.id] && <span className="wel-msg">{viewMsg[v.id]}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="wel-brand">Visto&Listo</div>
     </div>

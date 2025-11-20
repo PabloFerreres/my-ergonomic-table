@@ -142,3 +142,58 @@ async def delete_project_soft(project_id: int, mode: str = Query("soft")):
         )
 
     return {"success": True, "mode": "soft", **stats}
+
+# -------------------------------------------------------------------
+# GET: Projekt-Info (inkl. Views)
+# -------------------------------------------------------------------
+@router.get("/projects/{project_id}/info")
+async def get_project_info(project_id: int):
+    engine = sqlalchemy.create_engine(DB_URL)
+    with engine.connect() as conn:
+        # Get project info
+        project_row = conn.execute(sqlalchemy.text("""
+            SELECT id, name, project_cad_db_path
+            FROM projects
+            WHERE id = :id AND deleted_at IS NULL
+        """), {"id": project_id}).fetchone()
+        if not project_row:
+            raise HTTPException(status_code=404, detail="Project not found")
+        # Get views for project
+        views = conn.execute(sqlalchemy.text("""
+            SELECT id, name, cad_drawing_title, cad_drawing_guid, base_view_id
+            FROM views
+            WHERE project_id = :id AND deleted_at IS NULL
+        """), {"id": project_id}).fetchall()
+        views_list = [
+            {
+                "id": v.id,
+                "name": v.name,
+                "cad_drawing_title": v.cad_drawing_title,
+                "cad_drawing_guid": v.cad_drawing_guid,
+                "base_view_id": v.base_view_id
+            } for v in views
+        ]
+        return {
+            "id": project_row.id,
+            "name": project_row.name,
+            "project_cad_db_path": project_row.project_cad_db_path,
+            "views": views_list
+        }
+
+# -------------------------------------------------------------------
+# POST: Update CAD DB Path
+# -------------------------------------------------------------------
+@router.post("/projects/{project_id}/cad_db_path")
+async def update_project_cad_db_path(project_id: int, request: Request):
+    body = await request.json()
+    new_path = body.get("cad_db_path")
+    if not new_path:
+        raise HTTPException(status_code=400, detail="Missing cad_db_path")
+    engine = sqlalchemy.create_engine(DB_URL)
+    with engine.begin() as conn:
+        result = conn.execute(sqlalchemy.text("""
+            UPDATE projects SET project_cad_db_path = :path WHERE id = :id AND deleted_at IS NULL
+        """), {"path": new_path, "id": project_id})
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Project not found or already deleted")
+    return {"success": True, "cad_db_path": new_path}
