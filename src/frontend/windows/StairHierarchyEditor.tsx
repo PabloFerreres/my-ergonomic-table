@@ -5,6 +5,8 @@ type TreeNode = {
   name: string;
   sort_order: number;
   children: TreeNode[];
+  full_name?: string;
+  leaf_id?: number;
 };
 
 type Props = {
@@ -312,10 +314,10 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
           const num = prefix ? `${prefix}.${idx + 1}` : `${idx + 1}`;
           const isEditing = editingId === node.id;
           const isSelected = selectedId === node.id;
-
+          // Show both full_name and id for leaves
+          const isLeaf = !node.children || node.children.length === 0;
           return (
             <li key={node.id} style={UI.li(isSelected)}>
-              {/* Linker Button: selektiert & dient als Drag-Handle */}
               <button
                 draggable
                 onDragStart={(e) => onDragStart(e, node.id)}
@@ -357,7 +359,13 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
                   title="Zum Umbenennen klicken"
                   style={UI.nameClickable}
                 >
-                  {node.name}
+                  {isLeaf ? (
+                    <>
+                      {node.name} <span style={{opacity:0.7}}>[ID: {node.id}]</span>
+                    </>
+                  ) : (
+                    node.name
+                  )}
                 </span>
               )}
 

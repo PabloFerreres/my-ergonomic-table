@@ -34,6 +34,7 @@ async def fetch_tree(conn, project_id: int, parent_id=None, sort_nums=None, name
                 "project_id": project_id,
                 "name": r["name"],
                 "full_name": full_name,
+                "leaf_id": r["id"]
             })
         else:
             result.extend(

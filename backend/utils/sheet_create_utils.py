@@ -101,7 +101,11 @@ def create_sheet_full(display_name, base_view_id, project_id):
         sheet_name = f"materialized_{name}_{suffix.lower()}"
 
         # 4) position_meta: 20 leere Zeilen (keine IDs!), position 1..20
-        position_map = [{"project_article_id": None, "position": i} for i in range(1, 21)]
+        position_map = [{
+            "project_article_id": None,
+            "position": i
+        } for i in range(1, 21)]
+
         cursor.execute(
             "INSERT INTO position_meta (sheet_name, position_map) VALUES (%s, %s) RETURNING id",
             (sheet_name, json.dumps(position_map))
@@ -112,6 +116,13 @@ def create_sheet_full(display_name, base_view_id, project_id):
             conn.close()
             return False, {"error": "position_meta insert failed"}
         position_meta_id = pos_res[0]
+
+        # Set position_meta_id in views
+        cursor.execute(
+            "UPDATE views SET position_meta_id = %s WHERE id = %s",
+            (position_meta_id, view_id)
+        )
+        conn.commit()
 
         # 5) multiproject_meta_datas verknüpfen
         cursor.execute(

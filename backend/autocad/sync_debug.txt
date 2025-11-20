@@ -9044,3 +9044,24 @@ Final result mapping: {'article_id': None, 'ri_char': 'V', 'kommentar': '', 'ans
 Final result mapping: {'article_id': None, 'ri_char': 'V', 'kommentar': '', 'ansi_char': '', 'emsr_no': '23420', 'bmk': '', 'safety_kommentar': '', 'einbauort': None, 'medium': '', 't_daten_betriebspunkt': '', 'sps': '', 'funktion': '', 'ist_einstellung_inbetriebnahme': '', 'pnpguid': '1714afdb-979b-4866-b79c-ac835513fa13', 'relevance_e_tech': 'E'}
 upsert_position_map input pa_ids: [51]
 upsert_position_map result position_map: [{"position": 1, "project_article_id": 51}]
+Direct property mapping result: {'article_id': None, 'ri_char': 'V', 'kommentar': '', 'ansi_char': '', 'emsr_no': '23420', 'bmk': '', 'safety_kommentar': '', 'einbauort': 205, 'medium': '', 't_daten_betriebspunkt': '', 'sps': '', 'funktion': '', 'ist_einstellung_inbetriebnahme': '', 'pnpguid': '1714afdb-979b-4866-b79c-ac835513fa13'}
+Incoming CAD data: relevance_e_tech=True, Safety=None
+Injected relevance_e_tech value: E
+Final result mapping: {'article_id': None, 'ri_char': 'V', 'kommentar': '', 'ansi_char': '', 'emsr_no': '23420', 'bmk': '', 'safety_kommentar': '', 'einbauort': 205, 'medium': '', 't_daten_betriebspunkt': '', 'sps': '', 'funktion': '', 'ist_einstellung_inbetriebnahme': '', 'pnpguid': '1714afdb-979b-4866-b79c-ac835513fa13', 'relevance_e_tech': 'E'}
+Final result mapping: {'article_id': None, 'ri_char': 'V', 'kommentar': '', 'ansi_char': '', 'emsr_no': '23420', 'bmk': '', 'safety_kommentar': '', 'einbauort': 205, 'medium': '', 't_daten_betriebspunkt': '', 'sps': '', 'funktion': '', 'ist_einstellung_inbetriebnahme': '', 'pnpguid': '1714afdb-979b-4866-b79c-ac835513fa13', 'relevance_e_tech': 'E'}
+upsert_position_map input pa_ids: [51]
+upsert_position_map result position_map: [{"position": 1, "project_article_id": 51}]
+Direct property mapping result: {'article_id': None, 'ri_char': 'V', 'kommentar': '', 'ansi_char': '', 'emsr_no': '23420', 'bmk': '', 'safety_kommentar': '', 'einbauort': 205, 'medium': '', 't_daten_betriebspunkt': '', 'sps': '', 'funktion': '', 'ist_einstellung_inbetriebnahme': '', 'pnpguid': '1714afdb-979b-4866-b79c-ac835513fa13'}
+Incoming CAD data: relevance_e_tech=True, Safety=None
+Injected relevance_e_tech value: E
+Final result mapping: {'article_id': None, 'ri_char': 'V', 'kommentar': '', 'ansi_char': '', 'emsr_no': '23420', 'bmk': '', 'safety_kommentar': '', 'einbauort': 205, 'medium': '', 't_daten_betriebspunkt': '', 'sps': '', 'funktion': '', 'ist_einstellung_inbetriebnahme': '', 'pnpguid': '1714afdb-979b-4866-b79c-ac835513fa13', 'relevance_e_tech': 'E'}
+Final result mapping: {'article_id': None, 'ri_char': 'V', 'kommentar': '', 'ansi_char': '', 'emsr_no': '23420', 'bmk': '', 'safety_kommentar': '', 'einbauort': 205, 'medium': '', 't_daten_betriebspunkt': '', 'sps': '', 'funktion': '', 'ist_einstellung_inbetriebnahme': '', 'pnpguid': '1714afdb-979b-4866-b79c-ac835513fa13', 'relevance_e_tech': 'E'}
+upsert_position_map input pa_ids: [51]
+upsert_position_map result position_map: [{"position": 1, "project_article_id": 51}]
+Direct property mapping result: {'article_id': None, 'ri_char': 'V', 'kommentar': '', 'ansi_char': '', 'emsr_no': '23420', 'bmk': '', 'safety_kommentar': '', 'einbauort': 205, 'medium': '', 't_daten_betriebspunkt': '', 'sps': '', 'funktion': '', 'ist_einstellung_inbetriebnahme': '', 'pnpguid': '1714afdb-979b-4866-b79c-ac835513fa13'}
+Incoming CAD data: relevance_e_tech=True, Safety=None
+Injected relevance_e_tech value: E
+Final result mapping: {'article_id': None, 'ri_char': 'V', 'kommentar': '', 'ansi_char': '', 'emsr_no': '23420', 'bmk': '', 'safety_kommentar': '', 'einbauort': 205, 'medium': '', 't_daten_betriebspunkt': '', 'sps': '', 'funktion': '', 'ist_einstellung_inbetriebnahme': '', 'pnpguid': '1714afdb-979b-4866-b79c-ac835513fa13', 'relevance_e_tech': 'E'}
+Final result mapping: {'article_id': None, 'ri_char': 'V', 'kommentar': '', 'ansi_char': '', 'emsr_no': '23420', 'bmk': '', 'safety_kommentar': '', 'einbauort': 205, 'medium': '', 't_daten_betriebspunkt': '', 'sps': '', 'funktion': '', 'ist_einstellung_inbetriebnahme': '', 'pnpguid': '1714afdb-979b-4866-b79c-ac835513fa13', 'relevance_e_tech': 'E'}
+upsert_position_map input pa_ids: [51]
+upsert_position_map result position_map: [{"position": 1, "project_article_id": 51}]
