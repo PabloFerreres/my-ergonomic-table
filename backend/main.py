@@ -18,6 +18,14 @@ from backend.settings.connection_points import (
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # --- CORS (dynamisch aus config/ENV) ---
 if FRONTEND_ORIGIN_REGEX:
     app.add_middleware(

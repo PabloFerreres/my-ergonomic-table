@@ -191,12 +191,16 @@ async def connect_drawing_to_view(view_id: int, request: Request):
         user = str(user)
         password = str(password)
         try:
+            print(f"[DEBUG] pymssql.connect(server={server}, user={user}, password=****, database={database})")
+            print(f"[DEBUG] Drawing title: {drawing_title}")
             conn = pymssql.connect(server=server, user=user, password=password, database=database)
             cursor = conn.cursor()
             cursor.execute("SELECT PnPDrawingGuid FROM PnPDrawings WHERE Title = %s", (drawing_title,))
             row = cursor.fetchone()
+            print(f"[DEBUG] Query result: {row}")
             conn.close()
         except Exception as e:
+            print(f"[DEBUG] SQL Server CAD DB error: {e}")
             raise HTTPException(status_code=500, detail=f"SQL Server CAD DB error: {e}")
     else:
         # SQLite

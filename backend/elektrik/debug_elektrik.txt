@@ -106,3 +106,57 @@ project_id: 17
 project_articles_live: [49, 50, 46]
 Output row count: 4
 Output sample: [(None, None, None, None, None, None, None, None, '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'HEADER', None, None, Decimal('0.5')), (50, None, None, 'E', 'V', '00101', '', '', '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, '', 'Very safe', None, None, None, None, None, '', None, None, Decimal('1')), (49, None, None, 'E', '', '323232', None, None, None, None, None, None, None, None, None, None, None, None, None, '', None, None, '', None, None, None, '', None, None, '', None, None, Decimal('2')), (46, None, None, 'E', 'V', '77777', '', '', None, None, None, None, None, None, None, None, None, None, None, None, None, None, '', '', None, None, None, None, None, '', None, None, Decimal('3'))]
+
+--- Rematerialize Elektrik ---
+project_id: 17
+project_articles_live: [49, 50, 46]
+Output row count: 4
+Output sample: [(None, None, None, None, None, None, None, None, '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'HEADER', None, None, Decimal('0.5')), (50, None, None, 'E', 'V', '00101', '', '', '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, '', 'Very safe', None, None, None, None, None, '', None, None, Decimal('1')), (49, None, None, 'E', '', '323232', None, None, None, None, None, None, None, None, None, None, None, None, None, '', None, None, '', None, None, None, '', None, None, '', None, None, Decimal('2')), (46, None, None, 'E', 'V', '77777', '', '', None, None, None, None, None, None, None, None, None, None, None, None, None, None, '', '', None, None, None, None, None, '', None, None, Decimal('3'))]
+
+--- Rematerialize Elektrik ---
+project_id: 17
+project_articles_live: [49, 50, 46]
+Output row count: 4
+Output sample: [(None, None, None, None, None, None, None, None, '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'HEADER', None, None, Decimal('0.5')), (50, None, None, 'E', 'V', '00101', '', '', '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, '', 'Very safe', None, None, None, None, None, '', None, None, Decimal('1')), (49, None, None, 'E', '', '323232', None, None, None, None, None, None, None, None, None, None, None, None, None, '', None, None, '', None, None, None, '', None, None, '', None, None, Decimal('2')), (46, None, None, 'E', 'V', '77777', '', '', None, None, None, None, None, None, None, None, None, None, None, None, None, None, '', '', None, None, None, None, None, '', None, None, Decimal('3'))]
+
+--- Rematerialize Elektrik ---
+project_id: 17
+project_articles_live: [49, 50, 46]
+Output row count: 4
+Output sample: [(None, None, None, None, None, None, None, None, '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'HEADER', None, None, Decimal('0.5')), (50, None, None, 'E', 'V', '00101', '', '', '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, '', 'Very safe', None, None, None, None, None, '', None, None, Decimal('1')), (49, None, None, 'E', '', '323232', None, None, None, None, None, None, None, None, None, None, None, None, None, '', None, None, '', None, None, None, '', None, None, '', None, None, Decimal('2')), (46, None, None, 'E', 'V', '77777', '', '', None, None, None, None, None, None, None, None, None, None, None, None, None, None, '', '', None, None, None, None, None, '', None, None, Decimal('3'))]
+
+--- Rematerialize Elektrik ---
+project_id: 17
+project_articles_live: [49, 50, 46]
+Output row count: 4
+Output sample: [(None, None, None, None, None, None, None, None, '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'HEADER', None, None, Decimal('0.5')), (50, None, None, 'E', 'V', '00101', '', '', '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, '', 'Very safe', None, None, None, None, None, '', None, None, Decimal('1')), (49, None, None, 'E', '', '323232', None, None, None, None, None, None, None, None, None, None, None, None, None, '', None, None, '', None, None, None, '', None, None, '', None, None, Decimal('2')), (46, None, None, 'E', 'V', '77777', '', '', None, None, None, None, None, None, None, None, None, None, None, None, None, None, '', '', None, None, None, None, None, '', None, None, Decimal('3'))]
+
+--- Rematerialize Elektrik ---
+project_id: 17
+project_articles_live: [49, 50, 46]
+Output row count: 4
+Output sample: [(None, None, None, None, None, None, None, None, '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'HEADER', None, None, Decimal('0.5')), (50, None, None, 'E', 'V', '00101', '', '', '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, '', 'Very safe', None, None, None, None, None, '', None, None, Decimal('1')), (49, None, None, 'E', '', '323232', None, None, None, None, None, None, None, None, None, None, None, None, None, '', None, None, '', None, None, None, '', None, None, '', None, None, Decimal('2')), (46, None, None, 'E', 'V', '77777', '', '', None, None, None, None, None, None, None, None, None, None, None, None, None, None, '', '', None, None, None, None, None, '', None, None, Decimal('3'))]
+
+--- Rematerialize Elektrik ---
+project_id: 17
+project_articles_live: [49, 50, 46]
+Output row count: 4
+Output sample: [(None, None, None, None, None, None, None, None, '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'HEADER', None, None, Decimal('0.5')), (50, None, None, 'E', 'V', '00101', '', '', '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, '', 'Very safe', None, None, None, None, None, '', None, None, Decimal('1')), (49, None, None, 'E', '', '323232', None, None, None, None, None, None, None, None, None, None, None, None, None, '', None, None, '', None, None, None, '', None, None, '', None, None, Decimal('2')), (46, None, None, 'E', 'V', '77777', '', '', None, None, None, None, None, None, None, None, None, None, None, None, None, None, '', '', None, None, None, None, None, '', None, None, Decimal('3'))]
+
+--- Rematerialize Elektrik ---
+project_id: 17
+project_articles_live: [49, 50, 46]
+Output row count: 4
+Output sample: [(None, None, None, None, None, None, None, None, '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'HEADER', None, None, Decimal('0.5')), (50, None, None, 'E', 'V', '00101', '', '', '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, '', 'Very safe', None, None, None, None, None, '', None, None, Decimal('1')), (49, None, None, 'E', '', '323232', None, None, None, None, None, None, None, None, None, None, None, None, None, '', None, None, '', None, None, None, '', None, None, '', None, None, Decimal('2')), (46, None, None, 'E', 'V', '77777', '', '', None, None, None, None, None, None, None, None, None, None, None, None, None, None, '', '', None, None, None, None, None, '', None, None, Decimal('3'))]
+
+--- Rematerialize Elektrik ---
+project_id: 17
+project_articles_live: [49, 50, 46]
+Output row count: 4
+Output sample: [(None, None, None, None, None, None, None, None, '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'HEADER', None, None, Decimal('0.5')), (50, None, None, 'E', 'V', '00101', '', '', '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, '', 'Very safe', None, None, None, None, None, '', None, None, Decimal('1')), (49, None, None, 'E', '', '323232', None, None, None, None, None, None, None, None, None, None, None, None, None, '', None, None, '', None, None, None, '', None, None, '', None, None, Decimal('2')), (46, None, None, 'E', 'V', '77777', '', '', None, None, None, None, None, None, None, None, None, None, None, None, None, None, '', '', None, None, None, None, None, '', None, None, Decimal('3'))]
+
+--- Rematerialize Elektrik ---
+project_id: 17
+project_articles_live: [49, 50, 51, 46]
+Output row count: 5
+Output sample: [(None, None, None, None, None, None, None, None, '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'HEADER', None, None, Decimal('0.5')), (50, None, None, 'E', 'V', '00101', '', '', '1 [202] firstEinbauort', None, None, None, None, None, None, None, None, None, None, None, None, None, '', 'Very safe', None, None, None, None, None, '', None, None, Decimal('1')), (51, None, None, 'E', 'V', '23420', '', '', None, None, None, None, None, None, None, None, None, None, None, None, None, None, '', '', None, None, None, None, None, '', None, None, Decimal('2')), (49, None, None, 'E', '', '323232', None, None, None, None, None, None, None, None, None, None, None, None, None, '', None, None, '', None, None, None, '', None, None, '', None, None, Decimal('3')), (46, None, None, 'E', 'V', '77777', '', '', None, None, None, None, None, None, None, None, None, None, None, None, None, None, '', '', None, None, None, None, None, '', None, None, Decimal('4'))]

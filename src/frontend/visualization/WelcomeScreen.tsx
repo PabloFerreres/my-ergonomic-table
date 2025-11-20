@@ -83,7 +83,9 @@ export default function WelcomeScreen({
         setProjectInfo(info);
         setProjPath(info.project_cad_db_path || "");
         setViewEdits(
-          Object.fromEntries((info.views || []).map((v) => [v.id, v.cad_drawing_title || ""]))
+          Object.fromEntries(
+            (info.views || []).map((v) => [v.id, v.cad_drawing_title || ""])
+          )
         );
       })
       .catch(() => setProjectInfo(null));
@@ -190,15 +192,30 @@ export default function WelcomeScreen({
     setProjPathBusy(true);
     setProjPathMsg("");
     try {
-      const res = await fetch(`${API_PREFIX}/api/projects/${selectedId}/cad_db_path`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cad_db_path: projPath })
-      });
+      const res = await fetch(
+        `${API_PREFIX}/api/projects/${selectedId}/cad_db_path`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cad_db_path: projPath }),
+        }
+      );
       const j = await res.json();
       if (j.success) {
         setProjPathMsg("Saved!");
         setProjPathEdit(false);
+        // Refresh project info immediately after saving
+        fetch(`${API_PREFIX}/api/projects/${selectedId}/info`)
+          .then((r) => r.json())
+          .then((info: ProjectInfo) => {
+            setProjectInfo(info);
+            setProjPath(info.project_cad_db_path || "");
+            setViewEdits(
+              Object.fromEntries(
+                (info.views || []).map((v) => [v.id, v.cad_drawing_title || ""])
+              )
+            );
+          });
       } else {
         setProjPathMsg(j.error || "Error");
       }
@@ -212,11 +229,14 @@ export default function WelcomeScreen({
     setViewBusy((b) => ({ ...b, [viewId]: true }));
     setViewMsg((m) => ({ ...m, [viewId]: "" }));
     try {
-      const res = await fetch(`${API_PREFIX}/api/views/${viewId}/connect_drawing`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ drawing_title: viewEdits[viewId] })
-      });
+      const res = await fetch(
+        `${API_PREFIX}/api/views/${viewId}/connect_drawing`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ drawing_title: viewEdits[viewId] }),
+        }
+      );
       const j = await res.json();
       if (j.success) {
         setViewMsg((m) => ({ ...m, [viewId]: "Saved!" }));
@@ -226,7 +246,9 @@ export default function WelcomeScreen({
           .then((info: ProjectInfo) => {
             setProjectInfo(info);
             setViewEdits(
-              Object.fromEntries((info.views || []).map((v) => [v.id, v.cad_drawing_title || ""]))
+              Object.fromEntries(
+                (info.views || []).map((v) => [v.id, v.cad_drawing_title || ""])
+              )
             );
           });
       } else {
@@ -406,37 +428,80 @@ export default function WelcomeScreen({
           <div className="wel-row">
             <span className="wel-label">CAD DB Path:</span>
             {projPathEdit ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8, maxWidth: 320 }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: 8,
+                  maxWidth: 320,
+                }}
+              >
                 <textarea
                   className="wel-input"
                   value={projPath}
                   onChange={(e) => setProjPath(e.target.value)}
                   disabled={projPathBusy}
-                  style={{ width: 320, minHeight: 48, resize: 'vertical', wordBreak: 'break-all', whiteSpace: 'pre-line' }}
+                  style={{
+                    width: 320,
+                    minHeight: 48,
+                    resize: "vertical",
+                    wordBreak: "break-all",
+                    whiteSpace: "pre-line",
+                  }}
                 />
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="wel-btn wel-btn--primary" onClick={updateProjPath} disabled={projPathBusy}>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    className="wel-btn wel-btn--primary"
+                    onClick={updateProjPath}
+                    disabled={projPathBusy}
+                  >
                     Save
                   </button>
-                  <button className="wel-btn wel-btn--muted" onClick={() => setProjPathEdit(false)} disabled={projPathBusy}>
+                  <button
+                    className="wel-btn wel-btn--muted"
+                    onClick={() => setProjPathEdit(false)}
+                    disabled={projPathBusy}
+                  >
                     Cancel
                   </button>
                 </div>
                 {projPathMsg && <span className="wel-msg">{projPathMsg}</span>}
               </div>
             ) : (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', maxWidth: 320 }}>
-                <span style={{ marginLeft: 8, wordBreak: 'break-all', whiteSpace: 'pre-line' }}>
-                  {projectInfo.project_cad_db_path
-                    ? projectInfo.project_cad_db_path.split(/(?=\\|\/)/g).map((seg, i) => (
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  maxWidth: 320,
+                }}
+              >
+                <span
+                  style={{
+                    marginLeft: 8,
+                    wordBreak: "break-all",
+                    whiteSpace: "pre-line",
+                  }}
+                >
+                  {projectInfo.project_cad_db_path ? (
+                    projectInfo.project_cad_db_path
+                      .split(/(?=\\|\/)/g)
+                      .map((seg, i) => (
                         <span key={i}>
                           {seg}
                           <br />
                         </span>
                       ))
-                    : <i>Not set</i>}
+                  ) : (
+                    <i>Not set</i>
+                  )}
                 </span>
-                <button className="wel-btn wel-btn--muted" onClick={() => setProjPathEdit(true)}>
+                <button
+                  className="wel-btn wel-btn--muted"
+                  onClick={() => setProjPathEdit(true)}
+                >
                   Edit
                 </button>
               </div>
@@ -444,28 +509,38 @@ export default function WelcomeScreen({
           </div>
           <h3>Views</h3>
           <div className="wel-views">
-            {(projectInfo.views || []).filter(v => v.base_view_id !== 2).map((v) => (
-              <div key={v.id} className="wel-row wel-view-row">
-                <span className="wel-label">{v.name}</span>
-                <input
-                  className="wel-input"
-                  value={viewEdits[v.id] ?? ""}
-                  onChange={(e) => setViewEdits((ed) => ({ ...ed, [v.id]: e.target.value }))}
-                  style={{ width: 180 }}
-                  disabled={viewBusy[v.id]}
-                />
-                <button
-                  className="wel-btn wel-btn--primary"
-                  onClick={() => updateViewDrawing(v.id)}
-                  disabled={viewBusy[v.id]}
-                >
-                  Set Drawing
-                </button>
-                <span className="wel-label" style={{ marginLeft: 12 }}>GUID:</span>
-                <span style={{ fontFamily: 'monospace', fontSize: 13 }}>{v.cad_drawing_guid || <i>Not set</i>}</span>
-                {viewMsg[v.id] && <span className="wel-msg">{viewMsg[v.id]}</span>}
-              </div>
-            ))}
+            {(projectInfo.views || [])
+              .filter((v) => v.base_view_id !== 2)
+              .map((v) => (
+                <div key={v.id} className="wel-row wel-view-row">
+                  <span className="wel-label">{v.name}</span>
+                  <input
+                    className="wel-input"
+                    value={viewEdits[v.id] ?? ""}
+                    onChange={(e) =>
+                      setViewEdits((ed) => ({ ...ed, [v.id]: e.target.value }))
+                    }
+                    style={{ width: 180 }}
+                    disabled={viewBusy[v.id]}
+                  />
+                  <button
+                    className="wel-btn wel-btn--primary"
+                    onClick={() => updateViewDrawing(v.id)}
+                    disabled={viewBusy[v.id]}
+                  >
+                    Set Drawing
+                  </button>
+                  <span className="wel-label" style={{ marginLeft: 12 }}>
+                    GUID:
+                  </span>
+                  <span style={{ fontFamily: "monospace", fontSize: 13 }}>
+                    {v.cad_drawing_guid || <i>Not set</i>}
+                  </span>
+                  {viewMsg[v.id] && (
+                    <span className="wel-msg">{viewMsg[v.id]}</span>
+                  )}
+                </div>
+              ))}
           </div>
         </div>
       )}
