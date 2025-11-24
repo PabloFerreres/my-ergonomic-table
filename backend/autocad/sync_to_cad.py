@@ -28,7 +28,7 @@ def get_cad_connection(db_path):
     else:
         return sqlite3.connect(db_path), 'sqlite'
 
-def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_txt: bool = True):
+def fetch_smart_objects_for_view(pg_conn, project_id: int, view_id: int, debug_txt: bool = False):
     """
     Uses fetch_smart_objects_for_drawing as the core logic for fetching smart objects from CAD DB.
     1. Get CAD DB path and drawing guid from Postgres
@@ -199,13 +199,15 @@ def upsert_article_draft(pg_conn, pa_id, mapped_props):
     pg_conn.commit()
     return draft_id
 
-def debug_sync_payload(mapped_props):
+def debug_sync_payload(mapped_props, debug=False):
     """
     Debug utility: Write the payload that will be sent to upsert_project_article to a file for inspection.
+    Only writes if debug is True.
     """
-    debug_path = os.path.join(os.path.dirname(__file__), "sync_payload_debug.txt")
-    with open(debug_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(mapped_props, indent=2, ensure_ascii=False) + "\n")
+    if debug:
+        debug_path = os.path.join(os.path.dirname(__file__), "sync_payload_debug.txt")
+        with open(debug_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(mapped_props, indent=2, ensure_ascii=False) + "\n")
 
 def upsert_project_article(pg_conn, project_id, view_id, mapped_props):
     """

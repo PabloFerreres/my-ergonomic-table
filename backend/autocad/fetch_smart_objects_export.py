@@ -71,7 +71,9 @@ def fetch_smart_objects_for_drawing(pnpid: int):
     return results
 
 if __name__ == "__main__":
+    debug = False  # Set to True to enable export
     data = fetch_smart_objects_for_drawing(TARGET_PNPID)
-    with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
-        f.write(json.dumps(data, indent=2, ensure_ascii=False))
-    print(f"Exported {len(data)} objects to {OUTPUT_PATH}")
+    if debug:
+        with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
+            f.write(json.dumps(data, indent=2, ensure_ascii=False))
+        print(f"Exported {len(data)} objects to {OUTPUT_PATH}")

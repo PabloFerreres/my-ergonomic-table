@@ -34,9 +34,10 @@ def create_materialized_elektrik(project_id: int, debug: bool = False):
     DEBUG = debug
 
     debug_path = os.path.join(os.path.dirname(__file__), "debug_elektrik.txt")
-    with open(debug_path, "a", encoding="utf-8") as dbg:
-        dbg.write(f"\n--- Rematerialize Elektrik ---\n")
-        dbg.write(f"project_id: {project_id}\n")
+    if debug:
+        with open(debug_path, "a", encoding="utf-8") as dbg:
+            dbg.write(f"\n--- Rematerialize Elektrik ---\n")
+            dbg.write(f"project_id: {project_id}\n")
 
     get_active_project_articles(project_id)
 
@@ -52,12 +53,14 @@ def create_materialized_elektrik(project_id: int, debug: bool = False):
     ids = get_elektrik_article_ids(cursor, project_id)
     if DEBUG:
         print(f"[DEBUG] Elektrik IDs read from elektrik_meta for project {project_id}: {ids}")
-    with open(debug_path, "a", encoding="utf-8") as dbg:
-        dbg.write(f"project_articles_live: {ids}\n")
+    if debug:
+        with open(debug_path, "a", encoding="utf-8") as dbg:
+            dbg.write(f"project_articles_live: {ids}\n")
     if not ids:
         print("[ELEKTRIK] Keine Artikel gefunden – Abbruch.")
-        with open(debug_path, "a", encoding="utf-8") as dbg:
-            dbg.write("No IDs found, aborting.\n")
+        if debug:
+            with open(debug_path, "a", encoding="utf-8") as dbg:
+                dbg.write("No IDs found, aborting.\n")
         cursor.close()
         conn.close()
         DEBUG = old_debug
@@ -263,8 +266,9 @@ def create_materialized_elektrik(project_id: int, debug: bool = False):
         cursor.execute(sql, (ids,))
         conn.commit()  # Ensure commit after table creation
     except Exception as e:
-        with open(debug_path, "a", encoding="utf-8") as dbg:
-            dbg.write(f"ERROR during table creation/commit: {e}\n")
+        if debug:
+            with open(debug_path, "a", encoding="utf-8") as dbg:
+                dbg.write(f"ERROR during table creation/commit: {e}\n")
         print(f"[ERROR] Elektrik rematerialization failed: {e}")
         conn.rollback()
     # After table creation, print output row count and sample
@@ -277,9 +281,10 @@ def create_materialized_elektrik(project_id: int, debug: bool = False):
     except Exception as e:
         out_count = 'ERROR'
         out_sample = f'ERROR: {e}'
-    with open(debug_path, "a", encoding="utf-8") as dbg:
-        dbg.write(f"Output row count: {out_count}\n")
-        dbg.write(f"Output sample: {out_sample}\n")
+    if debug:
+        with open(debug_path, "a", encoding="utf-8") as dbg:
+            dbg.write(f"Output row count: {out_count}\n")
+            dbg.write(f"Output sample: {out_sample}\n")
     cursor.close()
     conn.close()
     DEBUG = old_debug

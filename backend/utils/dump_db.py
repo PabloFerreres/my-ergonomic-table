@@ -85,6 +85,8 @@ def write_dbdiagram_style_with_fks(output_path: str):
         conn.close()
 
 if __name__ == "__main__":
+    debug = False  # Set to True to enable writing dbdiagram.txt
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
     output_path = os.path.join(os.path.dirname(__file__), "dbdiagram.txt")
-    write_dbdiagram_style_with_fks(output_path)
+    if debug:
+        write_dbdiagram_style_with_fks(output_path)
