@@ -361,7 +361,8 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
                 >
                   {isLeaf ? (
                     <>
-                      {node.name} <span style={{opacity:0.7}}>[ID: {node.id}]</span>
+                      {node.name}{" "}
+                      <span style={{ opacity: 0.7 }}>[ID: {node.id}]</span>
                     </>
                   ) : (
                     node.name
