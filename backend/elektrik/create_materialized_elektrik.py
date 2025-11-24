@@ -113,48 +113,35 @@ def create_materialized_elektrik(project_id: int, debug: bool = False):
         kommentar_display = layout_name_map.get("kommentar", "Kommentar")
         einbauort_display = layout_name_map.get("einbauort", "Einbauort")
         einbauort_id_txt = None
-        einbauort_raw = None
 
         for layout_col, materialized_col in layout_name_map.items():
             if layout_col == "project_article_id":
                 continue
             sources = []
             in_p = layout_col in colmap["p"]
-            in_ad = layout_col in colmap["ad"]
-            in_a = layout_col in colmap["a"]
-            # Prioritize: if article_id exists, use articles; else use article_drafts
-            if in_p:
-                sources.append(f'pa."{layout_col}"')
-            if in_a or in_ad:
-                expr = f"CASE\n                WHEN pa.article_id IS NOT NULL THEN a.\"{layout_col}\"\n                ELSE ad.\"{layout_col}\"\n            END"
-                sources.append(expr)
-            if not sources:
-                continue  # keine Quelle
-            layout_expr = f"COALESCE({', '.join(sources)})"
+            # Only use pa."einbauort" for einbauort
             if layout_col == "einbauort":
-                raw_txt = f"NULLIF(TRIM(({layout_expr})::text), '')"
+                if in_p:
+                    layout_expr = 'NULLIF(TRIM(pa."einbauort"::text), \'\')'
+                else:
+                    layout_expr = 'NULL'
                 id_txt = f"""
                     CASE
-                    WHEN {raw_txt} ~ '^[0-9]+$' THEN {raw_txt}
-                    WHEN {raw_txt} ~ '\\[[0-9]+\\]' THEN regexp_replace({raw_txt}, '.*\\[([0-9]+)\\].*', '\\1')
-                    ELSE NULL
-                    END
+                    WHEN {layout_expr} ~ '^[0-9]+$' THEN {layout_expr}
+                    WHEN {layout_expr} ~ '\\[[0-9]+\\]' THEN regexp_replace({layout_expr}, '.*\\[([0-9]+)\\].*', '\\1')
+                    ELSE NULL END
                 """.strip()
-                expr = f"""
-                    COALESCE(
-                        (
-                            SELECT me.full_name
-                            FROM materialized_einbauorte me
-                            WHERE me.project_id = {project_id}
-                              AND me.id::text = ({id_txt})
-                            LIMIT 1
-                        ),
-                        {raw_txt}
-                    ) AS \"{materialized_col}\"
-                """.strip()
+                expr = f"COALESCE((SELECT me.full_name FROM materialized_einbauorte me WHERE me.project_id = {project_id} AND me.id::text = ({id_txt}) LIMIT 1), {layout_expr}) AS \"{materialized_col}\""
                 einbauort_id_txt = id_txt
-                einbauort_raw = raw_txt
             else:
+                if in_p:
+                    sources.append(f'pa."{layout_col}"')
+                if layout_col in colmap["ad"] or layout_col in colmap["a"]:
+                    expr = f"CASE\n                WHEN pa.article_id IS NOT NULL THEN a.\"{layout_col}\"\n                ELSE ad.\"{layout_col}\"\n            END"
+                    sources.append(expr)
+                if not sources:
+                    continue  # keine Quelle
+                layout_expr = f"COALESCE({', '.join(sources)})"
                 expr = f'{layout_expr} AS "{materialized_col}"'
             col_exprs.append(expr)
             output_cols.append(materialized_col)

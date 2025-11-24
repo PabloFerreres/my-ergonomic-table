@@ -94,7 +94,10 @@ function TableGrid({
           .map((c) => c.name_external_german)
           .filter(
             (name) =>
-              Boolean(name) && name !== "Status" && name !== "Lieferumfang"
+              Boolean(name) &&
+              name !== "Status" &&
+              name !== "Lieferumfang" &&
+              name !== "Kommentar"
           );
         setReadonlyCols(
           new Set([...paCols, "project_article_id", "order_key"])

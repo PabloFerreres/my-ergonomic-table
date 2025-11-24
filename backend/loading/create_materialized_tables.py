@@ -137,12 +137,19 @@ def create_materialized_table(project_id: int, view_id, base_view_id):
             sources.append(f'a."{layout_col}"')
         if in_ad:
             sources.append(f'ad."{layout_col}"')
-        # Special handling for einbauort: output display name from materialized_einbauorte
+        # Special handling for einbauort: output full name from materialized_einbauorte (with parents and IDs)
         if layout_col == "einbauort":
-            expr = f"me.name AS \"{materialized_col}\""
-            einbauort_id_text_expr = "me.name"
+            # Only use pa."einbauort" for einbauort, never ad or a
+            layout_expr = 'NULLIF(TRIM(pa."einbauort"::text), \'\')'
+            id_txt = f"""
+                CASE
+                WHEN {layout_expr} ~ '^[0-9]+$' THEN {layout_expr}
+                WHEN {layout_expr} ~ '\\[[0-9]+\\]' THEN regexp_replace({layout_expr}, '.*\\[([0-9]+)\\].*', '\\1')
+                ELSE NULL END
+            """.strip()
+            expr = f"COALESCE((SELECT me.full_name FROM materialized_einbauorte me WHERE me.project_id = {project_id} AND me.id::text = ({id_txt}) LIMIT 1), {layout_expr}) AS \"{materialized_col}\""
+            einbauort_id_text_expr = id_txt
         else:
-            # If article_id exists, use articles; else use article_drafts
             expr = f"CASE\n            WHEN pa.article_id IS NOT NULL THEN a.\"{layout_col}\"\n            ELSE ad.\"{layout_col}\"\n        END AS \"{materialized_col}\"" if in_a or in_ad else f"pa.\"{layout_col}\" AS \"{materialized_col}\""
         col_exprs.append(expr)
         output_cols.append(materialized_col)
@@ -189,6 +196,8 @@ def create_materialized_table(project_id: int, view_id, base_view_id):
     header_row_select_sql_hb = header_row_select_sql.replace('b."', 'hb."')
 
     quoted_cols = [f'"{c}"' for c in output_cols]
+    body_row_select_sql = ", ".join([f"b.{qc}" for qc in quoted_cols])
+    eid_sql = einbauort_id_text_expr if einbauort_id_text_expr else "NULL"
     body_row_select_sql = ", ".join([f"b.{qc}" for qc in quoted_cols])
     eid_sql = einbauort_id_text_expr if einbauort_id_text_expr else "NULL"
 

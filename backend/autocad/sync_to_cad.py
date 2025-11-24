@@ -222,17 +222,20 @@ def upsert_project_article(pg_conn, project_id, view_id, mapped_props):
         raise Exception('No GUID found in mapped properties')
     # Remove 'id' from mapped_props if present
     mapped_props = {k: v for k, v in mapped_props.items() if k != 'id'}
+    # When syncing from CAD, do NOT update 'Status' or 'Kommentar' in project_articles
+    # Filter out 'Status' and 'Kommentar' from mapped_props before updating/inserting
+    filtered_props = {k: v for k, v in mapped_props.items() if k.lower() not in ["status", "kommentar"]}
     # Check for existing row
     cur.execute("SELECT id FROM project_articles WHERE pnpguid = %s", (guid,))
     row = cur.fetchone()
     if row:
         pa_id = row[0]
-        set_clause = ', '.join([f"{col} = %s" for col in mapped_props.keys()])
-        values = list(mapped_props.values())
+        set_clause = ', '.join([f"{col} = %s" for col in filtered_props.keys()])
+        values = list(filtered_props.values())
         cur.execute(f"UPDATE project_articles SET {set_clause} WHERE id = %s", values + [pa_id])
     else:
-        cols = ["project_id", "view_id"] + list(mapped_props.keys())
-        vals = [project_id, view_id] + list(mapped_props.values())
+        cols = ["project_id", "view_id"] + list(filtered_props.keys())
+        vals = [project_id, view_id] + list(filtered_props.values())
         placeholders = ', '.join(['%s'] * len(vals))
         cur.execute(f"INSERT INTO project_articles ({', '.join(cols)}) VALUES ({placeholders}) RETURNING id", vals)
         pa_id = cur.fetchone()[0]
