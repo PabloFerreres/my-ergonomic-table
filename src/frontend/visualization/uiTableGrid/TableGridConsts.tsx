@@ -61,32 +61,21 @@ export function afterGetColHeader(
   const header = colHeaders[col];
   if (!header) return;
   const traits = traitsMap[header] || { header };
-  // Colored line based on data_source
+  // Data source label for filter button
   const dataSource = columnDataSources[header];
-  let lineColor = "";
-  if (dataSource === "cad") lineColor = "red";
-  else if (dataSource === "table") lineColor = "blue";
-  else if (dataSource === "articles") lineColor = "orange";
-  else if (dataSource === "intern") lineColor = "purple";
-  // Add colored line
-  if (lineColor) {
-    let line = TH.querySelector(".header-underline") as HTMLElement;
-    if (!line) {
-      line = document.createElement("div");
-      line.className = "header-underline";
-      TH.appendChild(line);
-    }
-    line.style.position = "absolute";
-    line.style.left = "0";
-    line.style.right = "0";
-    line.style.bottom = "0";
-    line.style.height = "4px";
-    line.style.background = lineColor;
-    line.style.borderRadius = "2px";
-  }
+  let dataSourceLabel = "";
+  if (dataSource === "cad") dataSourceLabel = "CAD";
+  else if (dataSource === "table") dataSourceLabel = "TBL";
+  else if (dataSource === "articles") dataSourceLabel = "ART";
+  else if (dataSource === "intern") dataSourceLabel = "INTR";
+  // Remove colored line if present
+  const oldLine = TH.querySelector(".header-underline") as HTMLElement;
+  if (oldLine) TH.removeChild(oldLine);
   // Edit icon for editable columns
-  const isEditable = !["cad", "intern", "articles"].includes(dataSource)
-    && header !== "order_key" && header !== "project_article_id";
+  const isEditable =
+    !["cad", "intern", "articles"].includes(dataSource) &&
+    header !== "order_key" &&
+    header !== "project_article_id";
   if (isEditable) {
     let icon = TH.querySelector(".edit-icon") as HTMLImageElement;
     if (!icon) {
@@ -105,6 +94,28 @@ export function afterGetColHeader(
   } else {
     const icon = TH.querySelector(".edit-icon") as HTMLImageElement;
     if (icon) icon.style.display = "none";
+  }
+  // Set filter button label to data source, remove arrow, and style smaller
+  const button = TH.querySelector("button.changeType") as HTMLButtonElement;
+  if (button && dataSourceLabel) {
+    // Set only text, let arrow stay
+    button.textContent = dataSourceLabel;
+    button.title = `Data source: ${dataSourceLabel}`;
+    button.style.fontSize = "24px";
+    button.style.fontWeight = "bold";
+    button.style.padding = "6px 24px 6px 6px";
+    button.style.background = "#eaeaea";
+    button.style.border = "1px solid #ccc";
+    button.style.borderRadius = "8px";
+    button.style.height = "32px";
+    button.style.lineHeight = "1.2";
+    button.style.width = "auto";
+    button.style.display = "inline-flex";
+    button.style.alignItems = "center";
+    button.style.verticalAlign = "middle";
+    // Reduce gap between arrow and text if arrow is present
+    const arrow = button.querySelector(".arrow");
+    if (arrow && arrow instanceof HTMLElement) arrow.style.marginLeft = "4px";
   }
   if (traits.color) {
     TH.style.backgroundColor = traits.color;
@@ -126,10 +137,10 @@ export function afterGetColHeader(
   TH.style.paddingTop = "0px";
   TH.style.paddingBottom = "0px";
   const wrapper = TH.querySelector("div") as HTMLElement;
-  const button = TH.querySelector("button.changeType") as HTMLElement;
-  if (wrapper && button && wrapper.contains(button)) {
-    wrapper.removeChild(button);
-    TH.appendChild(button);
+  const buttonElement = TH.querySelector("button.changeType") as HTMLElement;
+  if (wrapper && buttonElement && wrapper.contains(buttonElement)) {
+    wrapper.removeChild(buttonElement);
+    TH.appendChild(buttonElement);
   }
   if (wrapper) wrapper.style.position = "static";
   const headerLabel = TH.querySelector(".colHeader") as HTMLElement;

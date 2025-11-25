@@ -17,26 +17,28 @@
 
 button.changeType {
   position: absolute !important;
-  right: 4px !important;
+  right: 1px !important;
   bottom: 0px !important;
   top: auto !important;
   left: auto !important;
-
-  width: 40px !important;
-  height: 20px !important;
-  padding: 0 !important;
+  width: 45px !important;
+  height: 18px !important;
+  padding: 4px 16px 2px 2px !important;
   margin: 0 !important;
-
-  font-size: 15px !important;
-  background-size: 24px 24px !important;
-
+  font-size: 12px !important;
+  font-weight: normal !important;
+  background: #eaeaea !important;
+  border: 1px solid #ccc !important;
+  border-radius: 6px !important;
   z-index: 9999 !important;
   pointer-events: auto !important;
-  display: block !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  vertical-align: middle !important;
 }
-
-
-
+button.changeType .arrow {
+  margin-left: 4px !important;
+}
 
 /* 🔲 Make the multi-select checkbox list the focus */
 .htUIMultipleSelectHot {
