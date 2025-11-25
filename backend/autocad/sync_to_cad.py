@@ -209,12 +209,21 @@ def debug_sync_payload(mapped_props, debug=False):
         with open(debug_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(mapped_props, indent=2, ensure_ascii=False) + "\n")
 
+def get_cad_columns(pg_conn):
+    """
+    Returns a set of column names from columns table where data_source = 'cad'.
+    """
+    cur = pg_conn.cursor()
+    cur.execute("SELECT column_name FROM columns WHERE data_source = 'cad'")
+    return set(row[0].lower() for row in cur.fetchall())
+
 def upsert_project_article(pg_conn, project_id, view_id, mapped_props):
     """
     Checks if a project_articles row exists with pnpguid = mapped_props['pnpguid'].
     If yes, updates the row with mapped_props.
     If no, inserts a new row with mapped_props, project_id, and view_id.
     Returns the pa_id (id) of the row.
+    Only updates/inserts columns with data_source='cad'.
     """
     cur = pg_conn.cursor()
     guid = mapped_props.get('pnpguid')
@@ -222,9 +231,10 @@ def upsert_project_article(pg_conn, project_id, view_id, mapped_props):
         raise Exception('No GUID found in mapped properties')
     # Remove 'id' from mapped_props if present
     mapped_props = {k: v for k, v in mapped_props.items() if k != 'id'}
-    # When syncing from CAD, do NOT update 'Status' or 'Kommentar' in project_articles
-    # Filter out 'Status' and 'Kommentar' from mapped_props before updating/inserting
-    filtered_props = {k: v for k, v in mapped_props.items() if k.lower() not in ["status", "kommentar"]}
+    # Get allowed columns (data_source='cad')
+    cad_columns = get_cad_columns(pg_conn)
+    # Filter mapped_props to only those columns
+    filtered_props = {k: v for k, v in mapped_props.items() if k.lower() in cad_columns}
     # Check for existing row
     cur.execute("SELECT id FROM project_articles WHERE pnpguid = %s", (guid,))
     row = cur.fetchone()
@@ -232,7 +242,8 @@ def upsert_project_article(pg_conn, project_id, view_id, mapped_props):
         pa_id = row[0]
         set_clause = ', '.join([f"{col} = %s" for col in filtered_props.keys()])
         values = list(filtered_props.values())
-        cur.execute(f"UPDATE project_articles SET {set_clause} WHERE id = %s", values + [pa_id])
+        if set_clause:
+            cur.execute(f"UPDATE project_articles SET {set_clause} WHERE id = %s", values + [pa_id])
     else:
         cols = ["project_id", "view_id"] + list(filtered_props.keys())
         vals = [project_id, view_id] + list(filtered_props.values())
