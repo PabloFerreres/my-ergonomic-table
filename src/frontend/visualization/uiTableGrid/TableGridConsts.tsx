@@ -76,11 +76,14 @@ export function afterGetColHeader(
     !["cad", "intern", "articles"].includes(dataSource) &&
     header !== "order_key" &&
     header !== "project_article_id";
-  if (isEditable) {
+  let iconSrc = "/edit-icon.jpg";
+  if (dataSource === "articles") {
+    iconSrc = "/editable-rowbased.png";
+  }
+  if (isEditable || dataSource === "articles") {
     let icon = TH.querySelector(".edit-icon") as HTMLImageElement;
     if (!icon) {
       icon = document.createElement("img");
-      icon.src = "/edit-icon.jpg";
       icon.className = "edit-icon";
       icon.style.position = "absolute";
       icon.style.top = "4px";
@@ -90,6 +93,7 @@ export function afterGetColHeader(
       icon.style.zIndex = "10";
       TH.appendChild(icon);
     }
+    icon.src = iconSrc;
     icon.style.display = "block";
   } else {
     const icon = TH.querySelector(".edit-icon") as HTMLImageElement;
