@@ -12,15 +12,15 @@ router = APIRouter()
 @router.get("/columns_map")
 async def get_columns_map():
     conn = await asyncpg.connect(DB_URL)
-    # Get all columns from project_articles and articles
+    # Get all columns from project_articles and articles, including data_source
     result = await conn.fetch("""
-        SELECT c.name, c.name_external_german, 'project_articles' AS table_name
+        SELECT c.name, c.name_external_german, c.data_source, 'project_articles' AS table_name
         FROM columns c
         WHERE c.name IN (
             SELECT column_name FROM information_schema.columns WHERE table_name = 'project_articles'
         )
         UNION
-        SELECT c.name, c.name_external_german, 'articles' AS table_name
+        SELECT c.name, c.name_external_german, c.data_source, 'articles' AS table_name
         FROM columns c
         WHERE c.name IN (
             SELECT column_name FROM information_schema.columns WHERE table_name = 'articles'
@@ -33,15 +33,31 @@ async def get_columns_map():
         name = row["name"]
         ext = row["name_external_german"]
         tbl = row["table_name"]
+        data_source = row["data_source"]
         if name not in col_map:
             col_map[name] = {
                 "name": name,
                 "name_external_german": ext,
-                "tables": [tbl]
+                "tables": [tbl],
+                "data_source": data_source
             }
         else:
             if tbl not in col_map[name]["tables"]:
                 col_map[name]["tables"].append(tbl)
+            # Always prefer the explicit data_source from columns table
+            col_map[name]["data_source"] = data_source
+    # Exception: Add project_article_id manually if not present
+    if "project_article_id" not in col_map:
+        col_map["project_article_id"] = {
+            "name": "project_article_id",
+            "name_external_german": "project_article_id",
+            "tables": ["project_articles"],
+            "data_source": "intern"
+        }
+    # DEBUG: Print all columns and their data_source
+    print("\n[DEBUG] columns_map output:")
+    for col in col_map.values():
+        print(f"{col['name']} | {col['name_external_german']} | {col['data_source']} | tables: {col['tables']}")
     return list(col_map.values())
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ import { registerAllModules } from "handsontable/registry";
 registerAllModules();
 
 import "./TableGrid.css";
+import "./TableGrid.custom.css";
 import {
   afterGetColHeader,
   useHeaderTraits,
@@ -44,6 +45,7 @@ interface ColumnMapEntry {
   name: string;
   name_external_german: string;
   tables: string[];
+  data_source: string;
 }
 
 function TableGrid({
@@ -83,62 +85,53 @@ function TableGrid({
   const baseCellProps = useCellProperties(safeData, rowIdIndex, sheetName);
 
   // --- ReadOnly columns logic ---
-  const [readonlyCols, setReadonlyCols] = useState<Set<string>>(new Set());
-  const [articlesCols, setArticlesCols] = useState<Set<string>>(new Set());
+  const [columnDataSources, setColumnDataSources] = useState<Record<string, string>>({});
   useEffect(() => {
     fetch(`${API_PREFIX}/api/columns_map`)
       .then((res) => res.json())
       .then((cols: ColumnMapEntry[]) => {
-        const paCols = cols
-          .filter((c) => c.tables.includes("project_articles"))
-          .map((c) => c.name_external_german)
-          .filter(
-            (name) =>
-              Boolean(name) &&
-              name !== "Status" &&
-              name !== "Lieferumfang" &&
-              name !== "Kommentar"
-          );
-        setReadonlyCols(
-          new Set([...paCols, "project_article_id", "order_key"])
-        );
-        const aCols = cols
-          .filter((c) => c.tables.includes("articles"))
-          .map((c) => c.name_external_german)
-          .filter(Boolean);
-        setArticlesCols(new Set(aCols));
+        const dataSourceMap: Record<string, string> = {};
+        cols.forEach((c) => {
+          if (c.name_external_german) {
+            dataSourceMap[c.name_external_german] = c.data_source;
+          }
+        });
+        // Ensure order_key is always 'intern' for color and logic
+        dataSourceMap["order_key"] = "intern";
+        setColumnDataSources(dataSourceMap);
       });
-  }, []);
+  }, [colHeaders]);
 
   // Custom cell properties to set readOnly for project_articles and articles columns
   const getCellProps = useCallback(
     (row: number, col: number) => {
       const props = baseCellProps(row, col) as Handsontable.CellProperties;
       const header = colHeaders[col];
-      // Project_articles columns logic
-      if (readonlyCols.has(header)) {
+      const dataSource = columnDataSources[header];
+      // Static read-only columns
+      if (header === "order_key" || header === "project_article_id") {
         props.readOnly = true;
+        return props;
       }
-      // Articles columns dynamic logic
-      if (articlesCols.has(header)) {
-        // Find article_id for this row
-        const articleIdColIdx = colHeaders.indexOf("article_id");
-        const articleId =
-          articleIdColIdx >= 0 ? safeData[row]?.[articleIdColIdx] : undefined;
-        if (
-          articleId !== undefined &&
-          articleId !== null &&
-          articleId !== "" &&
-          !isNaN(Number(articleId))
-        ) {
-          props.readOnly = true;
+      // Read-only if data_source is intern, cad, or articles (unless articles and no article_id)
+      if (["intern", "cad", "articles"].includes(dataSource)) {
+        if (dataSource === "articles") {
+          const articleIdColIdx = colHeaders.indexOf("article_id");
+          const articleId = articleIdColIdx >= 0 ? safeData[row]?.[articleIdColIdx] : undefined;
+          if (articleId !== undefined && articleId !== null && articleId !== "" && !isNaN(Number(articleId))) {
+            props.readOnly = true;
+          } else {
+            props.readOnly = false;
+          }
         } else {
-          props.readOnly = false;
+          props.readOnly = true;
         }
+      } else {
+        props.readOnly = false;
       }
       return props;
     },
-    [baseCellProps, colHeaders, readonlyCols, articlesCols, safeData]
+    [baseCellProps, colHeaders, columnDataSources, safeData]
   );
 
   // Only these columns are editable
@@ -338,7 +331,7 @@ function TableGrid({
         }}
         beforeKeyDown={handleGridKeys}
         afterGetColHeader={(col, TH) =>
-          afterGetColHeader(col, TH, colHeaders, traitsMap)
+          afterGetColHeader(col, TH, colHeaders, traitsMap, columnDataSources)
         }
         afterFilter={() => {
           const hot = hotRef?.current?.hotInstance ?? null;

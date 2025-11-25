@@ -55,11 +55,57 @@ export function afterGetColHeader(
   col: number,
   TH: HTMLTableCellElement,
   colHeaders: string[],
-  traitsMap: Record<string, Awaited<ReturnType<typeof GetColumnTraits>>> = {}
+  traitsMap: Record<string, Awaited<ReturnType<typeof GetColumnTraits>>> = {},
+  columnDataSources: Record<string, string> = {}
 ) {
   const header = colHeaders[col];
   if (!header) return;
   const traits = traitsMap[header] || { header };
+  // Colored line based on data_source
+  const dataSource = columnDataSources[header];
+  let lineColor = "";
+  if (dataSource === "cad") lineColor = "red";
+  else if (dataSource === "table") lineColor = "blue";
+  else if (dataSource === "articles") lineColor = "orange";
+  else if (dataSource === "intern") lineColor = "purple";
+  // Add colored line
+  if (lineColor) {
+    let line = TH.querySelector(".header-underline") as HTMLElement;
+    if (!line) {
+      line = document.createElement("div");
+      line.className = "header-underline";
+      TH.appendChild(line);
+    }
+    line.style.position = "absolute";
+    line.style.left = "0";
+    line.style.right = "0";
+    line.style.bottom = "0";
+    line.style.height = "4px";
+    line.style.background = lineColor;
+    line.style.borderRadius = "2px";
+  }
+  // Edit icon for editable columns
+  const isEditable = !["cad", "intern", "articles"].includes(dataSource)
+    && header !== "order_key" && header !== "project_article_id";
+  if (isEditable) {
+    let icon = TH.querySelector(".edit-icon") as HTMLImageElement;
+    if (!icon) {
+      icon = document.createElement("img");
+      icon.src = "/edit-icon.jpg";
+      icon.className = "edit-icon";
+      icon.style.position = "absolute";
+      icon.style.top = "4px";
+      icon.style.right = "4px";
+      icon.style.width = "16px";
+      icon.style.height = "16px";
+      icon.style.zIndex = "10";
+      TH.appendChild(icon);
+    }
+    icon.style.display = "block";
+  } else {
+    const icon = TH.querySelector(".edit-icon") as HTMLImageElement;
+    if (icon) icon.style.display = "none";
+  }
   if (traits.color) {
     TH.style.backgroundColor = traits.color;
     TH.style.color = "#000";
