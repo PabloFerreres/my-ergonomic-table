@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { uiConsole } from "../utils/uiConsole";
 
 type TreeNode = {
   id: number;
@@ -117,6 +118,18 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
     setTree(data);
   };
 
+  // Helper: Trigger Einbauorte aktualisieren + Rematerialize All
+  const triggerEinbauorteAndRematerialize = async () => {
+    try {
+      await fetch(`${apiPrefix}/api/rematerialize_einbauorte?project_id=${projectId}`, { method: "POST" });
+      await fetch(`${apiPrefix}/api/rematerializeAll?project_id=${projectId}`, { method: "POST" });
+      uiConsole("✅ Hierarchieänderungen gespeichert & Einbauorte/Materialized aktualisiert.");
+    } catch (e) {
+      console.error("Materialized update failed:", e);
+      uiConsole("❌ Fehler beim Aktualisieren der Einbauorte/Materialized!");
+    }
+  };
+
   // ---------- Helpers ----------
   const findParentId = (
     nodes: TreeNode[],
@@ -193,6 +206,7 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
     if (res.ok) {
       setNewName("");
       await reloadTree();
+      await triggerEinbauorteAndRematerialize();
     }
   };
 
@@ -212,6 +226,7 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
       await sendReorder(parentId, orderedIds);
       await reloadTree();
       if (selectedId === id) setSelectedId(null);
+      await triggerEinbauorteAndRematerialize();
     }
   };
 
@@ -231,6 +246,7 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
       reordered.map((n) => n.id)
     );
     await reloadTree();
+    await triggerEinbauorteAndRematerialize();
   };
 
   // rename flow
@@ -251,7 +267,10 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: label }),
     });
-    if (res.ok) await reloadTree();
+    if (res.ok) {
+      await reloadTree();
+      await triggerEinbauorteAndRematerialize();
+    }
     setEditingId(null);
   };
 
@@ -296,6 +315,7 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
     );
     await reloadTree();
     setDraggingId(null);
+    await triggerEinbauorteAndRematerialize();
   };
 
   const clearSelection = () => setSelectedId(null);

@@ -507,33 +507,6 @@ function App() {
         >
           🧱 Hierarchie öffnen
         </button>
-        {/* Einbauorte aktualisieren */}
-        <button
-          onClick={async () => {
-            try {
-              const res = await fetch(
-                `${API_PREFIX}/api/rematerialize_einbauorte?project_id=${selectedProject?.id}`,
-                { method: "POST" }
-              );
-              const data = await res.json();
-              alert(`✅ ${data.count} Einbauorte aktualisiert`);
-            } catch (e) {
-              alert("❌ Fehler beim Einbauorte-Refresh: " + e);
-            }
-          }}
-          style={{
-            padding: "0.4rem 0.8rem",
-            background: "#444",
-            color: "#fff",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-            fontWeight: "bold",
-            marginLeft: "0.5rem",
-          }}
-        >
-          🔄 Materialized Einbauorte aktualisieren
-        </button>
         {/* Weitere Buttons + Filterstatus */}
         <div
           style={{
