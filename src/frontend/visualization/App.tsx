@@ -74,9 +74,6 @@ function App() {
   const [gridStatusBySheet, setGridStatusBySheet] = useState<
     Record<string, HotStatus>
   >({});
-  const [viewIdBySheet, setViewIdBySheet] = useState<Record<string, number>>(
-    {}
-  );
 
   const projectId = selectedProject?.id ?? undefined;
 
@@ -244,9 +241,8 @@ function App() {
             views.forEach((v) => {
               map[v.name] = v.id;
             });
-            setViewIdBySheet(map);
           })
-          .catch(() => setViewIdBySheet({}));
+          .catch(() => {});
         // ...existing code for loading sheets...
         return Promise.all(
           names.map((name) =>
@@ -548,100 +544,6 @@ function App() {
             }}
           >
             Rematerialize All
-          </button>
-
-          <button
-            onClick={async () => {
-              if (!selectedProject || !activeSheet) {
-                alert("Kein Projekt oder Sheet gewählt!");
-                return;
-              }
-              // Extract middle part for mapping
-              let sheetKey = activeSheet;
-              if (sheetKey.startsWith("materialized_")) {
-                sheetKey = sheetKey.slice("materialized_".length);
-              }
-              if (sheetKey.includes("_")) {
-                sheetKey = sheetKey.substring(0, sheetKey.lastIndexOf("_"));
-              }
-              const viewId = viewIdBySheet[sheetKey];
-              console.log("[Sync] activeSheet:", activeSheet);
-              console.log("[Sync] sheetKey:", sheetKey);
-              console.log("[Sync] viewIdBySheet:", viewIdBySheet);
-              console.log("[Sync] resolved viewId:", viewId);
-              if (!viewId) {
-                alert("view_id für aktives Sheet nicht gefunden!");
-                return;
-              }
-              try {
-                // Step 2: Trigger sync workflow
-                const payload = {
-                  project_id: selectedProject.id,
-                  view_id: viewId,
-                };
-                console.log("[Sync] Sending payload:", payload);
-                const syncRes = await fetch(`${API_PREFIX}/api/sync_to_cad`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(payload),
-                });
-                const raw = await syncRes.clone().text();
-                console.log("[Sync] Raw response:", raw);
-                if (!syncRes.ok)
-                  throw new Error(`Sync-Fehler: ${syncRes.status}`);
-                const syncResult = await syncRes.json();
-                console.log("[Sync] Parsed response:", syncResult);
-                const now = new Date().toLocaleTimeString();
-                setLogs((prev) => [
-                  ...prev,
-                  {
-                    text: `✅ Sync erfolgreich für view_id ${viewId}: ${
-                      syncResult.log || "OK"
-                    }`,
-                    time: now,
-                  },
-                ]);
-                alert(`✅ Sync erfolgreich für view_id ${viewId}`);
-
-                // Step 2: Rematerialize all
-                const rematRes = await fetch(
-                  `${API_PREFIX}/api/rematerializeAll?project_id=${selectedProject.id}`,
-                  { method: "POST" }
-                );
-                if (!rematRes.ok)
-                  throw new Error(`Rematerialize-Fehler: ${rematRes.status}`);
-                const rematResult = await rematRes.json();
-                console.log("[Sync] Rematerialize result:", rematResult);
-                setLogs((prev) => [
-                  ...prev,
-                  {
-                    text: `⚡️ Rematerialize erfolgreich: ${
-                      rematResult.log || "OK"
-                    }`,
-                    time: new Date().toLocaleTimeString(),
-                  },
-                ]);
-              } catch (err) {
-                const errorMsg =
-                  "❌ Advanced Sync fehlgeschlagen: " + String(err);
-                const now = new Date().toLocaleTimeString();
-                setLogs((prev) => [...prev, { text: errorMsg, time: now }]);
-                alert(errorMsg);
-              }
-            }}
-            style={{
-              padding: "0.4rem 0.8rem",
-              background: "#2170c4",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-              fontWeight: "bold",
-              marginLeft: "0.5rem",
-            }}
-            title="Erweiterte Sync-Einstellungen: CAD-Daten synchronisieren (direkt mit view_id)"
-          >
-            Sync With CAD (View)
           </button>
 
           <button
