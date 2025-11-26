@@ -14,14 +14,18 @@ async def sync_to_cad(request: Request):
     view_id = int(data.get("view_id"))
     try:
         pg_conn = psycopg2.connect(DB_URL)
+        # Check that view has a valid cad_drawing_guid
+        cur = pg_conn.cursor()
+        cur.execute("SELECT cad_drawing_guid, base_view_id FROM views WHERE id = %s AND project_id = %s", (view_id, project_id))
+        view_row = cur.fetchone()
+        if not view_row or not view_row[0] or len(view_row[0]) == 0:
+            pg_conn.close()
+            return {"status": "error", "error": "View does not have a valid cad_drawing_guid"}
+        cad_drawing_guid = view_row[0]
+        base_view_id = view_row[1]
         # 1. Fetch smart objects
         smart_objects = fetch_smart_objects_for_view(pg_conn, project_id, view_id, debug_txt=True)
         pa_ids = []
-        # Get base_view_id for conditional draft sync
-        cur = pg_conn.cursor()
-        cur.execute("SELECT base_view_id FROM views WHERE id = %s", (view_id,))
-        base_view_row = cur.fetchone()
-        base_view_id = base_view_row[0] if base_view_row else None
         for obj in smart_objects:
             mapped = map_cad_properties_to_pa(obj, pg_conn)
             pa_id = upsert_project_article(pg_conn, project_id, view_id, mapped_props=mapped)

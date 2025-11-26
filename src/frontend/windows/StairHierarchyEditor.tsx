@@ -121,9 +121,16 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
   // Helper: Trigger Einbauorte aktualisieren + Rematerialize All
   const triggerEinbauorteAndRematerialize = async () => {
     try {
-      await fetch(`${apiPrefix}/api/rematerialize_einbauorte?project_id=${projectId}`, { method: "POST" });
-      await fetch(`${apiPrefix}/api/rematerializeAll?project_id=${projectId}`, { method: "POST" });
-      uiConsole("✅ Hierarchieänderungen gespeichert & Einbauorte/Materialized aktualisiert.");
+      await fetch(
+        `${apiPrefix}/api/rematerialize_einbauorte?project_id=${projectId}`,
+        { method: "POST" }
+      );
+      await fetch(`${apiPrefix}/api/rematerializeAll?project_id=${projectId}`, {
+        method: "POST",
+      });
+      uiConsole(
+        "✅ Hierarchieänderungen gespeichert & Einbauorte/Materialized aktualisiert."
+      );
     } catch (e) {
       console.error("Materialized update failed:", e);
       uiConsole("❌ Fehler beim Aktualisieren der Einbauorte/Materialized!");

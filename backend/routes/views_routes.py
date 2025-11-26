@@ -109,11 +109,19 @@ async def list_views(request: Request):
     engine = create_engine(DB_URL)
     with engine.begin() as conn:
         rows = conn.execute(text("""
-            SELECT v.id, v.name
+            SELECT v.id, v.name, v.cad_drawing_guid, v.cad_drawing_title
             FROM views v
             WHERE v.project_id = :pid
         """), {"pid": int(project_id)}).fetchall()
-        return [{"id": row.id, "name": row.name} for row in rows]
+        return [
+            {
+                "id": row.id,
+                "name": row.name,
+                "cad_drawing_guid": row.cad_drawing_guid or "",
+                "cad_drawing_title": row.cad_drawing_title or ""
+            }
+            for row in rows
+        ]
 
 @router.post("/views/soft_delete")
 async def soft_delete_view(request: Request):

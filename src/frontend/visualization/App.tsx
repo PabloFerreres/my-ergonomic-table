@@ -644,6 +644,104 @@ function App() {
             Sync With CAD (View)
           </button>
 
+          <button
+            onClick={async () => {
+              if (!selectedProject) {
+                alert("Kein Projekt gewählt!");
+                return;
+              }
+              try {
+                // Fetch all views for the project
+                const viewsRes = await fetch(
+                  `${API_PREFIX}/api/views?project_id=${selectedProject.id}`
+                );
+                const views = await viewsRes.json();
+                // Filter views with a correct cad_drawing_guid (only sync those)
+                const validViews = views.filter(
+                  (v: {
+                    id: number;
+                    name: string;
+                    cad_drawing_guid?: string;
+                  }) => v.cad_drawing_guid && v.cad_drawing_guid.length > 0
+                );
+                const syncedIds: number[] = [];
+                for (const v of validViews) {
+                  const payload = {
+                    project_id: selectedProject.id,
+                    view_id: v.id,
+                  };
+                  const syncRes = await fetch(`${API_PREFIX}/api/sync_to_cad`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                  });
+                  if (syncRes.ok) {
+                    syncedIds.push(v.id);
+                  }
+                }
+                if (syncedIds.length > 0) {
+                  // Rematerialize all after successful syncs
+                  const rematRes = await fetch(
+                    `${API_PREFIX}/api/rematerializeAll?project_id=${selectedProject.id}`,
+                    { method: "POST" }
+                  );
+                  if (rematRes.ok) {
+                    const rematResult = await rematRes.json();
+                    setLogs((prev) => [
+                      ...prev,
+                      {
+                        text: `Synced with CAD: ${syncedIds.join(", ")}`,
+                        time: new Date().toLocaleTimeString(),
+                      },
+                      {
+                        text: `⚡️ Rematerialize erfolgreich: ${
+                          rematResult.log || "OK"
+                        }`,
+                        time: new Date().toLocaleTimeString(),
+                      },
+                    ]);
+                  } else {
+                    setLogs((prev) => [
+                      ...prev,
+                      {
+                        text: `Synced with CAD: ${syncedIds.join(", ")}`,
+                        time: new Date().toLocaleTimeString(),
+                      },
+                    ]);
+                  }
+                } else {
+                  setLogs((prev) => [
+                    ...prev,
+                    {
+                      text: `Synced with CAD: (keine gültigen Views)`,
+                      time: new Date().toLocaleTimeString(),
+                    },
+                  ]);
+                }
+              } catch (err) {
+                const errorMsg =
+                  "❌ Sync aller Views fehlgeschlagen: " + String(err);
+                setLogs((prev) => [
+                  ...prev,
+                  { text: errorMsg, time: new Date().toLocaleTimeString() },
+                ]);
+              }
+            }}
+            style={{
+              padding: "0.4rem 0.8rem",
+              background: "#2170c4",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontWeight: "bold",
+              marginLeft: "0.5rem",
+            }}
+            title="Alle Views mit CAD synchronisieren (nur gültige Pfade)"
+          >
+            Sync All Views With CAD
+          </button>
+
           <FilterStatus
             key={`fs-${currentStatus.isFiltered ? 1 : 0}`}
             isFilterActive={currentStatus.isFiltered}
