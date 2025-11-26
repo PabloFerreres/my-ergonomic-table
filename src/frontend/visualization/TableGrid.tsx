@@ -34,7 +34,6 @@ interface TableGridProps {
   hotRef?: React.RefObject<HotTableClass | null>;
   sheetName: string;
   isBlocked?: boolean;
-  onSelectionChange?: (cell: { row: number; col: number }) => void;
   onQuickFilterFocus?: (col: number) => void; // Alt+Click -> QuickFilter
   onSearchShortcut?: () => void; // Ctrl+F -> Searchbar
   selectedProject: Project;
@@ -56,7 +55,6 @@ function TableGrid({
   hotRef,
   sheetName,
   isBlocked = false,
-  onSelectionChange,
   onQuickFilterFocus,
   onSearchShortcut,
   selectedProject,
@@ -174,10 +172,6 @@ function TableGrid({
   //   colHeaders,
   //   selectedProject.id
   // );
-
-  const handleSelection = (row: number, col: number) => {
-    onSelectionChange?.({ row, col });
-  };
 
   const emitStatus = () => {
     const hot = hotRef?.current?.hotInstance ?? null;
@@ -308,23 +302,20 @@ function TableGrid({
         height="100%"
         stretchH="none"
         licenseKey="non-commercial-and-evaluation"
-        afterSelection={handleSelection}
-        // ✅ richtige Reihenfolge: (event, coords, TD)
         afterOnCellMouseDown={(event, coords) => {
           const hot = hotRef?.current?.hotInstance ?? null;
           if (event?.altKey && coords?.col != null && coords.col >= 0 && hot) {
-            // 1) genau die angeklickte Zelle kurz selektieren (NICHT die ganze Spalte)
+            // 1) Select only the clicked cell (not the whole column)
             const r =
               typeof coords.row === "number" && coords.row >= 0
                 ? coords.row
                 : hot.getSelectedLast()?.[0] ?? 0;
             hot.selectCell(r, coords.col);
 
-            // 2) QuickFilter öffnen & fokussieren (App -> Dock kümmert sich darum)
+            // 2) Open & focus QuickFilter (App Dock handles focus)
             onQuickFilterFocus?.(coords.col);
 
-            // 3) Zelle wieder deselektieren, NACHDEM der Dock fokussiert hat
-            //    (triple RAF, damit wir HOTs eigene Fokus-Logik sicher "überholen")
+            // 3) Deselect cell after Dock focus (triple RAF to overtake HOT focus logic)
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
@@ -385,6 +376,7 @@ function TableGrid({
                 const hot = hotRef?.current?.hotInstance;
                 if (!hot || selectionHasHeader()) return;
 
+                // Selection is read directly from Handsontable here
                 const selected = hot.getSelected();
                 if (!selected) return;
 

@@ -5,12 +5,10 @@ import type { HotStatus } from "./uiTableGrid/hotStatus";
 import TableGrid from "./TableGrid";
 import Zoom from "./uiButtonFunctions/Zoom";
 import { triggerLayoutCalculation } from "./uiButtonFunctions/TriggerLayoutCalculation";
-import { useRowMoverLogic } from "../hooks/useRowMoverLogic";
 import FilterStatus from "./uiButtonFunctions/FilterStatus";
 import type { SearchBarHandle } from "./uiButtonFormats/SearchBar";
 import { useSearchFunctions } from "./uiButtonFunctions/useSearchFunctions";
 import "./App.css";
-import SquareMover from "./uiSquares/SquareMover";
 import SquareSearch from "./uiSquares/SquareSearch";
 import { setInitialInsertedId } from "../utils/insertIdManager";
 import { ConsolePanel } from "./uiSquares/ConsolePanel";
@@ -147,9 +145,6 @@ function App() {
 
   const hotRefs = useRef<Record<string, React.RefObject<HotTableClass>>>({});
 
-  const { moveRowsUp, moveRowsDown } = useRowMoverLogic(
-    hotRefs.current[activeSheet ?? ""]?.current?.hotInstance ?? null
-  );
   const { search, goNext, goPrev, matchIndex, matchCount } = useSearchFunctions(
     hotRefs.current[activeSheet ?? ""]?.current?.hotInstance ?? null
   );
@@ -328,8 +323,6 @@ function App() {
   };
 
   // --- Elektrik-Block-Flag (robust) ---
-  const isElektrikActive =
-    activeSheet?.toLowerCase().includes("elektrik") ?? false;
   const currentStatus = getStatus(activeSheet);
   const isBlocked = currentStatus.isFiltered || currentStatus.isSorted;
 
@@ -684,14 +677,6 @@ function App() {
             onResetFilters={resetFilters}
           />
 
-          <SquareMover
-            selectedCell={selectedCell}
-            dataLength={sheets[activeSheet].data.length}
-            onMoveUp={moveRowsUp}
-            onMoveDown={moveRowsDown}
-            blocked={isElektrikActive}
-          />
-
           {/* 🔁 Dynamischer Dock: Searchbar ODER QuickFilter */}
           <FunctionDock
             ref={dockRef}
@@ -960,7 +945,6 @@ function App() {
                         }}
                       >
                         <TableGrid
-                          onSelectionChange={setSelectedCell}
                           data={sheet.data}
                           colHeaders={sheet.headers}
                           hotRef={hotRefs.current[name]}
