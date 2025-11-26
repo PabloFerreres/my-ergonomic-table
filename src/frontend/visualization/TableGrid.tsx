@@ -302,6 +302,7 @@ function TableGrid({
         height="100%"
         stretchH="none"
         licenseKey="non-commercial-and-evaluation"
+        fixedColumnsLeft={1}
         afterOnCellMouseDown={(event, coords) => {
           const hot = hotRef?.current?.hotInstance ?? null;
           if (event?.altKey && coords?.col != null && coords.col >= 0 && hot) {
