@@ -107,20 +107,17 @@ def create_materialized_elektrik(project_id: int, debug: bool = False):
         # 5. Erstelle die COALESCE-Spalten-Ausdrücke nur mit vorhandenen Spalten
         col_exprs = []
         output_cols = []  # Reihenfolge der finalen Output-Spalten
-        col_exprs.append("main.project_article_id AS project_article_id")
-        output_cols.append("project_article_id")
-
         kommentar_display = layout_name_map.get("kommentar", "Kommentar")
         einbauort_display = layout_name_map.get("einbauort", "Einbauort")
         einbauort_id_txt = None
 
         for layout_col, materialized_col in layout_name_map.items():
-            if layout_col == "project_article_id":
-                continue
             sources = []
             in_p = layout_col in colmap["p"]
             # Only use pa."einbauort" for einbauort
-            if layout_col == "einbauort":
+            if layout_col == "project_article_id":
+                expr = "main.project_article_id AS project_article_id"
+            elif layout_col == "einbauort":
                 if in_p:
                     layout_expr = 'NULLIF(TRIM(pa."einbauort"::text), \'\')'
                 else:

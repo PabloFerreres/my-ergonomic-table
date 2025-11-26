@@ -85,7 +85,9 @@ function TableGrid({
   const baseCellProps = useCellProperties(safeData, rowIdIndex, sheetName);
 
   // --- ReadOnly columns logic ---
-  const [columnDataSources, setColumnDataSources] = useState<Record<string, string>>({});
+  const [columnDataSources, setColumnDataSources] = useState<
+    Record<string, string>
+  >({});
   useEffect(() => {
     fetch(`${API_PREFIX}/api/columns_map`)
       .then((res) => res.json())
@@ -117,8 +119,14 @@ function TableGrid({
       if (["intern", "cad", "articles"].includes(dataSource)) {
         if (dataSource === "articles") {
           const articleIdColIdx = colHeaders.indexOf("article_id");
-          const articleId = articleIdColIdx >= 0 ? safeData[row]?.[articleIdColIdx] : undefined;
-          if (articleId !== undefined && articleId !== null && articleId !== "" && !isNaN(Number(articleId))) {
+          const articleId =
+            articleIdColIdx >= 0 ? safeData[row]?.[articleIdColIdx] : undefined;
+          if (
+            articleId !== undefined &&
+            articleId !== null &&
+            articleId !== "" &&
+            !isNaN(Number(articleId))
+          ) {
             props.readOnly = true;
           } else {
             props.readOnly = false;

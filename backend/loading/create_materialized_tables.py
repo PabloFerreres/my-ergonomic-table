@@ -116,8 +116,6 @@ def create_materialized_table(project_id: int, view_id, base_view_id):
     # 4. Build column expressions from layout
     col_exprs = []
     output_cols = []
-    col_exprs.append("(pd.data->>'project_article_id')::int AS project_article_id")
-    output_cols.append("project_article_id")
     kommentar_display = layout_name_map.get("kommentar", "Kommentar")
     einbauort_display = layout_name_map.get("einbauort", "Einbauort")
     einbauort_id_text_expr = None
@@ -125,21 +123,13 @@ def create_materialized_table(project_id: int, view_id, base_view_id):
     einbauort_in_layout = "einbauort" in layout_name_map
 
     for layout_col, materialized_col in layout_name_map.items():
-        if layout_col == "project_article_id":
-            continue
         in_p = layout_col in colmap["p"]
         in_ad = layout_col in colmap["ad"]
         in_a = layout_col in colmap["a"]
         sources = []
-        if in_p:
-            sources.append(f'pa."{layout_col}"')
-        if in_a:
-            sources.append(f'a."{layout_col}"')
-        if in_ad:
-            sources.append(f'ad."{layout_col}"')
-        # Special handling for einbauort: output full name from materialized_einbauorte (with parents and IDs)
-        if layout_col == "einbauort":
-            # Only use pa."einbauort" for einbauort, never ad or a
+        if layout_col == "project_article_id":
+            expr = "(pd.data->>'project_article_id')::int AS project_article_id"
+        elif layout_col == "einbauort":
             layout_expr = 'NULLIF(TRIM(pa."einbauort"::text), \'\')'
             id_txt = f"""
                 CASE
@@ -150,6 +140,12 @@ def create_materialized_table(project_id: int, view_id, base_view_id):
             expr = f"COALESCE((SELECT me.full_name FROM materialized_einbauorte me WHERE me.project_id = {project_id} AND me.id::text = ({id_txt}) LIMIT 1), {layout_expr}) AS \"{materialized_col}\""
             einbauort_id_text_expr = id_txt
         else:
+            if in_p:
+                sources.append(f'pa."{layout_col}"')
+            if in_a:
+                sources.append(f'a."{layout_col}"')
+            if in_ad:
+                sources.append(f'ad."{layout_col}"')
             expr = f"CASE\n            WHEN pa.article_id IS NOT NULL THEN a.\"{layout_col}\"\n            ELSE ad.\"{layout_col}\"\n        END AS \"{materialized_col}\"" if in_a or in_ad else f"pa.\"{layout_col}\" AS \"{materialized_col}\""
         col_exprs.append(expr)
         output_cols.append(materialized_col)

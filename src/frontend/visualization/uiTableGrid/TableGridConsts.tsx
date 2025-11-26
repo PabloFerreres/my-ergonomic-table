@@ -76,9 +76,9 @@ export function afterGetColHeader(
     !["cad", "intern", "articles"].includes(dataSource) &&
     header !== "order_key" &&
     header !== "project_article_id";
-  let iconSrc = "/edit-icon.jpg";
+  let iconSrc = "/edit-icon-grey.png";
   if (dataSource === "articles") {
-    iconSrc = "/editable-rowbased.png";
+    iconSrc = "/editable-rowbased-grey.png";
   }
   if (isEditable || dataSource === "articles") {
     let icon = TH.querySelector(".edit-icon") as HTMLImageElement;
