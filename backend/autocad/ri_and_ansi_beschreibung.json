@@ -1,0 +1,78 @@
+{
+  "Checking Devices": [
+    ["Manometer, analog mit Anzeige", "PI", "X"],
+    ["Drucksensor, Analogausgang", "PT", "X"],
+    ["Drucksensor, Digitalanzeige und Anbindung SPS", "PIT", "X"],
+    ["Druckwächter, öffnet beim Unterschreiten", "PA-", "X"],
+    ["Druckwächter, öffnet beim Überschreiten", "PA+", "X"],
+    ["Meßblende", "", "X"],
+    ["Thermometer, mit anal. Anzeige vor Ort", "TI", "X"],
+    ["Thermometer, mit Digitalanzeige", "TI", "X"],
+    ["Temperatursensor m. Ausgangssignal analog", "TT", "X"],
+    ["Strömungswächter", "FIA-", "X"],
+    ["Durchflussmesser, m. analogem Ausgang", "FIT", "X"],
+    ["Durchflussmengenzähler", "FQI", "X"],
+    ["Durchflussmengenzähler m. Impulsgeber", "FQTR", "X"],
+    ["Schwebekörper-Durchflussmesser m. Impulsausgang", "FITR", "X"],
+    ["Schwebekörper-Durchflussmesser m. MIN Überwachung", "FIT-", "X"],
+    ["Leckagesensor ISP (Liquiphant)", "LA+", "X"],
+    ["Niveausensor (analog) m. Anzeige i.d. SPS", "LIT", "F"],
+    ["Niveauregenschalter m. 4 Schaltpunkten", "LIT", "F"],
+    ["Naßabscheider", "", ""],
+    ["pH-Wert Messung", "AT", "X"],
+    ["Feuchtigkeitsmessung", "MT", "X"]
+  ],
+
+  "Ventile": [
+    ["Absperrarmatur m. Handantrieb", "", "H/V/K/S"],
+    ["Mengenstellventil zum Drosseln (STRV, Nadelventil o.ä.)", "CV", "V"],
+    ["Überdruck Sicherheitsventil", "PC+", "V"],
+    ["Absperrarmatur Antrieb Elektromotor", "EV", "H/V/K/S"],
+    ["Absperrarmatur Steuerung elektr.", "ESV", "H/V/K/S"],
+    ["Absperrarmatur, Betriebszustand gedrosselt", "FC", "V"],
+    ["Absperrarmatur Betriebszustand geschl.", "CV", "V"],
+    ["Absperrarmatur, im Fehlerzustand schließend (NO)", "CV", "V"],
+    ["Absperrarmatur mit Endlagenüberwachung", "CVT +/-", "V"],
+    ["Temperaturgeregeltes Ventil", "TC", "V"],
+    ["3-Wege Kugelhahn mit Endlagenüberwachung", "HVT +/-", "H"],
+    ["Entlüftungsventil, automatisch", "OC", "V"],
+    ["Entlüftungsventil, manuell", "", "V"],
+    ["Rückschlagventil Durchfluss: R→L", "FD", "V"],
+    ["Rückschlagklappe Durchfluss: R→L", "FD", "K"]
+  ],
+
+  "Antriebe": [
+    ["Ventilator 400V", "EU", "V"],
+    ["Flüssigkeitspumpe, allg, 400V", "EU", "P"],
+    ["Kreispumpe, 400V", "EU", "P"],
+    ["Membranpumpe", "EU", "P"]
+  ],
+
+  "Sonstige": [
+    ["Schalldämpfer, allgemein", "", "X"],
+    ["Gas- / Luftfilter, allgemein", "", "F"],
+    ["Flüssigkeitsfilter, allg.", "", "F"],
+    ["Behälter", "", "B"],
+    ["Rohrbündel-Wärmeaustauscher", "", "W"],
+    ["Kompensator", "", "X"],
+    ["Gastherme", "", "W"],
+    ["Plattenwärmeaustauscher", "", "W"]
+  ],
+
+  "Pneumatik": [
+    ["Feinfilter", "", "X"],
+    ["Druckbehälter / Pufferbehälter", "", "F"],
+    ["Druckregler", "", "F"],
+    ["Manometersymbol", "", "B"],
+    ["Schalldämpfer", "", "W"],
+    ["5/3 Wegeventil mit Neutralstellung", "", "X"],
+    ["Druckregelventil", "", "X"],
+    ["Schnellverschlusskupplung", "", "F"],
+    ["Drosselrückschlagventil", "", "F"],
+    ["Zylinder, doppelwirkend, endl. gedämpft", "", "B"],
+    ["Magnetventil 2/2", "", "X"],
+    ["Düse", "", "X"],
+    ["Klappenantrieb betätigt durch Magnetventil", "", "F"],
+    ["verstellbare Drossel", "FC", "V"]
+  ]
+}

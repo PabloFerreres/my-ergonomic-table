@@ -440,7 +440,7 @@ function App() {
         display: "flex",
         flexDirection: "column",
         height: "100vh",
-        backgroundImage: 'url("/1234.png")',
+        backgroundImage: 'url("/dark.png")',
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundAttachment: "fixed",
@@ -566,7 +566,7 @@ function App() {
                     cad_drawing_guid?: string;
                   }) => v.cad_drawing_guid && v.cad_drawing_guid.length > 0
                 );
-                const syncedIds: number[] = [];
+                const syncedViews: { id: number; name: string }[] = [];
                 for (const v of validViews) {
                   const payload = {
                     project_id: selectedProject.id,
@@ -578,10 +578,10 @@ function App() {
                     body: JSON.stringify(payload),
                   });
                   if (syncRes.ok) {
-                    syncedIds.push(v.id);
+                    syncedViews.push({ id: v.id, name: v.name });
                   }
                 }
-                if (syncedIds.length > 0) {
+                if (syncedViews.length > 0) {
                   // Rematerialize all after successful syncs
                   const rematRes = await fetch(
                     `${API_PREFIX}/api/rematerializeAll?project_id=${selectedProject.id}`,
@@ -592,7 +592,9 @@ function App() {
                     setLogs((prev) => [
                       ...prev,
                       {
-                        text: `Synced with CAD: ${syncedIds.join(", ")}`,
+                        text: `Synced with CAD: ${syncedViews
+                          .map((v) => `${v.id} (${v.name})`)
+                          .join(", ")}`,
                         time: new Date().toLocaleTimeString(),
                       },
                       {
@@ -606,7 +608,9 @@ function App() {
                     setLogs((prev) => [
                       ...prev,
                       {
-                        text: `Synced with CAD: ${syncedIds.join(", ")}`,
+                        text: `Synced with CAD: ${syncedViews
+                          .map((v) => `${v.id} (${v.name})`)
+                          .join(", ")}`,
                         time: new Date().toLocaleTimeString(),
                       },
                     ]);
