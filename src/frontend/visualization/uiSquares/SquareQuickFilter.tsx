@@ -40,7 +40,7 @@ const SquareQuickFilter = forwardRef<QuickFilterHandle, Props>(
     return (
       <MSquareContainer width="260px" height="88px">
         <div style={{ fontSize: 12, marginBottom: 4 }}>
-          Quick-Filter {header ? `• ${header}` : ""}
+          [ALT + CLICK] Quick-Filter {header ? `• ${header}` : ""}
         </div>
         <div style={{ display: "flex", gap: 6, width: "100%" }}>
           <input

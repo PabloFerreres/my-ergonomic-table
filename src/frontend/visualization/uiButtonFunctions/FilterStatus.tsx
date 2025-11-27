@@ -12,7 +12,7 @@ const SquareFilter: React.FC<FilterStatusProps> = ({
 }) => {
   return (
     <SquareContainer
-      width="300px"
+      width="150px"
       backgroundColor={
         isFilterActive ? "rgb(255, 109, 109)" : "rgb(168, 252, 168)"
       }

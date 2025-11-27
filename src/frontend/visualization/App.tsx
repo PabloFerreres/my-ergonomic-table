@@ -488,6 +488,41 @@ function App() {
           >
             🔄 Alle Tabellen aktualisieren
           </button>
+          <button
+            style={{
+              padding: "0.4rem 0.8rem",
+              background: "#2170c4",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+            title="Rematerialize All"
+            onClick={async () => {
+              try {
+                if (!selectedProject) return;
+                const res = await fetch(
+                  `${API_PREFIX}/api/rematerializeAll?project_id=${selectedProject?.id}`,
+                  { method: "POST" }
+                );
+                if (!res.ok) throw new Error(`Server error ${res.status}`);
+                const result = await res.json();
+                console.log("🔁 + ⚡️ All rematerialized:", result);
+                if (result.log) {
+                  const now = new Date().toLocaleTimeString();
+                  setLogs((prev) => [...prev, { text: result.log, time: now }]);
+                }
+              } catch (err) {
+                const errorMsg = "❌ Rematerialize all failed: " + String(err);
+                console.error(errorMsg);
+                const now = new Date().toLocaleTimeString();
+                setLogs((prev) => [...prev, { text: errorMsg, time: now }]);
+              }
+            }}
+          >
+            Rematerialize All
+          </button>
         </div>
         <button
           onClick={() => setShowHierarchy(true)}
@@ -523,48 +558,18 @@ function App() {
 
           <button
             onClick={async () => {
-              try {
-                const res = await fetch(
-                  `${API_PREFIX}/api/rematerializeAll?project_id=${selectedProject?.id}`,
-                  { method: "POST" }
-                );
-                if (!res.ok) throw new Error(`Server error ${res.status}`);
-                const result = await res.json();
-                console.log("🔁 + ⚡️ All rematerialized:", result);
-                if (result.log) {
-                  const now = new Date().toLocaleTimeString();
-                  setLogs((prev) => [...prev, { text: result.log, time: now }]);
-                }
-              } catch (err) {
-                const errorMsg = "❌ Rematerialize all failed: " + String(err);
-                console.error(errorMsg);
-                const now = new Date().toLocaleTimeString();
-                setLogs((prev) => [...prev, { text: errorMsg, time: now }]);
-              }
-            }}
-          >
-            Rematerialize All
-          </button>
-
-          <button
-            onClick={async () => {
               if (!selectedProject) {
                 alert("Kein Projekt gewählt!");
                 return;
               }
               try {
                 // Fetch all views for the project
-                const viewsRes = await fetch(
+                const views: { id: number; name: string; cad_drawing_guid?: string }[] = await fetch(
                   `${API_PREFIX}/api/views?project_id=${selectedProject.id}`
-                );
-                const views = await viewsRes.json();
+                ).then(res => res.json());
                 // Filter views with a correct cad_drawing_guid (only sync those)
                 const validViews = views.filter(
-                  (v: {
-                    id: number;
-                    name: string;
-                    cad_drawing_guid?: string;
-                  }) => v.cad_drawing_guid && v.cad_drawing_guid.length > 0
+                  (v) => v.cad_drawing_guid && v.cad_drawing_guid.length > 0
                 );
                 const syncedViews: { id: number; name: string }[] = [];
                 for (const v of validViews) {
