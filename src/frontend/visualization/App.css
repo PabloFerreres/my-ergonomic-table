@@ -27,3 +27,11 @@ html, body, #root {
 .console-scroll::-webkit-scrollbar-thumb:hover {
   background: #666;
 }
+
+.custom-console-scroll::-webkit-scrollbar {
+  display: none;
+}
+.custom-console-scroll {
+  scrollbar-width: none;
+  ms-overflow-style: none;
+}

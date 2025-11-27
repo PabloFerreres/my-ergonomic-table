@@ -678,16 +678,9 @@ function App() {
             )}
           />
 
-          <div
-            style={{
-              position: "absolute",
-              top: "1rem",
-              right: "1rem",
-              zIndex: 10,
-            }}
-          >
-            <ConsolePanel logs={logs} />
-          </div>
+          {/* Console Panel - replaced inline code with shared component */}
+          <ConsolePanel logs={logs} />
+
         </div>
         {/* Sheet Tabs */}
         <div
