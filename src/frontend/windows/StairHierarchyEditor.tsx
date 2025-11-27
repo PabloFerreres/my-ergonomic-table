@@ -341,8 +341,7 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
           const num = prefix ? `${prefix}.${idx + 1}` : `${idx + 1}`;
           const isEditing = editingId === node.id;
           const isSelected = selectedId === node.id;
-          // Show both full_name and id for leaves
-          const isLeaf = !node.children || node.children.length === 0;
+          // Show id for every node (not just leaves)
           return (
             <li key={node.id} style={UI.li(isSelected)}>
               <button
@@ -382,18 +381,11 @@ export default function StairHierarchyEditor({ projectId, apiPrefix }: Props) {
                 />
               ) : (
                 <span
-                  onClick={() => startRename(node)}
-                  title="Zum Umbenennen klicken"
+                  onDoubleClick={() => startRename(node)}
+                  title="Zum Umbenennen doppelklicken"
                   style={UI.nameClickable}
                 >
-                  {isLeaf ? (
-                    <>
-                      {node.name}{" "}
-                      <span style={{ opacity: 0.7 }}>[ID: {node.id}]</span>
-                    </>
-                  ) : (
-                    node.name
-                  )}
+                  {node.name} <span style={{ opacity: 0.7 }}>[ID: {node.id}]</span>
                 </span>
               )}
 

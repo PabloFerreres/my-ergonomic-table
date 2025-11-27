@@ -24,10 +24,10 @@ async def fetch_tree(conn, project_id: int, parent_id=None, sort_nums=None, name
             LIMIT 1
         """, r["id"], project_id)
 
+        pos = ".".join(str(x) for x in new_sort)
+        name_path = " | ".join(new_names)
+        # ⬇️ ID zwischen Position und Name
         if not children:  # Leaf
-            pos = ".".join(str(x) for x in new_sort)
-            name_path = " | ".join(new_names)
-            # ⬇️ ID zwischen Position und Name
             full_name = f"{pos} [{r['id']}] {name_path}"
             result.append({
                 "id": r["id"],
@@ -37,6 +37,16 @@ async def fetch_tree(conn, project_id: int, parent_id=None, sort_nums=None, name
                 "leaf_id": r["id"]
             })
         else:
+            # Branch: materialize with warning [!]
+            full_name = f"{pos} [{r['id']}] {name_path} [!]"
+            result.append({
+                "id": r["id"],
+                "project_id": project_id,
+                "name": r["name"],
+                "full_name": full_name,
+                "leaf_id": None
+            })
+            # Also recurse for children
             result.extend(
                 await fetch_tree(conn, project_id, r["id"], new_sort, new_names)
             )
