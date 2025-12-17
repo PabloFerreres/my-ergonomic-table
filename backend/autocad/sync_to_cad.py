@@ -223,7 +223,7 @@ def upsert_project_article(pg_conn, project_id, view_id, mapped_props):
     If yes, updates the row with mapped_props.
     If no, inserts a new row with mapped_props, project_id, and view_id.
     Returns the pa_id (id) of the row.
-    Only updates/inserts columns with data_source='cad'.
+    No filter: all properties in mapped_props that match columns in project_articles are synced.
     """
     cur = pg_conn.cursor()
     guid = mapped_props.get('pnpguid')
@@ -231,10 +231,11 @@ def upsert_project_article(pg_conn, project_id, view_id, mapped_props):
         raise Exception('No GUID found in mapped properties')
     # Remove 'id' from mapped_props if present
     mapped_props = {k: v for k, v in mapped_props.items() if k != 'id'}
-    # Get allowed columns (data_source='cad')
-    cad_columns = get_cad_columns(pg_conn)
+    # Get all columns from project_articles
+    cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'project_articles'")
+    pa_columns = set(row[0].lower() for row in cur.fetchall())
     # Filter mapped_props to only those columns
-    filtered_props = {k: v for k, v in mapped_props.items() if k.lower() in cad_columns}
+    filtered_props = {k: v for k, v in mapped_props.items() if k.lower() in pa_columns}
     # Check for existing row
     cur.execute("SELECT id FROM project_articles WHERE pnpguid = %s", (guid,))
     row = cur.fetchone()
