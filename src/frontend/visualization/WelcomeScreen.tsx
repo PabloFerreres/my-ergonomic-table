@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { Project } from "./SesionParameters";
 import { createSheetApiCall } from "../utils/apiSync";
 import config from "../../../config.json";
@@ -53,6 +53,22 @@ export default function WelcomeScreen({
   const [viewMsg, setViewMsg] = useState<{ [id: number]: string }>({});
 
   const [showSettings, setShowSettings] = useState(false);
+
+  // Track the ArticleVisualizer window
+  const articleWindowRef = useRef<Window | null>(null);
+
+  // Function to open the ArticleVisualizer window (only one instance)
+  const openArticleVisualizer = () => {
+    if (!articleWindowRef.current || articleWindowRef.current.closed) {
+      articleWindowRef.current = window.open(
+        "/article-visualizer.html",
+        "ArticleVisualizerWindow",
+        "width=1400,height=700"
+      );
+    } else {
+      articleWindowRef.current.focus();
+    }
+  };
 
   useEffect(() => {
     fetch(`${API_PREFIX}/api/projects`)
@@ -267,285 +283,301 @@ export default function WelcomeScreen({
     : null;
 
   return (
-    <div className="wel-root">
-      <h1 className="wel-title">Welcome!</h1>
+    <div className="wel-wrap" style={{ position: "relative", minHeight: "100vh" }}>
+      <div className="wel-root">
+        <h1 className="wel-title">Welcome!</h1>
 
-      <div className="wel-card">
-        <div className="wel-hero" />
+        <div className="wel-card">
+          <div className="wel-hero" />
 
-        <div className="wel-body">
-          {/* Linke Spalte: schwarzes Quadrat (Projektliste) */}
-          <div className="wel-left">
-            <div className="wel-label">Project:</div>
-            <div className="wel-projects">
-              {projects.map((p) => (
-                <div
-                  key={p.id}
-                  className={`wel-item ${
-                    selectedId === p.id ? "is-active" : ""
-                  }`}
-                  onClick={() => {
-                    setSelectedId(p.id);
-                    setConfirmingId(null);
-                  }}
-                  title={p.name}
-                >
-                  <span className="wel-name">{p.name}</span>
-                  <button
-                    className="wel-btn wel-btn--muted wel-btn--xs"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setConfirmingId(p.id);
+          <div className="wel-body">
+            {/* Linke Spalte: schwarzes Quadrat (Projektliste) */}
+            <div className="wel-left">
+              <div className="wel-label">Project:</div>
+              <div className="wel-projects">
+                {projects.map((p) => (
+                  <div
+                    key={p.id}
+                    className={`wel-item ${
+                      selectedId === p.id ? "is-active" : ""
+                    }`}
+                    onClick={() => {
+                      setSelectedId(p.id);
+                      setConfirmingId(null);
                     }}
+                    title={p.name}
+                  >
+                    <span className="wel-name">{p.name}</span>
+                    <button
+                      className="wel-btn wel-btn--muted wel-btn--xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmingId(p.id);
+                      }}
+                      disabled={busy}
+                    >
+                      Löschen
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {confirmingId && (
+                <div className="wel-row" style={{ marginTop: 8 }}>
+                  <button
+                    className="wel-btn wel-btn--danger wel-btn--sm"
+                    onClick={() => softDelete(confirmingId)}
                     disabled={busy}
                   >
-                    Löschen
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {confirmingId && (
-              <div className="wel-row" style={{ marginTop: 8 }}>
-                <button
-                  className="wel-btn wel-btn--danger wel-btn--sm"
-                  onClick={() => softDelete(confirmingId)}
-                  disabled={busy}
-                >
-                  Wirklich löschen
-                </button>
-                <button
-                  className="wel-btn wel-btn--muted wel-btn--sm"
-                  onClick={() => setConfirmingId(null)}
-                  disabled={busy}
-                >
-                  Abbrechen
-                </button>
-              </div>
-            )}
-
-            {err && <div className="wel-err">{err}</div>}
-          </div>
-
-          {/* Rechte Spalte: Open + Create */}
-          <div className="wel-actions">
-            <button
-              className="wel-btn wel-btn--primary"
-              onClick={() => selectedProject && openProject(selectedProject)}
-              disabled={!selectedProject || busy}
-            >
-              Open Project
-            </button>
-
-            <button
-              className="wel-btn wel-btn--muted"
-              onClick={() => setShowSettings((v) => !v)}
-              disabled={!selectedProject || busy}
-            >
-              ⚙️ Project Settings
-            </button>
-
-            {!creating ? (
-              <button
-                className="wel-btn wel-btn--muted"
-                onClick={() => setCreating(true)}
-                disabled={busy}
-              >
-                ➕ Neues Projekt
-              </button>
-            ) : (
-              <div className="wel-create">
-                <input
-                  className="wel-input"
-                  placeholder="Projektname"
-                  value={projName}
-                  onChange={(e) => setProjName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-                  autoFocus
-                />
-                <input
-                  className="wel-input"
-                  placeholder="Erstes Sheet (Anzeige)"
-                  value={sheetName}
-                  onChange={(e) => setSheetName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-                />
-                <select
-                  className="wel-input"
-                  value={baseViewId ?? ""}
-                  onChange={(e) =>
-                    setBaseViewId(
-                      e.target.value === "" ? null : Number(e.target.value)
-                    )
-                  }
-                >
-                  <option value="" disabled>
-                    — Typ wählen —
-                  </option>
-                  {baseViews.map((bv) => (
-                    <option key={bv.id} value={bv.id}>
-                      {bv.name}
-                    </option>
-                  ))}
-                </select>
-
-                <div className="wel-create-row">
-                  <button
-                    className="wel-btn wel-btn--primary"
-                    onClick={handleCreate}
-                    disabled={
-                      !projName.trim() ||
-                      !sheetName.trim() ||
-                      baseViewId == null ||
-                      busy
-                    }
-                  >
-                    {busy ? "Anlegen…" : "Projekt erstellen"}
+                    Wirklich löschen
                   </button>
                   <button
-                    className="wel-btn wel-btn--muted"
-                    onClick={() => {
-                      setCreating(false);
-                      setErr(null);
-                      setProjName("");
-                      setSheetName("");
-                      setBaseViewId(null);
-                    }}
+                    className="wel-btn wel-btn--muted wel-btn--sm"
+                    onClick={() => setConfirmingId(null)}
                     disabled={busy}
                   >
                     Abbrechen
                   </button>
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+              )}
 
-      {showSettings && selectedProject && projectInfo && (
-        <div className="wel-settings-panel">
-          <h2>Project Settings</h2>
-          <div className="wel-row">
-            <span className="wel-label">CAD DB Path:</span>
-            {projPathEdit ? (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                  gap: 8,
-                  maxWidth: 320,
-                }}
+              {err && <div className="wel-err">{err}</div>}
+            </div>
+
+            {/* Rechte Spalte: Open + Create */}
+            <div className="wel-actions">
+              <button
+                className="wel-btn wel-btn--primary"
+                onClick={() => selectedProject && openProject(selectedProject)}
+                disabled={!selectedProject || busy}
               >
-                <textarea
-                  className="wel-input"
-                  value={projPath}
-                  onChange={(e) => setProjPath(e.target.value)}
-                  disabled={projPathBusy}
-                  style={{
-                    width: 320,
-                    minHeight: 48,
-                    resize: "vertical",
-                    wordBreak: "break-all",
-                    whiteSpace: "pre-line",
-                  }}
-                />
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    className="wel-btn wel-btn--primary"
-                    onClick={updateProjPath}
-                    disabled={projPathBusy}
-                  >
-                    Save
-                  </button>
-                  <button
-                    className="wel-btn wel-btn--muted"
-                    onClick={() => setProjPathEdit(false)}
-                    disabled={projPathBusy}
-                  >
-                    Cancel
-                  </button>
-                </div>
-                {projPathMsg && <span className="wel-msg">{projPathMsg}</span>}
-              </div>
-            ) : (
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  flexWrap: "wrap",
-                  maxWidth: 320,
-                }}
+                Open Project
+              </button>
+
+              <button
+                className="wel-btn wel-btn--muted"
+                onClick={() => setShowSettings((v) => !v)}
+                disabled={!selectedProject || busy}
               >
-                <span
-                  style={{
-                    marginLeft: 8,
-                    wordBreak: "break-all",
-                    whiteSpace: "pre-line",
-                  }}
-                >
-                  {projectInfo.project_cad_db_path ? (
-                    projectInfo.project_cad_db_path
-                      .split(/(?=\\|\/)/g)
-                      .map((seg, i) => (
-                        <span key={i}>
-                          {seg}
-                          <br />
-                        </span>
-                      ))
-                  ) : (
-                    <i>Not set</i>
-                  )}
-                </span>
+                ⚙️ Project Settings
+              </button>
+
+              {!creating ? (
                 <button
                   className="wel-btn wel-btn--muted"
-                  onClick={() => setProjPathEdit(true)}
+                  onClick={() => setCreating(true)}
+                  disabled={busy}
                 >
-                  Edit
+                  ➕ Neues Projekt
                 </button>
-              </div>
-            )}
-          </div>
-          <h3>Views</h3>
-          <div className="wel-views">
-            {(projectInfo.views || [])
-              .filter((v) => v.base_view_id !== 2)
-              .map((v) => (
-                <div key={v.id} className="wel-row wel-view-row">
-                  <span className="wel-label">{v.name}</span>
+              ) : (
+                <div className="wel-create">
                   <input
                     className="wel-input"
-                    value={viewEdits[v.id] ?? ""}
-                    onChange={(e) =>
-                      setViewEdits((ed) => ({ ...ed, [v.id]: e.target.value }))
-                    }
-                    style={{ width: 180 }}
-                    disabled={viewBusy[v.id]}
+                    placeholder="Projektname"
+                    value={projName}
+                    onChange={(e) => setProjName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                    autoFocus
                   />
-                  <button
-                    className="wel-btn wel-btn--primary"
-                    onClick={() => updateViewDrawing(v.id)}
-                    disabled={viewBusy[v.id]}
+                  <input
+                    className="wel-input"
+                    placeholder="Erstes Sheet (Anzeige)"
+                    value={sheetName}
+                    onChange={(e) => setSheetName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                  />
+                  <select
+                    className="wel-input"
+                    value={baseViewId ?? ""}
+                    onChange={(e) =>
+                      setBaseViewId(
+                        e.target.value === "" ? null : Number(e.target.value)
+                      )
+                    }
                   >
-                    Set Drawing
-                  </button>
-                  <span className="wel-label" style={{ marginLeft: 12 }}>
-                    GUID:
-                  </span>
-                  <span style={{ fontFamily: "monospace", fontSize: 13 }}>
-                    {v.cad_drawing_guid || <i>Not set</i>}
-                  </span>
-                  {viewMsg[v.id] && (
-                    <span className="wel-msg">{viewMsg[v.id]}</span>
-                  )}
+                    <option value="" disabled>
+                      — Typ wählen —
+                    </option>
+                    {baseViews.map((bv) => (
+                      <option key={bv.id} value={bv.id}>
+                        {bv.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="wel-create-row">
+                    <button
+                      className="wel-btn wel-btn--primary"
+                      onClick={handleCreate}
+                      disabled={
+                        !projName.trim() ||
+                        !sheetName.trim() ||
+                        baseViewId == null ||
+                        busy
+                      }
+                    >
+                      {busy ? "Anlegen…" : "Projekt erstellen"}
+                    </button>
+                    <button
+                      className="wel-btn wel-btn--muted"
+                      onClick={() => {
+                        setCreating(false);
+                        setErr(null);
+                        setProjName("");
+                        setSheetName("");
+                        setBaseViewId(null);
+                      }}
+                      disabled={busy}
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
                 </div>
-              ))}
+              )}
+            </div>
           </div>
         </div>
-      )}
 
-      <div className="wel-brand">Visto&Listo</div>
+        {showSettings && selectedProject && projectInfo && (
+          <div className="wel-settings-panel">
+            <h2>Project Settings</h2>
+            <div className="wel-row">
+              <span className="wel-label">CAD DB Path:</span>
+              {projPathEdit ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    gap: 8,
+                    maxWidth: 320,
+                  }}
+                >
+                  <textarea
+                    className="wel-input"
+                    value={projPath}
+                    onChange={(e) => setProjPath(e.target.value)}
+                    disabled={projPathBusy}
+                    style={{
+                      width: 320,
+                      minHeight: 48,
+                      resize: "vertical",
+                      wordBreak: "break-all",
+                      whiteSpace: "pre-line",
+                    }}
+                  />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      className="wel-btn wel-btn--primary"
+                      onClick={updateProjPath}
+                      disabled={projPathBusy}
+                    >
+                      Save
+                    </button>
+                    <button
+                      className="wel-btn wel-btn--muted"
+                      onClick={() => setProjPathEdit(false)}
+                      disabled={projPathBusy}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {projPathMsg && <span className="wel-msg">{projPathMsg}</span>}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    maxWidth: 320,
+                  }}
+                >
+                  <span
+                    style={{
+                      marginLeft: 8,
+                      wordBreak: "break-all",
+                      whiteSpace: "pre-line",
+                    }}
+                  >
+                    {projectInfo.project_cad_db_path ? (
+                      projectInfo.project_cad_db_path
+                        .split(/(?=\\|\/)/g)
+                        .map((seg, i) => (
+                          <span key={i}>
+                            {seg}
+                            <br />
+                          </span>
+                        ))
+                    ) : (
+                      <i>Not set</i>
+                    )}
+                  </span>
+                  <button
+                    className="wel-btn wel-btn--muted"
+                    onClick={() => setProjPathEdit(true)}
+                  >
+                    Edit
+                  </button>
+                </div>
+              )}
+            </div>
+            <h3>Views</h3>
+            <div className="wel-views">
+              {(projectInfo.views || [])
+                .filter((v) => v.base_view_id !== 2)
+                .map((v) => (
+                  <div key={v.id} className="wel-row wel-view-row">
+                    <span className="wel-label">{v.name}</span>
+                    <input
+                      className="wel-input"
+                      value={viewEdits[v.id] ?? ""}
+                      onChange={(e) =>
+                        setViewEdits((ed) => ({ ...ed, [v.id]: e.target.value }))
+                      }
+                      style={{ width: 180 }}
+                      disabled={viewBusy[v.id]}
+                    />
+                    <button
+                      className="wel-btn wel-btn--primary"
+                      onClick={() => updateViewDrawing(v.id)}
+                      disabled={viewBusy[v.id]}
+                    >
+                      Set Drawing
+                    </button>
+                    <span className="wel-label" style={{ marginLeft: 12 }}>
+                      GUID:
+                    </span>
+                    <span style={{ fontFamily: "monospace", fontSize: 13 }}>
+                      {v.cad_drawing_guid || <i>Not set</i>}
+                    </span>
+                    {viewMsg[v.id] && (
+                      <span className="wel-msg">{viewMsg[v.id]}</span>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        <div className="wel-brand">Visto&Listo</div>
+      </div>
+
+      {/* Article Visualizer Button - fixed bottom left */}
+      <button
+        className="wel-btn wel-btn--primary"
+        style={{
+          position: "fixed",
+          left: 24,
+          bottom: 24,
+          zIndex: 1000,
+        }}
+        onClick={openArticleVisualizer}
+      >
+        Open Article Visualizer
+      </button>
     </div>
   );
 }

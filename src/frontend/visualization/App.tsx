@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, createRef } from "react";
+import React, { useRef, useState, useEffect, createRef } from "react";
 import { Rnd } from "react-rnd";
 import { HotTableClass } from "@handsontable/react";
 import type { HotStatus } from "./uiTableGrid/hotStatus";
@@ -45,6 +45,25 @@ const API_PREFIX = config.BACKEND_URL;
 const ENABLE_WELCOME_SCREEN = true;
 
 function App() {
+  useEffect(() => {
+    // Prevent browser zoom via Ctrl+Wheel and Ctrl+Plus/Minus/Zero
+    const preventZoom = (e: WheelEvent | KeyboardEvent) => {
+      if (
+        (e instanceof WheelEvent && e.ctrlKey) ||
+        (e instanceof KeyboardEvent && e.ctrlKey &&
+          (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0'))
+      ) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('wheel', preventZoom, { passive: false });
+    window.addEventListener('keydown', preventZoom, { passive: false });
+    return () => {
+      window.removeEventListener('wheel', preventZoom);
+      window.removeEventListener('keydown', preventZoom);
+    };
+  }, []);
+
   type SheetData = {
     headers: string[];
     data: (string | number)[][];

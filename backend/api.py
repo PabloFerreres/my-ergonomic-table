@@ -29,6 +29,7 @@ from backend.routes.views_routes import router as views_router
 from backend.routes.sync_to_cad_routes import router as sync_to_cad_router
 from backend.routes.header_colors import router as header_colors_router
 from backend.routes.columns_names_origin import router as columns_names_origin_router
+from backend.routes.articles_routes import router as articles_router
 
 router = APIRouter(prefix="/api")
 router.include_router(views_router)
@@ -46,6 +47,7 @@ router.include_router(export_excel_router)
 router.include_router(sync_to_cad_router)
 router.include_router(header_colors_router)
 router.include_router(columns_names_origin_router)
+router.include_router(articles_router)
 
 
 @router.post("/updatePosition")
