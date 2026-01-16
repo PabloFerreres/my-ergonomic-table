@@ -1,5 +1,6 @@
 {
   "DB_URL": "postgresql://myuser:1999@localhost:5432/CAD_prototype_2",
   "BACKEND_URL": "http://localhost:8000",
-  "FRONTEND_ORIGINS": ["http://localhost:5173", "http://127.0.0.1:5173"]
+  "FRONTEND_ORIGINS": ["http://localhost:5173", "http://127.0.0.1:5173"],
+  "ARTICLE_DOCUMENTATION_PATH": "C:\\Users\\ferreres\\Documents\\article_documentation"
 }

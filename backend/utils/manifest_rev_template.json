@@ -1,0 +1,25 @@
+{
+  "article_id": "X",
+  "revision": "Y",
+
+  "remove_prefix": [
+    ""
+  ],
+
+  "links": [
+    {
+      "name": "",
+      "url": ""
+    },
+
+    {
+      "name": "",
+      "url": ""
+    },
+
+    {
+      "name": "",
+      "url": ""
+    }
+  ]
+}

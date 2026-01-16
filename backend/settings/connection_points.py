@@ -12,6 +12,7 @@ config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
 DB_URL: str = config["DB_URL"]
 BACKEND_URL: str = config.get("BACKEND_URL", "")
+ARTICLE_DOCUMENTATION_PATH: str = config["ARTICLE_DOCUMENTATION_PATH"]
 # DEBUG aus ENV überschreibbar (default True wie bisher)
 DEBUG: bool = (os.getenv("DEBUG", "1") == "1")
 

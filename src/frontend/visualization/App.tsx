@@ -50,17 +50,18 @@ function App() {
     const preventZoom = (e: WheelEvent | KeyboardEvent) => {
       if (
         (e instanceof WheelEvent && e.ctrlKey) ||
-        (e instanceof KeyboardEvent && e.ctrlKey &&
-          (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0'))
+        (e instanceof KeyboardEvent &&
+          e.ctrlKey &&
+          (e.key === "+" || e.key === "-" || e.key === "=" || e.key === "0"))
       ) {
         e.preventDefault();
       }
     };
-    window.addEventListener('wheel', preventZoom, { passive: false });
-    window.addEventListener('keydown', preventZoom, { passive: false });
+    window.addEventListener("wheel", preventZoom, { passive: false });
+    window.addEventListener("keydown", preventZoom, { passive: false });
     return () => {
-      window.removeEventListener('wheel', preventZoom);
-      window.removeEventListener('keydown', preventZoom);
+      window.removeEventListener("wheel", preventZoom);
+      window.removeEventListener("keydown", preventZoom);
     };
   }, []);
 
@@ -583,9 +584,13 @@ function App() {
               }
               try {
                 // Fetch all views for the project
-                const views: { id: number; name: string; cad_drawing_guid?: string }[] = await fetch(
+                const views: {
+                  id: number;
+                  name: string;
+                  cad_drawing_guid?: string;
+                }[] = await fetch(
                   `${API_PREFIX}/api/views?project_id=${selectedProject.id}`
-                ).then(res => res.json());
+                ).then((res) => res.json());
                 // Filter views with a correct cad_drawing_guid (only sync those)
                 const validViews = views.filter(
                   (v) => v.cad_drawing_guid && v.cad_drawing_guid.length > 0
@@ -704,7 +709,6 @@ function App() {
 
           {/* Console Panel - replaced inline code with shared component */}
           <ConsolePanel logs={logs} />
-
         </div>
         {/* Sheet Tabs */}
         <div

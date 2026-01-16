@@ -283,7 +283,10 @@ export default function WelcomeScreen({
     : null;
 
   return (
-    <div className="wel-wrap" style={{ position: "relative", minHeight: "100vh" }}>
+    <div
+      className="wel-wrap"
+      style={{ position: "relative", minHeight: "100vh" }}
+    >
       <div className="wel-root">
         <h1 className="wel-title">Welcome!</h1>
 
@@ -483,7 +486,9 @@ export default function WelcomeScreen({
                       Cancel
                     </button>
                   </div>
-                  {projPathMsg && <span className="wel-msg">{projPathMsg}</span>}
+                  {projPathMsg && (
+                    <span className="wel-msg">{projPathMsg}</span>
+                  )}
                 </div>
               ) : (
                 <div
@@ -535,7 +540,10 @@ export default function WelcomeScreen({
                       className="wel-input"
                       value={viewEdits[v.id] ?? ""}
                       onChange={(e) =>
-                        setViewEdits((ed) => ({ ...ed, [v.id]: e.target.value }))
+                        setViewEdits((ed) => ({
+                          ...ed,
+                          [v.id]: e.target.value,
+                        }))
                       }
                       style={{ width: 180 }}
                       disabled={viewBusy[v.id]}
