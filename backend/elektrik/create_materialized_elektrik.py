@@ -70,7 +70,7 @@ def create_materialized_elektrik(project_id: int, debug: bool = False):
         # 3. Hole Layout-Spalten
         cursor.execute("""
             SELECT c.name, c.name_external_german, vc.position
-            FROM views_columns vc
+            FROM views_columns_auto vc
             JOIN columns c ON vc.column_id = c.id
             WHERE vc.base_view_id = %s AND vc.visible = TRUE
             ORDER BY vc.position

@@ -139,6 +139,147 @@ def write_to_postgres(
             execute_values(cur, sql, values, page_size=1000)
     conn.close()
 
+def add_missing_columns_from_excel(
+    xlsm_path: str,
+    sheet_name: str = "Headers Preview",
+    start_row: int = 2,
+    start_col: int = 1,
+    block_height: int = 5,
+    block_spacing: int = 3,
+    max_empty_blocks: int = 10,
+):
+    import psycopg2
+    wb = load_workbook(xlsm_path, data_only=True, keep_vba=True)
+    ws = wb[sheet_name]
+    step = block_height + block_spacing
+    r = start_row
+    conn = psycopg2.connect(DB_URL)
+    conn.autocommit = True
+    with conn:
+        with conn.cursor() as cur:
+            while True:
+                base_view_id_cell = ws.cell(row=r, column=start_col).value
+                if base_view_id_cell is None or str(base_view_id_cell).strip() == "":
+                    break
+                pos_row = r + 1
+                type_row = r + 3  # 4th row in block
+                id_row = r + 4
+                c = start_col
+                while True:
+                    col_id_val = ws.cell(row=id_row, column=c).value
+                    if col_id_val is None or str(col_id_val).strip() == "":
+                        break
+                    try:
+                        column_id = int(str(col_id_val))
+                    except Exception:
+                        c += 1
+                        continue
+                    type_val = ws.cell(row=type_row, column=c).value
+                    type_digit = None
+                    if type_val is not None and str(type_val).strip():
+                        type_digit = str(type_val).strip()[0]
+                    if type_digit and type_digit in "12345678":
+                        # Get column name from columns table
+                        cur.execute("SELECT name FROM columns WHERE id = %s", (column_id,))
+                        row = cur.fetchone()
+                        if not row:
+                            c += 1
+                            continue
+                        col_name = row[0]
+                        # Determine target tables
+                        targets = []
+                        if type_digit in "128":
+                            targets = ["articles", "article_drafts"]
+                        elif type_digit in "34567":
+                            targets = ["project_articles"]
+                        for table in targets:
+                            # Check if column exists
+                            cur.execute("""
+                                SELECT 1 FROM information_schema.columns
+                                WHERE table_name = %s AND column_name = %s
+                            """, (table, col_name))
+                            if not cur.fetchone():
+                                # Add column as varchar (default type)
+                                print(f"Adding column '{col_name}' to {table}")
+                                cur.execute(f'ALTER TABLE {table} ADD COLUMN "{col_name}" VARCHAR')
+                    c += 1
+                r += step
+    conn.close()
+
+def generate_column_style_map_json(output_path: str = r"c:\Users\ferreres\my-ergonomic-table\src\frontend\visualization\Formating\ColumnStyleMap.json"):
+    """
+    Generate a JSON file mapping column group (color class) to color and headers, based on DB data.
+    Structure matches ColumnStyleMap.json for frontend use.
+    If the file exists, it will be overwritten to ensure a clean update.
+    """
+    import psycopg2
+    import json
+    import os
+    # Remove the file if it exists to avoid merge/update issues
+    if os.path.exists(output_path):
+        os.remove(output_path)
+    conn = psycopg2.connect(DB_URL)
+    cur = conn.cursor()
+    try:
+        cur.execute('''
+            SELECT cg.color_name, cg.color, c.name_external_german
+            FROM columns c
+            LEFT JOIN column_groups cg ON c.column_group_id = cg.id
+            WHERE c.name_external_german IS NOT NULL AND cg.color_name IS NOT NULL
+        ''')
+        style_map = {}
+        for color_name, color, header in cur.fetchall():
+            if color_name not in style_map:
+                style_map[color_name] = {"color": color or "#f0f0f0", "headers": []}
+            style_map[color_name]["headers"].append(header)
+        # Add static entries for grid-header-rows and grid-inbetween-red (as in legacy)
+        style_map["grid-header-rows"] = {
+            "color": "#999999",
+            "headers": [],
+            "used_for": ["HEADER rows (Einbauort-Gruppen) Hintergrund"]
+        }
+        style_map["grid-inbetween-red"] = {
+            "color": "#FF0000",
+            "headers": [],
+            "used_for": ["In-between '**' Markierung / Trennhinweis"]
+        }
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(style_map, f, ensure_ascii=False, indent=2)
+        print(f"[INFO] Wrote column style map to {output_path}")
+    finally:
+        cur.close(); conn.close()
+
+def generate_views_columns_auto_json(output_path: str = r"c:\Users\ferreres\my-ergonomic-table\src\frontend\visualization\views_columns_auto.json"):
+    """
+    Generate a JSON file with the ordered, visible columns for each base_view_id from views_columns_auto.
+    Structure: { base_view_id: [ { column_id, position, visible, editable }, ... ] }
+    """
+    import psycopg2
+    import json
+    conn = psycopg2.connect(DB_URL)
+    cur = conn.cursor()
+    try:
+        cur.execute('''
+            SELECT base_view_id, column_id, visible, editable, position
+            FROM views_columns_auto
+            ORDER BY base_view_id, position
+        ''')
+        result = {}
+        for base_view_id, column_id, visible, editable, position in cur.fetchall():
+            if base_view_id not in result:
+                result[base_view_id] = []
+            result[base_view_id].append({
+                "column_id": column_id,
+                "visible": visible,
+                "editable": editable,
+                "position": position
+            })
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+        print(f"[INFO] Wrote views_columns_auto to {output_path}")
+    finally:
+        cur.close(); conn.close()
+
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Import Headers Preview -> views_columns_auto")
     p.add_argument(
@@ -166,6 +307,11 @@ def main() -> None:
         truncate_first=args.truncate,
     )
     print(f"Upserted {len(records)} rows into table '{args.table}' (id is SERIAL4 in DB).")
+    # Add missing columns to target tables
+    add_missing_columns_from_excel(args.xlsm, sheet_name=args.sheet)
+    # Generate the up-to-date ColumnStyleMap JSON
+    generate_column_style_map_json()
+    # No longer generate views_columns_auto JSON for frontend
 
 if __name__ == "__main__":
     main()

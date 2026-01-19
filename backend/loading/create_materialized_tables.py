@@ -71,7 +71,7 @@ def create_materialized_table(project_id: int, view_id, base_view_id):
     # 1. Fetch visible layout columns
     cursor.execute("""
         SELECT c.name, c.name_external_german, vc.position
-        FROM views_columns vc
+        FROM views_columns_auto vc
         JOIN columns c ON vc.column_id = c.id
         WHERE vc.base_view_id = %s
         AND vc.visible = TRUE

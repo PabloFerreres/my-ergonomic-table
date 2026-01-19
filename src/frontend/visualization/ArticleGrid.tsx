@@ -1,8 +1,9 @@
-import React, { useMemo, useRef } from "react";
+import React, { useMemo } from "react";
 import { HotTable } from "@handsontable/react";
 import "handsontable/dist/handsontable.full.min.css";
 import { registerAllModules } from "handsontable/registry";
 import Handsontable from "handsontable";
+import { GetColumnTraits } from "./Formating/ColumnTraits";
 registerAllModules();
 
 interface ArticleGridProps {
@@ -53,21 +54,24 @@ function stripedRenderer(
 }
 
 const ArticleGrid: React.FC<ArticleGridProps> = ({ data, colHeaders }) => {
-  // Use real data from props
-  const gridData = data;
-  const gridHeaders = colHeaders;
-  const colWidths = useMemo(
-    () => getColumnWidths(gridData, gridHeaders),
-    [gridData, gridHeaders]
-  );
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const hotRef = useRef<any>(null);
+  const colWidths = useMemo(() => getColumnWidths(data, colHeaders), [data, colHeaders]);
+
+  // Build column definitions with color classes
+  const columns = useMemo(() => {
+    return colHeaders.map((header) => {
+      const traits = GetColumnTraits(header);
+      return {
+        renderer: stripedRenderer,
+        className: traits.colorName ? traits.colorName : "",
+      };
+    });
+  }, [colHeaders]);
+
   return (
     <div style={{ height: "100%", width: "calc(100%)" }}>
       <HotTable
-        ref={hotRef}
-        data={gridData}
-        colHeaders={gridHeaders.length > 0 ? gridHeaders : true}
+        data={data}
+        colHeaders={colHeaders}
         colWidths={colWidths}
         rowHeights={ROW_HEIGHT}
         rowHeaders={true}
@@ -88,7 +92,7 @@ const ArticleGrid: React.FC<ArticleGridProps> = ({ data, colHeaders }) => {
         filters={true}
         dropdownMenu={true}
         className="article-grid"
-        columns={gridHeaders.map(() => ({ renderer: stripedRenderer }))}
+        columns={columns}
       />
       <style>{`
         .article-grid .htCore th {
