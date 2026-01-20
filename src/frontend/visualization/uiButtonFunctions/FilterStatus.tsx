@@ -13,10 +13,8 @@ const SquareFilter: React.FC<FilterStatusProps> = ({
   return (
     <SquareContainer
       width="150px"
-      backgroundColor={
-        isFilterActive ? "rgb(255, 109, 109)" : "rgb(168, 252, 168)"
-      }
-      textColor={isFilterActive ? "     #990000" : " #006600"}
+      backgroundColor={isFilterActive ? "rgb(255, 109, 109)" : "rgb(168, 252, 168)"}
+      textColor={isFilterActive ? "#990000" : "#006600"}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <span style={{ fontSize: "18px" }}>{isFilterActive ? "⚠️" : "✅"}</span>

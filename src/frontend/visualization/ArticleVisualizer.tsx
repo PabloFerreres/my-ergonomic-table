@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Zoom from "./uiButtonFunctions/Zoom";
 import ArticleGrid from "./ArticleGrid";
 import config from "../../../config.json";
@@ -6,6 +6,7 @@ import "./ArticleVisualizer.custom.css";
 import SquareQuickFilter from "./uiSquares/SquareQuickFilter";
 import SquareFilter from "./uiButtonFunctions/FilterStatus";
 import SquareSearch from "./uiSquares/SquareSearch";
+import type { ArticleGridHandle } from "./ArticleGrid";
 
 const API_PREFIX = config.BACKEND_URL || "";
 const ZOOM_CONTAINER_WIDTH = "90vw"; // Easily adjustable width
@@ -22,33 +23,61 @@ const ArticleVisualizer: React.FC = () => {
   const [searchMatchIndex, setSearchMatchIndex] = useState(0);
   const [searchMatchCount, setSearchMatchCount] = useState(0);
 
-  // Dummy handlers for now
+  // Track which column to quick filter and the quick filter input value
+  const [quickFilterCol, setQuickFilterCol] = useState<number>(0);
+  const [quickFilterInput, setQuickFilterInput] = useState<string>("");
+
+  const articleGridRef = useRef<ArticleGridHandle>(null);
+
   const handleQuickFilterApply = (query: string, exact: boolean) => {
-    setQuickFilter(query);
-    setIsFilterActive(!!query);
-    // TODO: filter ArticleGrid data
+    setQuickFilterInput(query);
+    setQuickFilter(query); // For legacy prop, but not used for actual filtering
+    if (articleGridRef.current) {
+      articleGridRef.current.applyQuickFilter(quickFilterCol, query, exact);
+    }
   };
   const handleQuickFilterClear = () => {
+    setQuickFilterInput("");
     setQuickFilter("");
-    setIsFilterActive(false);
-    // TODO: reset ArticleGrid filter
+    if (articleGridRef.current) {
+      articleGridRef.current.clearQuickFilter(quickFilterCol);
+    }
   };
   const handleResetFilters = () => {
     setQuickFilter("");
-    setIsFilterActive(false);
-    // TODO: reset ArticleGrid filter
+    if (articleGridRef.current) {
+      for (let col = 0; col < headers.length; col++) {
+        articleGridRef.current.clearQuickFilter(col);
+      }
+      // isFilterActive will be set by onStatusChange
+    }
   };
   const handleSearch = (query: string, exact: boolean) => {
     setSearchQuery(query);
-    // TODO: search ArticleGrid data
+    if (articleGridRef.current) {
+      articleGridRef.current.search(query, exact);
+    }
     setSearchMatchIndex(0);
-    setSearchMatchCount(0);
+    setSearchMatchCount(0); // TODO: update with real match count
   };
   const handleSearchNext = () => {
+    if (articleGridRef.current) articleGridRef.current.goNext();
     setSearchMatchIndex((i) => Math.min(i + 1, searchMatchCount - 1));
   };
   const handleSearchPrev = () => {
+    if (articleGridRef.current) articleGridRef.current.goPrev();
     setSearchMatchIndex((i) => Math.max(i - 1, 0));
+  };
+
+  const handleQuickFilterFocus = (col: number) => {
+    setQuickFilterCol(col);
+    setQuickFilterInput(""); // Clear input for new column
+    // Focus the input after a short delay to ensure UI is ready
+    setTimeout(() => {
+      const input = document.querySelector<HTMLInputElement>("input[placeholder='Wert eingeben…']");
+      input?.focus();
+      input?.select();
+    }, 100);
   };
 
   useEffect(() => {
@@ -112,9 +141,11 @@ const ArticleVisualizer: React.FC = () => {
             onResetFilters={handleResetFilters}
           />
           <SquareQuickFilter
-            header={headers[0]}
+            header={headers[quickFilterCol]}
             onApply={handleQuickFilterApply}
             onClear={handleQuickFilterClear}
+            value={quickFilterInput}
+            setValue={setQuickFilterInput}
           />
           <SquareSearch
             onSearch={handleSearch}
@@ -206,10 +237,13 @@ const ArticleVisualizer: React.FC = () => {
                   }}
                 >
                   <ArticleGrid
+                    ref={articleGridRef}
                     data={data}
                     colHeaders={headers}
                     quickFilter={quickFilter}
                     searchQuery={searchQuery}
+                    onStatusChange={({ isFiltered }) => setIsFilterActive(isFiltered)}
+                    onQuickFilterFocus={handleQuickFilterFocus}
                   />
                 </div>
               </div>

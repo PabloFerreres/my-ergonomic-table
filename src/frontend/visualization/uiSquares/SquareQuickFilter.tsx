@@ -10,17 +10,17 @@ interface Props {
   header: string | undefined;
   onApply: (query: string, exact: boolean) => void;
   onClear: () => void;
+  value: string;
+  setValue: (v: string) => void;
 }
 
 const SquareQuickFilter = forwardRef<QuickFilterHandle, Props>(
-  ({ header, onApply, onClear }, ref) => {
+  ({ header, onApply, onClear, value, setValue }, ref) => {
     const inputRef = useRef<HTMLInputElement>(null);
-    const [query, setQuery] = useState("");
     const [exact, setExact] = useState(false);
 
     useImperativeHandle(ref, () => ({
       focusInput: () => {
-        // Optional: bisherigen Text selektieren
         inputRef.current?.focus();
         inputRef.current?.select();
       },
@@ -29,10 +29,10 @@ const SquareQuickFilter = forwardRef<QuickFilterHandle, Props>(
     const handleKeyDown = (e: React.KeyboardEvent) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        onApply(query, exact);
+        onApply(value, exact);
       } else if (e.key === "Escape") {
         e.preventDefault();
-        setQuery("");
+        setValue("");
         onClear();
       }
     };
@@ -45,8 +45,8 @@ const SquareQuickFilter = forwardRef<QuickFilterHandle, Props>(
         <div style={{ display: "flex", gap: 6, width: "100%" }}>
           <input
             ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Wert eingeben…"
             style={{
@@ -69,12 +69,12 @@ const SquareQuickFilter = forwardRef<QuickFilterHandle, Props>(
           </label>
         </div>
         <div style={{ marginTop: 6, display: "flex", gap: 6 }}>
-          <MSquareButton onClick={() => onApply(query, exact)}>
+          <MSquareButton onClick={() => onApply(value, exact)}>
             Anwenden
           </MSquareButton>
           <MSquareButton
             onClick={() => {
-              setQuery("");
+              setValue("");
               onClear();
             }}
           >

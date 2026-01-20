@@ -1,0 +1,14 @@
+QuickFilter Debug Log
+====================
+
+This file will log each call to applyQuickFilter in ArticleGrid.tsx.
+
+Format:
+---
+Column: <col>
+Query: <query>
+Exact: <exact>
+Operator: <op>
+Sample Data: <first 10 values in column>
+---
+
