@@ -10,6 +10,8 @@ registerAllModules();
 interface ArticleGridProps {
   data: (string | number)[][];
   colHeaders: string[];
+  quickFilter?: string;
+  searchQuery?: string;
 }
 
 const MAX_COL_WIDTH = 70;
@@ -64,7 +66,28 @@ Object.entries(ColumnStyleMap).forEach(([className, obj]) => {
   }
 });
 
-const ArticleGrid: React.FC<ArticleGridProps> = ({ data, colHeaders }) => {
+const ArticleGrid: React.FC<ArticleGridProps & {
+  quickFilter?: string;
+  searchQuery?: string;
+}> = ({ data, colHeaders, quickFilter, searchQuery }) => {
+  // Filtering logic
+  const filteredData = useMemo(() => {
+    let result = data;
+    if (quickFilter && quickFilter.trim() !== "") {
+      const q = quickFilter.toLowerCase();
+      result = result.filter((row) =>
+        row.some((cell) => (cell + "").toLowerCase().includes(q))
+      );
+    }
+    if (searchQuery && searchQuery.trim() !== "") {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((row) =>
+        row.some((cell) => (cell + "").toLowerCase().includes(q))
+      );
+    }
+    return result;
+  }, [data, quickFilter, searchQuery]);
+
   const colWidths = useMemo(
     () => getColumnWidths(data, colHeaders),
     [data, colHeaders]
@@ -93,7 +116,7 @@ const ArticleGrid: React.FC<ArticleGridProps> = ({ data, colHeaders }) => {
   return (
     <div style={{ height: "100%", width: "calc(100%)" }}>
       <HotTable
-        data={data}
+        data={filteredData}
         colHeaders={colHeaders}
         colWidths={colWidths}
         rowHeights={ROW_HEIGHT}
