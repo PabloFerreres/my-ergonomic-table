@@ -3,7 +3,7 @@ import { HotTable } from "@handsontable/react";
 import "handsontable/dist/handsontable.full.min.css";
 import { registerAllModules } from "handsontable/registry";
 import Handsontable from "handsontable";
-import { GetColumnTraits } from "./Formating/ColumnTraits";
+import ColumnStyleMap from "./Formating/ColumnStyleMap.json";
 registerAllModules();
 
 interface ArticleGridProps {
@@ -53,19 +53,41 @@ function stripedRenderer(
   td.style.borderColor = "#bbb";
 }
 
+// Move headerToColorClass outside the component to avoid React hook warning
+const headerToColorClass: Record<string, string> = {};
+Object.entries(ColumnStyleMap).forEach(([className, obj]) => {
+  if (obj.headers) {
+    obj.headers.forEach((header: string) => {
+      headerToColorClass[header] = className;
+    });
+  }
+});
+
 const ArticleGrid: React.FC<ArticleGridProps> = ({ data, colHeaders }) => {
-  const colWidths = useMemo(() => getColumnWidths(data, colHeaders), [data, colHeaders]);
+  const colWidths = useMemo(
+    () => getColumnWidths(data, colHeaders),
+    [data, colHeaders]
+  );
 
   // Build column definitions with color classes
   const columns = useMemo(() => {
     return colHeaders.map((header) => {
-      const traits = GetColumnTraits(header);
       return {
         renderer: stripedRenderer,
-        className: traits.colorName ? traits.colorName : "",
+        className: '', // No color class for data cells
+        headerClassName: headerToColorClass[header] || '', // Use color class for header only
       };
     });
   }, [colHeaders]);
+
+  // Add header color styling
+  const headerColorStyles = Object.entries(ColumnStyleMap)
+    .map(([className, obj]) =>
+      obj.color
+        ? `.article-grid .${className} { background-color: ${obj.color} !important; }`
+        : ""
+    )
+    .join("\n");
 
   return (
     <div style={{ height: "100%", width: "calc(100%)" }}>
@@ -97,10 +119,12 @@ const ArticleGrid: React.FC<ArticleGridProps> = ({ data, colHeaders }) => {
       <style>{`
         .article-grid .htCore th {
           color: #222 !important;
+          font-weight: bold !important;
         }
         .article-grid .htCore td, .article-grid .htCore th {
           border-color: #bbb !important;
         }
+        ${headerColorStyles}
       `}</style>
     </div>
   );
