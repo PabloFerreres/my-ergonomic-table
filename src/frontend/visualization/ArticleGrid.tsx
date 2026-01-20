@@ -125,7 +125,9 @@ const ArticleGrid: React.FC<ArticleGridProps> = ({ data, colHeaders }) => {
         columns={columns}
         afterGetColHeader={(_col, TH) => {
           // Only change filter button style/position, not the rest
-          const button = TH.querySelector("button.changeType") as HTMLButtonElement;
+          const button = TH.querySelector(
+            "button.changeType"
+          ) as HTMLButtonElement;
           if (button) {
             button.style.position = "absolute";
             button.style.right = "1px";
@@ -152,22 +154,22 @@ const ArticleGrid: React.FC<ArticleGridProps> = ({ data, colHeaders }) => {
             button.onmouseleave = () => (button.style.opacity = "0.5");
           }
           // Make header double rowed
-          const headerLabel = TH.querySelector('.colHeader') as HTMLElement;
+          const headerLabel = TH.querySelector(".colHeader") as HTMLElement;
           if (headerLabel) {
-            headerLabel.style.whiteSpace = 'normal';
-            headerLabel.style.wordBreak = 'break-word';
-            headerLabel.style.display = 'block';
-            headerLabel.style.lineHeight = '1.2';
-            headerLabel.style.height = '2.4em'; // always reserve space for 2 lines
-            headerLabel.style.maxHeight = '2.4em';
-            headerLabel.style.overflow = 'hidden';
+            headerLabel.style.whiteSpace = "normal";
+            headerLabel.style.wordBreak = "break-word";
+            headerLabel.style.display = "block";
+            headerLabel.style.lineHeight = "1.2";
+            headerLabel.style.height = "2.4em"; // always reserve space for 2 lines
+            headerLabel.style.maxHeight = "2.4em";
+            headerLabel.style.overflow = "hidden";
             // Ensure header background color fills the whole cell
-            TH.style.backgroundClip = 'padding-box';
-            TH.style.backgroundColor = TH.style.backgroundColor || '#f0f0f0';
-            TH.style.paddingTop = '0px'; // Remove extra padding
-            TH.style.paddingBottom = '0px';
-            TH.style.height = '2.4em'; // always fill header cell, exactly 2 lines
-            TH.style.minHeight = '2.4em';
+            TH.style.backgroundClip = "padding-box";
+            TH.style.backgroundColor = TH.style.backgroundColor || "#f0f0f0";
+            TH.style.paddingTop = "0px"; // Remove extra padding
+            TH.style.paddingBottom = "0px";
+            TH.style.height = "2.4em"; // always fill header cell, exactly 2 lines
+            TH.style.minHeight = "2.4em";
           }
         }}
       />

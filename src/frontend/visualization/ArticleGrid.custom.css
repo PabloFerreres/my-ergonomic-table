@@ -23,24 +23,3 @@
 .article-grid .htFilters .htDropdownMenu:hover {
   opacity: 0.8 !important;
 }
-
-/* Responsive height for Handsontable filter context menu based on browser window size */
-.htMenu.htDropdownMenu {
-  max-height: 600px !important; /* max when window is large */
-  min-height: 180px !important; /* never smaller than this */
-  height: calc(max(30vh, min(600px, 40vh))) !important; /* responsive: 40% of viewport, capped */
-  overflow-y: auto !important;
-}
-
-@media (max-height: 900px) {
-  .htMenu.htDropdownMenu {
-    max-height: 320px !important;
-    height: calc(max(18vh, min(320px, 40vh))) !important;
-  }
-}
-@media (max-height: 600px) {
-  .htMenu.htDropdownMenu {
-    max-height: 200px !important;
-    height: calc(max(18vh, min(200px, 40vh))) !important;
-  }
-}
