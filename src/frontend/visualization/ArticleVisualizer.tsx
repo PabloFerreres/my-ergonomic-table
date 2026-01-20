@@ -56,17 +56,49 @@ const ArticleVisualizer: React.FC = () => {
     setSearchQuery(query);
     if (articleGridRef.current) {
       articleGridRef.current.search(query, exact);
+      // After search, update match count and reset index to 0
+      const matches = articleGridRef.current.matchesRef?.current || [];
+      setSearchMatchIndex(matches.length > 0 ? 0 : 0);
+      setSearchMatchCount(matches.length);
+    } else {
+      setSearchMatchIndex(0);
+      setSearchMatchCount(0);
     }
-    setSearchMatchIndex(0);
-    setSearchMatchCount(0); // TODO: update with real match count
   };
   const handleSearchNext = () => {
-    if (articleGridRef.current) articleGridRef.current.goNext();
-    setSearchMatchIndex((i) => Math.min(i + 1, searchMatchCount - 1));
+    if (articleGridRef.current) {
+      // Always compute the next index based on the current match index
+      const matches = articleGridRef.current.matchesRef?.current || [];
+      if (matches.length === 0) return;
+      const nextIndex = (searchMatchIndex + 1) % matches.length;
+      setSearchMatchIndex(nextIndex);
+      // Select the next match
+      const [r, c] = matches[nextIndex];
+      const hot = articleGridRef.current?.hotRef?.current?.hotInstance;
+      if (hot) {
+        const visualRow = hot.toVisualRow ? hot.toVisualRow(r) : r;
+        hot.selectCell(visualRow, c);
+      } else {
+        articleGridRef.current.goNext();
+      }
+    }
   };
   const handleSearchPrev = () => {
-    if (articleGridRef.current) articleGridRef.current.goPrev();
-    setSearchMatchIndex((i) => Math.max(i - 1, 0));
+    if (articleGridRef.current) {
+      const matches = articleGridRef.current.matchesRef?.current || [];
+      if (matches.length === 0) return;
+      const prevIndex = (searchMatchIndex - 1 + matches.length) % matches.length;
+      setSearchMatchIndex(prevIndex);
+      // Select the previous match
+      const [r, c] = matches[prevIndex];
+      const hot = articleGridRef.current?.hotRef?.current?.hotInstance;
+      if (hot) {
+        const visualRow = hot.toVisualRow ? hot.toVisualRow(r) : r;
+        hot.selectCell(visualRow, c);
+      } else {
+        articleGridRef.current.goPrev();
+      }
+    }
   };
 
   const handleQuickFilterFocus = (col: number) => {

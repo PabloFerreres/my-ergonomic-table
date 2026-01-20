@@ -10,14 +10,18 @@ interface Props {
   header: string | undefined;
   onApply: (query: string, exact: boolean) => void;
   onClear: () => void;
-  value: string;
-  setValue: (v: string) => void;
+  value?: string; // now optional
+  setValue?: (v: string) => void; // now optional
 }
 
 const SquareQuickFilter = forwardRef<QuickFilterHandle, Props>(
   ({ header, onApply, onClear, value, setValue }, ref) => {
     const inputRef = useRef<HTMLInputElement>(null);
+    const [internalValue, setInternalValue] = useState("");
     const [exact, setExact] = useState(false);
+    const isControlled = value !== undefined && setValue !== undefined;
+    const inputValue = isControlled ? value : internalValue;
+    const setInputValue = isControlled ? setValue! : setInternalValue;
 
     useImperativeHandle(ref, () => ({
       focusInput: () => {
@@ -29,10 +33,10 @@ const SquareQuickFilter = forwardRef<QuickFilterHandle, Props>(
     const handleKeyDown = (e: React.KeyboardEvent) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        onApply(value, exact);
+        onApply(inputValue, exact);
       } else if (e.key === "Escape") {
         e.preventDefault();
-        setValue("");
+        setInputValue("");
         onClear();
       }
     };
@@ -45,8 +49,8 @@ const SquareQuickFilter = forwardRef<QuickFilterHandle, Props>(
         <div style={{ display: "flex", gap: 6, width: "100%" }}>
           <input
             ref={inputRef}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Wert eingeben…"
             style={{
@@ -69,12 +73,12 @@ const SquareQuickFilter = forwardRef<QuickFilterHandle, Props>(
           </label>
         </div>
         <div style={{ marginTop: 6, display: "flex", gap: 6 }}>
-          <MSquareButton onClick={() => onApply(value, exact)}>
+          <MSquareButton onClick={() => onApply(inputValue, exact)}>
             Anwenden
           </MSquareButton>
           <MSquareButton
             onClick={() => {
-              setValue("");
+              setInputValue("");
               onClear();
             }}
           >

@@ -1,4 +1,4 @@
-import React, { useMemo, useImperativeHandle, useRef, forwardRef } from "react";
+import React, { useMemo, useImperativeHandle, useRef, forwardRef, useState } from "react";
 import { HotTable, HotTableClass } from "@handsontable/react";
 import "handsontable/dist/handsontable.full.min.css";
 import { registerAllModules } from "handsontable/registry";
@@ -79,6 +79,9 @@ Object.entries(ColumnStyleMap).forEach(([className, obj]) => {
 const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
   ({ data, colHeaders, onStatusChange, onQuickFilterFocus }, ref) => {
     const hotRef = useRef<HotTableClass | null>(null);
+    // Search state for matches
+    const matchesRef = useRef<[number, number][]>([]);
+    const [matchIndex, setMatchIndex] = useState<number>(0);
 
     const colWidths = useMemo(
       () => getColumnWidths(data, colHeaders),
@@ -140,9 +143,52 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
         filters.filter();
         emitStatus();
       },
-      search: () => {},
-      goNext: () => {},
-      goPrev: () => {},
+      search: (query, exact) => {
+        const hot = hotRef.current?.hotInstance as Handsontable | undefined;
+        if (!hot) return;
+        matchesRef.current = [];
+        const q = query.toLowerCase();
+        hot.getData().forEach((row, rowIndex) => {
+          row.forEach((cell: string | number, colIndex: number) => {
+            const value = String(cell ?? "").toLowerCase();
+            const match = exact ? value === q : value.includes(q);
+            if (match) {
+              matchesRef.current.push([rowIndex, colIndex]);
+            }
+          });
+        });
+        if (matchesRef.current.length > 0) {
+          setMatchIndex(0);
+          const [r, c] = matchesRef.current[0];
+          const visualRow = hot.toVisualRow(r);
+          hot.selectCell(visualRow, c);
+        } else {
+          setMatchIndex(0);
+          alert("🔍 Kein Treffer gefunden");
+        }
+      },
+      goNext: () => {
+        const hot = hotRef.current?.hotInstance as Handsontable | undefined;
+        if (!hot || matchesRef.current.length === 0) return;
+        setMatchIndex((prev) => {
+          const next = (prev + 1) % matchesRef.current.length;
+          const [r, c] = matchesRef.current[next];
+          const visualRow = hot.toVisualRow(r);
+          hot.selectCell(visualRow, c);
+          return next;
+        });
+      },
+      goPrev: () => {
+        const hot = hotRef.current?.hotInstance as Handsontable | undefined;
+        if (!hot || matchesRef.current.length === 0) return;
+        setMatchIndex((prev) => {
+          const next = (prev - 1 + matchesRef.current.length) % matchesRef.current.length;
+          const [r, c] = matchesRef.current[next];
+          const visualRow = hot.toVisualRow(r);
+          hot.selectCell(visualRow, c);
+          return next;
+        });
+      },
       getFilterStatus: () => {
         const hot = hotRef.current?.hotInstance as Handsontable | undefined;
         if (!hot) return false;
@@ -152,6 +198,10 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
           return (filters as unknown as { _conditions: unknown[] })._conditions.some((c) => Array.isArray(c) && c.length > 0);
         }
         return false;
+      },
+      // Expose matchesRef for parent (search bar) to read match count
+      get matchesRef() {
+        return matchesRef;
       },
     }));
 
