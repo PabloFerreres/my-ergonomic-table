@@ -4,6 +4,7 @@ import "handsontable/dist/handsontable.full.min.css";
 import { registerAllModules } from "handsontable/registry";
 import Handsontable from "handsontable";
 import ColumnStyleMap from "./Formating/ColumnStyleMap.json";
+import "./ArticleGrid.custom.css";
 registerAllModules();
 
 interface ArticleGridProps {
@@ -74,8 +75,8 @@ const ArticleGrid: React.FC<ArticleGridProps> = ({ data, colHeaders }) => {
     return colHeaders.map((header) => {
       return {
         renderer: stripedRenderer,
-        className: '', // No color class for data cells
-        headerClassName: headerToColorClass[header] || '', // Use color class for header only
+        className: "", // No color class for data cells
+        headerClassName: headerToColorClass[header] || "", // Use color class for header only
       };
     });
   }, [colHeaders]);
@@ -112,9 +113,63 @@ const ArticleGrid: React.FC<ArticleGridProps> = ({ data, colHeaders }) => {
         fixedColumnsLeft={1}
         columnSorting={true}
         filters={true}
-        dropdownMenu={true}
+        dropdownMenu={{
+          items: [
+            "filter_by_condition",
+            "filter_operators",
+            "filter_by_value",
+            "filter_action_bar",
+          ],
+        }}
         className="article-grid"
         columns={columns}
+        afterGetColHeader={(_col, TH) => {
+          // Only change filter button style/position, not the rest
+          const button = TH.querySelector("button.changeType") as HTMLButtonElement;
+          if (button) {
+            button.style.position = "absolute";
+            button.style.right = "1px";
+            button.style.bottom = "0px";
+            button.style.top = "auto";
+            button.style.left = "auto";
+            button.style.width = "28px";
+            button.style.height = "18px";
+            button.style.padding = "2px 4px 2px 2px";
+            button.style.margin = "0";
+            button.style.fontSize = "11px";
+            button.style.fontWeight = "normal";
+            button.style.background = "#eaeaea";
+            button.style.border = "1px solid #ccc";
+            button.style.borderRadius = "6px";
+            button.style.zIndex = "9999";
+            button.style.pointerEvents = "auto";
+            button.style.display = "inline-flex";
+            button.style.alignItems = "center";
+            button.style.verticalAlign = "middle";
+            button.style.opacity = "0.5";
+            // On hover, increase opacity
+            button.onmouseenter = () => (button.style.opacity = "0.8");
+            button.onmouseleave = () => (button.style.opacity = "0.5");
+          }
+          // Make header double rowed
+          const headerLabel = TH.querySelector('.colHeader') as HTMLElement;
+          if (headerLabel) {
+            headerLabel.style.whiteSpace = 'normal';
+            headerLabel.style.wordBreak = 'break-word';
+            headerLabel.style.display = 'block';
+            headerLabel.style.lineHeight = '1.2';
+            headerLabel.style.height = '2.4em'; // always reserve space for 2 lines
+            headerLabel.style.maxHeight = '2.4em';
+            headerLabel.style.overflow = 'hidden';
+            // Ensure header background color fills the whole cell
+            TH.style.backgroundClip = 'padding-box';
+            TH.style.backgroundColor = TH.style.backgroundColor || '#f0f0f0';
+            TH.style.paddingTop = '0px'; // Remove extra padding
+            TH.style.paddingBottom = '0px';
+            TH.style.height = '2.4em'; // always fill header cell, exactly 2 lines
+            TH.style.minHeight = '2.4em';
+          }
+        }}
       />
       <style>{`
         .article-grid .htCore th {

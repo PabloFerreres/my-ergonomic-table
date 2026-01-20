@@ -1,0 +1,46 @@
+/* Overlay filter button in Handsontable header, keep it visible and semi-transparent */
+.article-grid .htFilters {
+  z-index: 10 !important;
+  opacity: 0.5 !important;
+  pointer-events: auto !important;
+}
+
+/* Ensure filter button is above header text */
+.article-grid .htFilters .changeType,
+.article-grid .htFilters .htUISelect,
+.article-grid .htFilters .htUIButton,
+.article-grid .htFilters .htDropdownMenu {
+  z-index: 11 !important;
+  opacity: 0.5 !important;
+  pointer-events: auto !important;
+}
+
+/* On hover, increase opacity for usability */
+.article-grid .htFilters:hover,
+.article-grid .htFilters .changeType:hover,
+.article-grid .htFilters .htUISelect:hover,
+.article-grid .htFilters .htUIButton:hover,
+.article-grid .htFilters .htDropdownMenu:hover {
+  opacity: 0.8 !important;
+}
+
+/* Responsive height for Handsontable filter context menu based on browser window size */
+.htMenu.htDropdownMenu {
+  max-height: 600px !important; /* max when window is large */
+  min-height: 180px !important; /* never smaller than this */
+  height: calc(max(30vh, min(600px, 40vh))) !important; /* responsive: 40% of viewport, capped */
+  overflow-y: auto !important;
+}
+
+@media (max-height: 900px) {
+  .htMenu.htDropdownMenu {
+    max-height: 320px !important;
+    height: calc(max(18vh, min(320px, 40vh))) !important;
+  }
+}
+@media (max-height: 600px) {
+  .htMenu.htDropdownMenu {
+    max-height: 200px !important;
+    height: calc(max(18vh, min(200px, 40vh))) !important;
+  }
+}

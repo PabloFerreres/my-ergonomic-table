@@ -10,7 +10,7 @@ const ZOOM_CONTAINER_WIDTH = "90vw"; // Easily adjustable width
 const ArticleVisualizer: React.FC = () => {
   const [headers, setHeaders] = useState<string[]>([]);
   const [data, setData] = useState<(string | number)[][]>([]);
-  const [activeTable, setActiveTable] = useState<5 | 6>(5);
+  const [activeTable, setActiveTable] = useState<5 | 6>(6); // Default to articles (6)
 
   useEffect(() => {
     // Block only the main window scrollbars, not the grid's
@@ -43,7 +43,25 @@ const ArticleVisualizer: React.FC = () => {
       {/* Top bar placeholder for spacing, simulating App's top controls */}
       <div style={{ height: 56, minHeight: 56 }} />
       <div style={{ position: "relative", width: "100%", height: "100%" }}>
-        <div className="articlevisualizer-filter-buttons">
+        {/* Sheet buttons absolutely positioned relative to the grid container, just above the blue box */}
+        <div
+          className="articlevisualizer-filter-buttons"
+          style={{
+            position: "absolute",
+            left: "calc(10vw + 0px)", // aligns with blue container's left
+            top: "calc(50% - 40vh - 40px)", // 40px above blue box (adjust as needed)
+            zIndex: 200,
+            display: "flex",
+            gap: 8,
+            background: "#f6f6f6",
+            padding: "4px 0",
+            borderRadius: 6,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+            width: "auto",
+            justifyContent: "flex-start",
+            alignItems: "flex-end",
+          }}
+        >
           <button
             onClick={() => setActiveTable(5)}
             style={{
@@ -80,11 +98,11 @@ const ArticleVisualizer: React.FC = () => {
               <div
                 style={{
                   position: "absolute",
-                  right: "10px", // 5px buffer from right edge
+                  right: "10px",
                   top: "50%",
                   transform: "translateY(-50%)",
-                  width: ZOOM_CONTAINER_WIDTH, // Use the parameter here
-                  height: "80vh", // adjust as needed
+                  width: ZOOM_CONTAINER_WIDTH,
+                  height: "80vh",
                   background: "#e0e0ff",
                   border: "2px solid #6a6aff",
                   boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
@@ -110,8 +128,8 @@ const ArticleVisualizer: React.FC = () => {
               <div
                 style={{
                   position: "absolute",
-                  right: "10px", // 5px buffer from right edge
-                  top: `calc(50% + 40vh)`, // below the zoom box
+                  right: "10px",
+                  top: `calc(50% + 40vh)`,
                   width: ZOOM_CONTAINER_WIDTH,
                   display: "flex",
                   justifyContent: "flex-end",
