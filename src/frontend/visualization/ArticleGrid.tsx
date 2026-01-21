@@ -18,6 +18,14 @@ export interface ArticleGridHandle {
   goNext: () => void;
   goPrev: () => void;
   getFilterStatus: () => boolean;
+  /**
+   * Ref to the array of search matches, for parent to read match count and indices.
+   */
+  matchesRef: React.RefObject<[number, number][]>;
+  /**
+   * Ref to the Handsontable instance, for parent to control selection, etc.
+   */
+  hotRef: React.RefObject<HotTableClass | null>;
 }
 
 interface ArticleGridProps {
@@ -197,10 +205,8 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
         }
         return false;
       },
-      // Expose matchesRef for parent (search bar) to read match count
-      get matchesRef() {
-        return matchesRef;
-      },
+      matchesRef,
+      hotRef,
     }));
 
     // Add afterFilter hook to always update status after any filter action

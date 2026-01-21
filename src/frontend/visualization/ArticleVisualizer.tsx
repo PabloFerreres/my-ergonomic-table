@@ -17,9 +17,7 @@ const ArticleVisualizer: React.FC = () => {
   const [activeTable, setActiveTable] = useState<5 | 6>(6); // Default to articles (6)
 
   // Add filter/search state
-  const [quickFilter, setQuickFilter] = useState("");
   const [isFilterActive, setIsFilterActive] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [searchMatchIndex, setSearchMatchIndex] = useState(0);
   const [searchMatchCount, setSearchMatchCount] = useState(0);
 
@@ -31,20 +29,17 @@ const ArticleVisualizer: React.FC = () => {
 
   const handleQuickFilterApply = (query: string, exact: boolean) => {
     setQuickFilterInput(query);
-    setQuickFilter(query); // For legacy prop, but not used for actual filtering
     if (articleGridRef.current) {
       articleGridRef.current.applyQuickFilter(quickFilterCol, query, exact);
     }
   };
   const handleQuickFilterClear = () => {
     setQuickFilterInput("");
-    setQuickFilter("");
     if (articleGridRef.current) {
       articleGridRef.current.clearQuickFilter(quickFilterCol);
     }
   };
   const handleResetFilters = () => {
-    setQuickFilter("");
     if (articleGridRef.current) {
       for (let col = 0; col < headers.length; col++) {
         articleGridRef.current.clearQuickFilter(col);
@@ -53,7 +48,6 @@ const ArticleVisualizer: React.FC = () => {
     }
   };
   const handleSearch = (query: string, exact: boolean) => {
-    setSearchQuery(query);
     if (articleGridRef.current) {
       articleGridRef.current.search(query, exact);
       // After search, update match count and reset index to 0
@@ -151,7 +145,6 @@ const ArticleVisualizer: React.FC = () => {
           // fallback: use search logic
           articleGridRef.current.search(String(articleId), true);
         }
-        setSearchQuery(""); // Optionally clear search bar
       }
     }
     window.addEventListener("message", handleShowArticleMessage);
@@ -300,8 +293,6 @@ const ArticleVisualizer: React.FC = () => {
                     ref={articleGridRef}
                     data={data}
                     colHeaders={headers}
-                    quickFilter={quickFilter}
-                    searchQuery={searchQuery}
                     onStatusChange={({ isFiltered }) => setIsFilterActive(isFiltered)}
                     onQuickFilterFocus={handleQuickFilterFocus}
                   />

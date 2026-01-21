@@ -556,10 +556,6 @@ function TableGrid({
                 }
               },
             },
-            remove_row: {
-              name: "Remove row",
-              disabled: () => isBlocked || selectionHasHeader(),
-            },
             clear_column: {},
             undo: {},
             redo: {},
