@@ -489,6 +489,75 @@ function TableGrid({
                 }
               },
             },
+            open_article_doc_folder: {
+              name: "Open Article Documentation Folder 📂",
+              disabled: () => {
+                if (isBlocked || selectionHasHeader()) return true;
+                const hot = hotRef?.current?.hotInstance;
+                if (!hot) return true;
+                const selected = hot.getSelectedLast();
+                if (!selected) return true;
+                const row = selected[0];
+                const articleIdCol = colHeaders.indexOf("article_id");
+                if (articleIdCol < 0) return true;
+                const rowData = hot.getSourceDataAtRow(row);
+                let articleId = null;
+                if (Array.isArray(rowData)) {
+                  articleId = rowData[articleIdCol];
+                } else if (rowData && typeof rowData === 'object') {
+                  const header = colHeaders[articleIdCol];
+                  articleId = rowData[header];
+                }
+                return !articleId;
+              },
+              callback: async function () {
+                const hot = hotRef?.current?.hotInstance;
+                if (!hot || selectionHasHeader()) return;
+                const selected = hot.getSelectedLast();
+                if (!selected) return;
+                const row = selected[0];
+                const articleIdCol = colHeaders.indexOf("article_id");
+                if (articleIdCol < 0) {
+                  uiConsole("No article_id column found!");
+                  return;
+                }
+                const revCol = colHeaders.indexOf("article_revision_char");
+                const rowData = hot.getSourceDataAtRow(row);
+                let articleId = null;
+                let revision = null;
+                if (Array.isArray(rowData)) {
+                  articleId = rowData[articleIdCol];
+                  if (revCol >= 0) revision = rowData[revCol];
+                } else if (rowData && typeof rowData === 'object') {
+                  const header = colHeaders[articleIdCol];
+                  articleId = rowData[header];
+                  if (revCol >= 0) revision = rowData[colHeaders[revCol]];
+                }
+                if (!articleId) {
+                  uiConsole("No article_id found in selected row!");
+                  return;
+                }
+                // Build the path
+                const basePath = config.ARTICLE_DOCUMENTATION_PATH;
+                let folderPath = `${basePath}\\article_id(${articleId})`;
+                if (revision) {
+                  folderPath += `\\rev(${revision})`;
+                }
+                try {
+                  const res = await fetch(`${API_PREFIX}/api/open-explorer`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ path: folderPath })
+                  });
+                  if (!res.ok) {
+                    const msg = await res.text();
+                    uiConsole(`Failed to open folder: ${msg}`);
+                  }
+                } catch (err) {
+                  uiConsole(`Error opening folder: ${err}`);
+                }
+              },
+            },
             remove_row: {
               name: "Remove row",
               disabled: () => isBlocked || selectionHasHeader(),

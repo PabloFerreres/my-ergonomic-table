@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Request, Query
+from fastapi import APIRouter, Request, Query, Response, Body
 import asyncpg
 import asyncio,sqlalchemy
 import json
 from pathlib import Path
-
+import subprocess
+import os
 
 from backend.SSE.event_bus import publish
 from backend.routes.layout_routes import router as layout_router
@@ -15,7 +16,7 @@ from backend.loading.rematerialize_control import (
     schedule_sheet_and_elektrik_rematerialize,
     schedule_all_rematerialize,   # <-- wichtig
 )
-from backend.settings.connection_points import DB_URL, DEBUG, get_views_to_show
+from backend.settings.connection_points import DB_URL, DEBUG, get_views_to_show, ARTICLE_DOCUMENTATION_PATH
 from backend.routes.elektrik_routes import router as elektrik_router
 from backend.elektrik.create_materialized_elektrik import create_materialized_elektrik
 from backend.routes.projects_routes import router as project_router
@@ -402,3 +403,22 @@ async def import_or_update_articles(request: Request):
         "new_last_id": new_id,
         "log": logs
     }
+
+
+@router.post("/open-explorer")
+def open_explorer(request: Request, response: Response, body: dict = Body(...)):
+    path = body.get("path")
+    if not path or not isinstance(path, str):
+        response.status_code = 400
+        return {"success": False, "error": "Missing or invalid path"}
+    abs_path = os.path.abspath(path)
+    allowed_root = os.path.abspath(ARTICLE_DOCUMENTATION_PATH)
+    if not abs_path.startswith(allowed_root):
+        response.status_code = 403
+        return {"success": False, "error": "Invalid path"}
+    try:
+        subprocess.Popen(["explorer", abs_path])
+        return {"success": True}
+    except Exception as e:
+        response.status_code = 500
+        return {"success": False, "error": str(e)}
