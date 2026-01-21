@@ -419,6 +419,76 @@ function TableGrid({
                 }
               },
             },
+            send_to_article_visualizer: {
+              name: "Show in ArticleVisualizer 🔎",
+              disabled: () => {
+                if (isBlocked || selectionHasHeader()) return true;
+                const hot = hotRef?.current?.hotInstance;
+                if (!hot) return true;
+                const selected = hot.getSelectedLast();
+                if (!selected) return true;
+                const row = selected[0];
+                const articleIdCol = colHeaders.indexOf("article_id") >= 0
+                  ? colHeaders.indexOf("article_id")
+                  : colHeaders.indexOf("project_article_id");
+                if (articleIdCol < 0) return true;
+                const rowData = hot.getSourceDataAtRow(row);
+                let articleId = null;
+                if (Array.isArray(rowData)) {
+                  articleId = rowData[articleIdCol];
+                } else if (rowData && typeof rowData === 'object') {
+                  const header = colHeaders[articleIdCol];
+                  articleId = rowData[header];
+                }
+                return !articleId;
+              },
+              callback: function () {
+                const hot = hotRef?.current?.hotInstance;
+                if (!hot || selectionHasHeader()) return;
+                const selected = hot.getSelectedLast();
+                if (!selected) return;
+                const row = selected[0];
+                const articleIdCol = colHeaders.indexOf("article_id") >= 0
+                  ? colHeaders.indexOf("article_id")
+                  : colHeaders.indexOf("project_article_id");
+                if (articleIdCol < 0) {
+                  uiConsole("No article_id or project_article_id column found!");
+                  return;
+                }
+                const rowData = hot.getSourceDataAtRow(row);
+                let articleId = null;
+                if (Array.isArray(rowData)) {
+                  articleId = rowData[articleIdCol];
+                } else if (rowData && typeof rowData === 'object') {
+                  const header = colHeaders[articleIdCol];
+                  articleId = rowData[header];
+                }
+                if (!articleId) {
+                  uiConsole("No article_id found in selected row!");
+                  return;
+                }
+                // Send message to ArticleVisualizer window
+                // @ts-expect-error: custom property for ArticleVisualizerWindow
+                const win = window.ArticleVisualizerWindow;
+                if (win && !win.closed) {
+                  win.postMessage({ type: "show-article", articleId }, "*");
+                  win.focus();
+                } else {
+                  // Optionally, open the window if not open
+                  // @ts-expect-error: set custom property
+                  window.ArticleVisualizerWindow = window.open(
+                    "/article-visualizer.html",
+                    "ArticleVisualizerWindow",
+                    "width=1400,height=700"
+                  );
+                  setTimeout(() => {
+                    // Try again after window is ready
+                    // @ts-expect-error: custom property
+                    window.ArticleVisualizerWindow?.postMessage?.({ type: "show-article", articleId }, "*");
+                  }, 1000);
+                }
+              },
+            },
             remove_row: {
               name: "Remove row",
               disabled: () => isBlocked || selectionHasHeader(),

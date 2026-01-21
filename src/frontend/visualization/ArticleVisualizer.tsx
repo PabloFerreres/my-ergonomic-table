@@ -130,6 +130,34 @@ const ArticleVisualizer: React.FC = () => {
       });
   }, [activeTable]);
 
+  useEffect(() => {
+    function handleShowArticleMessage(event: MessageEvent) {
+      if (!event.data || event.data.type !== "show-article") return;
+      const articleId = event.data.articleId;
+      if (!articleId || !headers.length || !data.length) return;
+      // Find the article_id column
+      const articleIdCol = headers.indexOf("article_id");
+      if (articleIdCol < 0) return;
+      // Find the row with the matching article_id (exact match, string or number)
+      const rowIndex = data.findIndex(row => String(row[articleIdCol]) === String(articleId));
+      if (rowIndex >= 0 && articleGridRef.current) {
+        // Select and scroll to the cell
+        const hot = articleGridRef.current.hotRef?.current?.hotInstance;
+        if (hot) {
+          const visualRow = hot.toVisualRow ? hot.toVisualRow(rowIndex) : rowIndex;
+          hot.selectCell(visualRow, articleIdCol);
+          hot.scrollViewportTo(visualRow, articleIdCol, true, true);
+        } else {
+          // fallback: use search logic
+          articleGridRef.current.search(String(articleId), true);
+        }
+        setSearchQuery(""); // Optionally clear search bar
+      }
+    }
+    window.addEventListener("message", handleShowArticleMessage);
+    return () => window.removeEventListener("message", handleShowArticleMessage);
+  }, [headers, data]);
+
   return (
     <div
       style={{

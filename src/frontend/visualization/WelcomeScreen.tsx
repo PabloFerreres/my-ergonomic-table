@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import type { Project } from "./SesionParameters";
 import { createSheetApiCall } from "../utils/apiSync";
 import config from "../../../config.json";
@@ -54,19 +54,29 @@ export default function WelcomeScreen({
 
   const [showSettings, setShowSettings] = useState(false);
 
-  // Track the ArticleVisualizer window
-  const articleWindowRef = useRef<Window | null>(null);
+  // Track the ArticleVisualizer window globally so it persists across reloads
+  // @ts-expect-error: Add custom property to window for ArticleVisualizerWindow reference
+  window.ArticleVisualizerWindow = window.ArticleVisualizerWindow || null;
+
+  // On mount, reacquire the ArticleVisualizer window reference if it exists (without reloading)
+  useEffect(() => {
+    // @ts-expect-error: custom property for ArticleVisualizerWindow
+    window.ArticleVisualizerWindow = window.open('', 'ArticleVisualizerWindow');
+  }, []);
 
   // Function to open the ArticleVisualizer window (only one instance)
   const openArticleVisualizer = () => {
-    if (!articleWindowRef.current || articleWindowRef.current.closed) {
-      articleWindowRef.current = window.open(
+    // @ts-expect-error: Access custom property on window for ArticleVisualizerWindow
+    if (!window.ArticleVisualizerWindow || window.ArticleVisualizerWindow.closed) {
+      // @ts-expect-error: Set custom property on window for ArticleVisualizerWindow
+      window.ArticleVisualizerWindow = window.open(
         "/article-visualizer.html",
         "ArticleVisualizerWindow",
         "width=1400,height=700"
       );
     } else {
-      articleWindowRef.current.focus();
+      // @ts-expect-error: Focus custom property on window for ArticleVisualizerWindow
+      window.ArticleVisualizerWindow.focus();
     }
   };
 
