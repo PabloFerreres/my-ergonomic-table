@@ -567,7 +567,6 @@ function TableGrid({
             redo: {},
             alignment: {},
             copy: {},
-            cut: {},
             paste: {},
             separator: Handsontable.plugins.ContextMenu.SEPARATOR,
           },

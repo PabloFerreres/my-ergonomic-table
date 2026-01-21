@@ -1,4 +1,4 @@
-import React, { useMemo, useImperativeHandle, useRef, forwardRef, useState } from "react";
+import React, { useMemo, useImperativeHandle, useRef, forwardRef, useState, useEffect } from "react";
 import { HotTable, HotTableClass } from "@handsontable/react";
 import "handsontable/dist/handsontable.full.min.css";
 import { registerAllModules } from "handsontable/registry";
@@ -6,7 +6,10 @@ import Handsontable from "handsontable";
 import ColumnStyleMap from "./Formating/ColumnStyleMap.json";
 import "./ArticleGrid.custom.css";
 import { computeHotStatus } from "./uiTableGrid/hotStatus";
+import config from "../../../config.json";
 registerAllModules();
+
+const API_PREFIX = config.BACKEND_URL || "";
 
 export interface ArticleGridHandle {
   applyQuickFilter: (col: number, query: string, exact: boolean) => void;
@@ -81,7 +84,10 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
     const hotRef = useRef<HotTableClass | null>(null);
     // Search state for matches
     const matchesRef = useRef<[number, number][]>([]);
-    const [matchIndex, setMatchIndex] = useState<number>(0);
+
+    // Custom context menu state
+    const [menu, setMenu] = useState<{ x: number; y: number; row: number; col: number } | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
 
     const colWidths = useMemo(
       () => getColumnWidths(data, colHeaders),
@@ -158,36 +164,28 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
           });
         });
         if (matchesRef.current.length > 0) {
-          setMatchIndex(0);
           const [r, c] = matchesRef.current[0];
           const visualRow = hot.toVisualRow(r);
           hot.selectCell(visualRow, c);
         } else {
-          setMatchIndex(0);
           alert("🔍 Kein Treffer gefunden");
         }
       },
       goNext: () => {
         const hot = hotRef.current?.hotInstance as Handsontable | undefined;
         if (!hot || matchesRef.current.length === 0) return;
-        setMatchIndex((prev) => {
-          const next = (prev + 1) % matchesRef.current.length;
-          const [r, c] = matchesRef.current[next];
-          const visualRow = hot.toVisualRow(r);
-          hot.selectCell(visualRow, c);
-          return next;
-        });
+        const next = (matchesRef.current.length + 1) % matchesRef.current.length;
+        const [r, c] = matchesRef.current[next];
+        const visualRow = hot.toVisualRow(r);
+        hot.selectCell(visualRow, c);
       },
       goPrev: () => {
         const hot = hotRef.current?.hotInstance as Handsontable | undefined;
         if (!hot || matchesRef.current.length === 0) return;
-        setMatchIndex((prev) => {
-          const next = (prev - 1 + matchesRef.current.length) % matchesRef.current.length;
-          const [r, c] = matchesRef.current[next];
-          const visualRow = hot.toVisualRow(r);
-          hot.selectCell(visualRow, c);
-          return next;
-        });
+        const next = (matchesRef.current.length - 1 + matchesRef.current.length) % matchesRef.current.length;
+        const [r, c] = matchesRef.current[next];
+        const visualRow = hot.toVisualRow(r);
+        hot.selectCell(visualRow, c);
       },
       getFilterStatus: () => {
         const hot = hotRef.current?.hotInstance as Handsontable | undefined;
@@ -233,11 +231,23 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
       }
     };
 
+    // Close menu on click elsewhere
+    useEffect(() => {
+      if (!menu) return;
+      const handler = (e: MouseEvent) => {
+        if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+          setMenu(null);
+        }
+      };
+      window.addEventListener("mousedown", handler);
+      return () => window.removeEventListener("mousedown", handler);
+    }, [menu]);
+
     return (
-      <div style={{ height: "100%", width: "calc(100%)" }}>
+      <div style={{ height: "100%", width: "calc(100%)", position: "relative" }}>
         <HotTable
           ref={hotRef}
-          data={data} // Pass full data, not filteredData
+          data={data}
           colHeaders={colHeaders}
           colWidths={colWidths}
           rowHeights={ROW_HEIGHT}
@@ -318,8 +328,103 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
               TH.style.minHeight = "2.4em";
             }
           }}
+          contextMenu={{
+            items: {
+              open_article_doc_folder: {
+                name: "Open Article Documentation Folder \uD83D\uDCC2",
+                disabled: function () {
+                  const hot = hotRef.current?.hotInstance;
+                  if (!hot) return true;
+                  const selected = hot.getSelectedLast();
+                  if (!selected) return true;
+                  const row = selected[0];
+                  const articleIdCol = colHeaders.indexOf("article_id");
+                  if (articleIdCol < 0) return true;
+                  const rowData = data[row];
+                  let articleId = null;
+                  if (Array.isArray(rowData)) {
+                    articleId = rowData[articleIdCol];
+                  } else if (rowData && typeof rowData === 'object') {
+                    const header = colHeaders[articleIdCol];
+                    articleId = rowData[header];
+                  }
+                  return !articleId;
+                },
+                callback: async function () {
+                  const hot = hotRef.current?.hotInstance;
+                  if (!hot) return;
+                  const selected = hot.getSelectedLast();
+                  if (!selected) return;
+                  const row = selected[0];
+                  const articleIdCol = colHeaders.indexOf("article_id");
+                  if (articleIdCol < 0) return;
+                  const revCol = colHeaders.indexOf("article_revision_char");
+                  const rowData = data[row];
+                  let articleId = null;
+                  let revision = null;
+                  if (Array.isArray(rowData)) {
+                    articleId = rowData[articleIdCol];
+                    if (revCol >= 0) revision = rowData[revCol];
+                  } else if (rowData && typeof rowData === 'object') {
+                    const header = colHeaders[articleIdCol];
+                    articleId = rowData[header];
+                    if (revCol >= 0) revision = rowData[colHeaders[revCol]];
+                  }
+                  if (!articleId) return;
+                  const basePath = config.ARTICLE_DOCUMENTATION_PATH;
+                  let folderPath = `${basePath}\\article_id(${articleId})`;
+                  if (revision) {
+                    folderPath += `\\rev(${revision})`;
+                  }
+                  try {
+                    const res = await fetch(`${API_PREFIX}/api/open-explorer`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ path: folderPath })
+                    });
+                    if (!res.ok) {
+                      const msg = await res.text();
+                      alert(`Failed to open folder: ${msg}`);
+                    }
+                  } catch (err) {
+                    alert(`Error opening folder: ${err}`);
+                  }
+                },
+              },
+              separator: Handsontable.plugins.ContextMenu.SEPARATOR,
+              copy: {},
+            },
+          }}
         />
         <style>{`
+          .article-grid .htContextMenu,
+          .article-grid .htContextMenu .ht_master .htCore,
+          .article-grid .htContextMenu .ht_master .htCore td,
+          .article-grid .htContextMenu .ht_master .htCore th {
+            font-size: 24px !important;
+            line-height: 1.7 !important;
+          }
+          .article-grid .htContextMenu {
+            min-width: 320px !important;
+            z-index: 99999 !important;
+          }
+          .article-grid .htContextMenu .ht_master .htCore td,
+          .article-grid .htContextMenu .ht_master .htCore th {
+            padding: 18px 36px !important;
+            color: #222 !important;
+            background: #fff !important;
+          }
+          .article-grid .htContextMenu .ht_master .htCore .htSeparator {
+            margin: 14px 0 !important;
+          }
+          .article-grid .htContextMenu .ht_master .htCore .htDisabled {
+            color: #aaa !important;
+            background: #f7f7f7 !important;
+          }
+          .article-grid .htContextMenu .ht_master .htCore .current {
+            background: #e0e0ff !important;
+            color: #222 !important;
+          }
           .article-grid .htCore th {
             color: #222 !important;
             font-weight: bold !important;
