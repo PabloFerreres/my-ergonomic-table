@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ConsoleLog = {
   text: string;
@@ -8,6 +8,52 @@ type ConsoleLog = {
 export function ConsolePanel({ logs }: { logs: ConsoleLog[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null); // ref for scrollable log area
+  const [animatedLines, setAnimatedLines] = useState<string[]>([]);
+  const [animating, setAnimating] = useState(false);
+
+  // Animate only new log lines (not previously shown)
+  useEffect(() => {
+    if (!logs.length) return;
+    if (animating) return;
+    setAnimating(true);
+    // Find how many lines are already in animatedLines and fully shown
+    let prevCount = 0;
+    for (let i = 0; i < animatedLines.length; i++) {
+      if (animatedLines[i] === `> ${logs[i]?.text} [${logs[i]?.time}]`) {
+        prevCount++;
+      } else {
+        break;
+      }
+    }
+    let i = prevCount;
+    let j = 0;
+    // Fill previous lines instantly
+    let newLines = logs
+      .slice(0, prevCount)
+      .map((l) => `> ${l.text} [${l.time}]`);
+    // Fill animated lines with empty string initially
+    for (let k = prevCount; k < logs.length; k++) newLines.push("");
+    function animateLine() {
+      if (i >= logs.length) {
+        setAnimating(false);
+        return;
+      }
+      const fullLine = `> ${logs[i].text} [${logs[i].time}]`;
+      if (!newLines[i]) newLines[i] = "";
+      if (j <= fullLine.length) {
+        newLines[i] = fullLine.slice(0, j);
+        setAnimatedLines([...newLines]);
+        j++;
+        setTimeout(animateLine, 12); // speed: 12ms per char (adjust as needed)
+      } else {
+        i++;
+        j = 0;
+        animateLine();
+      }
+    }
+    animateLine();
+    // eslint-disable-next-line
+  }, [logs]);
 
   // Smooth scroll to bottom on new logs
   useEffect(() => {
@@ -15,7 +61,7 @@ export function ConsolePanel({ logs }: { logs: ConsoleLog[] }) {
     if (el) {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     }
-  }, [logs]);
+  }, [animatedLines]);
 
   // Attach wheel event once for less sensitive manual scrolling
   useEffect(() => {
@@ -85,40 +131,25 @@ export function ConsolePanel({ logs }: { logs: ConsoleLog[] }) {
         }}
         ref={scrollRef}
       >
-        {logs.map((entry, idx) => {
-          // Mark entries within 3 seconds of the latest as green, not bold, smaller text
-          const latestTime = logs.length > 0 ? logs[logs.length - 1].time : "";
-          const latestDate = latestTime
-            ? new Date(`1970-01-01T${latestTime}`)
-            : null;
-          const entryDate = entry.time
-            ? new Date(`1970-01-01T${entry.time}`)
-            : null;
-          let isRecent = false;
-          if (latestDate && entryDate) {
-            isRecent = latestDate.getTime() - entryDate.getTime() <= 3000;
-          }
-          return (
-            <div key={idx} style={{ marginBottom: "0.5em" }}>
-              <div
-                style={{
-                  color: isRecent ? "#4ade80" : "#f0e9dc",
-                  fontWeight: 400,
-                  fontSize: "0.92em",
-                  whiteSpace: "pre-wrap",
-                  textAlign: "left",
-                  paddingLeft: 4,
-                  fontFamily:
-                    'VT323, "Share Tech Mono", "IBM Plex Mono", "Courier", monospace', // more retro font
-                  letterSpacing: 1,
-                }}
-              >
-                {`> ${entry.text} `}
-                <span style={{ color: "#888" }}>{`[${entry.time}]`}</span>
-              </div>
+        {animatedLines.map((line, idx) => (
+          <div key={idx} style={{ marginBottom: "0.5em" }}>
+            <div
+              style={{
+                color: "#f0e9dc",
+                fontWeight: 400,
+                fontSize: "0.92em",
+                whiteSpace: "pre-wrap",
+                textAlign: "left",
+                paddingLeft: 4,
+                fontFamily:
+                  'VT323, "Share Tech Mono", "IBM Plex Mono", "Courier", monospace',
+                letterSpacing: 1,
+              }}
+            >
+              {line}
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
     </div>
   );

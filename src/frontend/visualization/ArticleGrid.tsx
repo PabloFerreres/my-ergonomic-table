@@ -1,4 +1,4 @@
-import React, { useMemo, useImperativeHandle, useRef, forwardRef, useState, useEffect } from "react";
+import React, { useMemo, useImperativeHandle, useRef, forwardRef, useState, useEffect, useCallback } from "react";
 import { HotTable, HotTableClass } from "@handsontable/react";
 import "handsontable/dist/handsontable.full.min.css";
 import { registerAllModules } from "handsontable/registry";
@@ -33,6 +33,7 @@ interface ArticleGridProps {
   colHeaders: string[];
   onStatusChange?: (status: { isFiltered: boolean }) => void;
   onQuickFilterFocus?: (col: number) => void;
+  draftRow?: Record<string, string | number> | null;
 }
 
 const MAX_COL_WIDTH = 70;
@@ -88,7 +89,7 @@ Object.entries(ColumnStyleMap).forEach(([className, obj]) => {
 });
 
 const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
-  ({ data, colHeaders, onStatusChange, onQuickFilterFocus }, ref) => {
+  ({ data, colHeaders, onStatusChange, onQuickFilterFocus, draftRow }, ref) => {
     const hotRef = useRef<HotTableClass | null>(null);
     // Search state for matches
     const matchesRef = useRef<[number, number][]>([]);
@@ -237,6 +238,21 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
       }
     };
 
+    // --- Cell highlight for article_search sheet ---
+    const cellHighlight = useCallback((row: number, col: number) => {
+      if (!draftRow) return {};
+      const colName = colHeaders[col];
+      const draftVal = draftRow[colName];
+      if (!draftVal || String(draftVal).trim() === "") return {};
+      const cellVal = String(data[row][col] ?? "");
+      if (cellVal === "") return {};
+      if (cellVal.toLowerCase().includes(String(draftVal).toLowerCase())) {
+        return { className: "cell-match-green cell-match-force" };
+      } else {
+        return { className: "cell-match-red cell-match-force" };
+      }
+    }, [draftRow, data, colHeaders]);
+
     // Close menu on click elsewhere
     useEffect(() => {
       if (!menu) return;
@@ -285,6 +301,7 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
           columns={columns}
           afterFilter={afterFilter}
           afterOnCellMouseDown={handleOnCellMouseDown}
+          cells={(row, col) => cellHighlight(row, col)}
           afterGetColHeader={(_col, TH) => {
             // Only change filter button style/position, not the rest
             const button = TH.querySelector(
@@ -403,6 +420,11 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
           }}
         />
         <style>{`
+          .cell-match-green { background: #b6f5b6 !important; }
+          .cell-match-red { background: #ffb6b6 !important; }
+          .cell-match-green.cell-match-force { background: #b6f5b6 !important; }
+          .cell-match-red.cell-match-force { background: #ffb6b6 !important; }
+          .cell-match-force { z-index: 10; position: relative; }
           .article-grid .htContextMenu,
           .article-grid .htContextMenu .ht_master .htCore,
           .article-grid .htContextMenu .ht_master .htCore td,

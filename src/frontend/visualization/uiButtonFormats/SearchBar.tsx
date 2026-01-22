@@ -42,8 +42,8 @@ const SearchBar = forwardRef<SearchBarHandle, SearchBarProps>(
     };
 
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
           <input
             ref={inputRef}
             type="text"
@@ -52,32 +52,39 @@ const SearchBar = forwardRef<SearchBarHandle, SearchBarProps>(
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             style={{
-              padding: "6px",
+              padding: "4px 6px",
               borderRadius: "4px",
               border: "1px solid #ccc",
+              fontSize: "0.95em",
+              width: 120,
+              minWidth: 0,
+              height: 20,
             }}
           />
-          <label>
+          <label style={{ fontSize: "0.95em" }}>
             <input
               type="checkbox"
               checked={exact}
               onChange={(e) => setExact(e.target.checked)}
+              style={{ marginRight: 2 }}
             />
             Exakter Treffer
           </label>
-          <MSquareButton onClick={handleSearch}>Suchen</MSquareButton>
+          <MSquareButton onClick={handleSearch} width="60px" height="28px">
+            Suchen
+          </MSquareButton>
         </div>
 
         {matchCount > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+            <span style={{ fontSize: "0.92em" }}>
               {matchIndex + 1} von {matchCount} Treffern
             </span>
-            <MSquareButton onClick={onPrev} width="40px">
-              <span style={{ fontSize: "20px" }}>▲</span>
+            <MSquareButton onClick={onPrev} width="28px" height="28px">
+              <span style={{ fontSize: "16px" }}>▲</span>
             </MSquareButton>
-            <MSquareButton onClick={onNext} width="40px">
-              <span style={{ fontSize: "20px" }}>▼</span>
+            <MSquareButton onClick={onNext} width="28px" height="28px">
+              <span style={{ fontSize: "16px" }}>▼</span>
             </MSquareButton>
           </div>
         )}

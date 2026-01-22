@@ -22,7 +22,9 @@ const SquareSearch = forwardRef<SearchBarHandle, SquareSearchProps>(
     }));
 
     return (
-      <MSquareContainer width="360px" height="60px">
+      <MSquareContainer width="260px" height="60px">
+        {" "}
+        {/* Thinner and smaller */}
         <SearchBar
           ref={searchBarRef}
           onSearch={onSearch}
