@@ -1,4 +1,4 @@
-import React, { useMemo, useImperativeHandle, useRef, forwardRef, useState, useEffect, useCallback } from "react";
+import React, { useMemo, useImperativeHandle, useRef, forwardRef, useState, useEffect } from "react";
 import { HotTable, HotTableClass } from "@handsontable/react";
 import "handsontable/dist/handsontable.full.min.css";
 import { registerAllModules } from "handsontable/registry";
@@ -33,7 +33,7 @@ interface ArticleGridProps {
   colHeaders: string[];
   onStatusChange?: (status: { isFiltered: boolean }) => void;
   onQuickFilterFocus?: (col: number) => void;
-  draftRow?: Record<string, string | number> | null;
+  cellColorMap?: Record<number, Record<string, "match" | "mismatch">>;
 }
 
 const MAX_COL_WIDTH = 70;
@@ -89,7 +89,7 @@ Object.entries(ColumnStyleMap).forEach(([className, obj]) => {
 });
 
 const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
-  ({ data, colHeaders, onStatusChange, onQuickFilterFocus, draftRow }, ref) => {
+  ({ data, colHeaders, onStatusChange, onQuickFilterFocus, cellColorMap }, ref) => {
     const hotRef = useRef<HotTableClass | null>(null);
     // Search state for matches
     const matchesRef = useRef<[number, number][]>([]);
@@ -239,19 +239,14 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
     };
 
     // --- Cell highlight for article_search sheet ---
-    const cellHighlight = useCallback((row: number, col: number) => {
-      if (!draftRow) return {};
+    const cellHighlight = (row: number, col: number) => {
+      if (!cellColorMap) return {};
       const colName = colHeaders[col];
-      const draftVal = draftRow[colName];
-      if (!draftVal || String(draftVal).trim() === "") return {};
-      const cellVal = String(data[row][col] ?? "");
-      if (cellVal === "") return {};
-      if (cellVal.toLowerCase().includes(String(draftVal).toLowerCase())) {
-        return { className: "cell-match-green cell-match-force" };
-      } else {
-        return { className: "cell-match-red cell-match-force" };
-      }
-    }, [draftRow, data, colHeaders]);
+      const color = cellColorMap[row]?.[colName];
+      if (color === "match") return { className: "cell-match-green cell-match-force" };
+      if (color === "mismatch") return { className: "cell-match-red cell-match-force" };
+      return {};
+    };
 
     // Close menu on click elsewhere
     useEffect(() => {

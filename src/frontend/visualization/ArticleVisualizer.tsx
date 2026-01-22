@@ -8,7 +8,7 @@ import SquareFilter from "./uiButtonFunctions/FilterStatus";
 import SquareSearch from "./uiSquares/SquareSearch";
 import type { ArticleGridHandle } from "./ArticleGrid";
 import { ConsolePanel } from "./uiSquares/ConsolePanel";
-import { subscribeToConsole, unsubscribeFromConsole, uiConsole } from "../utils/uiConsole";
+import { subscribeToConsole, unsubscribeFromConsole } from "../utils/uiConsole";
 
 const API_PREFIX = config.BACKEND_URL || "";
 const ZOOM_CONTAINER_WIDTH = "90vw"; // Easily adjustable width
@@ -29,7 +29,7 @@ const ArticleVisualizer: React.FC = () => {
   const [consoleLogs, setConsoleLogs] = useState<
     { text: string; time: string }[]
   >([]);
-  const [draftRow, setDraftRow] = useState<Record<string, string | number> | null>(null);
+  const [cellColorMap, setCellColorMap] = useState<Record<number, Record<string, "match" | "mismatch">>>({});
 
   const articleGridRef = useRef<ArticleGridHandle>(null);
 
@@ -179,39 +179,19 @@ const ArticleVisualizer: React.FC = () => {
         ),
       });
       setActiveTable("article_search");
-      setDraftRow(comparison.draft_row || null);
-      // Debug print for cell coloring
-      if (comparison.draft_row && comparison.results) {
-        const debugRows: string[] = [];
-        (comparison.results as Array<{ row: Record<string, string | number> }>).forEach((result: { row: Record<string, string | number> }, rowIdx: number) => {
-          (comparison.headers as string[]).forEach((colName: string, colIdx: number) => {
-            const draftVal = comparison.draft_row[colName];
-            if (draftVal === undefined || draftVal === null || String(draftVal).trim() === "") return;
-            const cellVal = String(result.row[colName] ?? "").toLowerCase();
-            const draftValStr = String(draftVal).toLowerCase();
-            let color = "NO COLOR";
-            if (cellVal === "" && draftValStr !== "") {
-              color = "RED (cell empty, draft has data)";
-            } else if (cellVal.includes(draftValStr)) {
-              color = "GREEN (cell contains draft)";
-            } else if (draftValStr !== "" && cellVal !== "" && !cellVal.includes(draftValStr)) {
-              color = "RED (cell does not contain draft)";
+      // Build cellColorMap: { rowIdx: { colName: "match"|"mismatch" } }
+      const colorMap: Record<number, Record<string, "match" | "mismatch">> = {};
+      comparison.results.forEach((result: { cell_matches?: Record<string, "match" | "mismatch"> }, rowIdx: number) => {
+        colorMap[rowIdx] = {};
+        if (result.cell_matches) {
+          Object.entries(result.cell_matches).forEach(([col, val]) => {
+            if (val === "match" || val === "mismatch") {
+              colorMap[rowIdx][col] = val;
             }
-            debugRows.push(`[DEBUG] row=${rowIdx}, col=${colIdx} (${colName}), draftVal='${draftValStr}', cellVal='${cellVal}' => ${color}`);
-          });
-        });
-        if (debugRows.length > 0) {
-          // Write debug output to debug.txt
-          fetch("/debug.txt", {
-            method: "POST",
-            headers: { "Content-Type": "text/plain" },
-            body: debugRows.join("\n") + "\n",
           });
         }
-      }
-      // Count perfect matches (all columns match exactly, case-insensitive)
-      const perfectMatches = comparison.results.filter((r: { perfect_match?: boolean }) => r.perfect_match === true).length;
-      uiConsole(`Article search: ${perfectMatches} perfect match${perfectMatches === 1 ? "" : "es"} found.`);
+      });
+      setCellColorMap(colorMap);
     }
     window.addEventListener("message", handleShowComparison);
     return () => window.removeEventListener("message", handleShowComparison);
@@ -224,33 +204,6 @@ const ArticleVisualizer: React.FC = () => {
     subscribeToConsole(handler);
     return () => unsubscribeFromConsole(handler);
   }, []);
-
-  useEffect(() => {
-    // Debug print for cell highlighting in article_search
-    if (activeTable === "article_search" && searchResult && draftRow) {
-      const debugRows: string[] = [];
-      searchResult.data.forEach((row: (string | number)[], rowIdx: number) => {
-        searchResult.headers.forEach((colName: string, colIdx: number) => {
-          const draftVal = draftRow[colName];
-          if (draftVal === undefined || draftVal === null || String(draftVal).trim() === "") return;
-          const cellVal = String(row[colIdx] ?? "").toLowerCase();
-          const draftValStr = String(draftVal).toLowerCase();
-          let color = "NO COLOR";
-          if (cellVal === "" && draftValStr !== "") {
-            color = "RED (cell empty, draft has data)";
-          } else if (cellVal.includes(draftValStr)) {
-            color = "GREEN (cell contains draft)";
-          } else if (draftValStr !== "" && cellVal !== "" && !cellVal.includes(draftValStr)) {
-            color = "RED (cell does not contain draft)";
-          }
-          debugRows.push(`[DEBUG] row=${rowIdx}, col=${colIdx} (${colName}), draftVal='${draftValStr}', cellVal='${cellVal}' => ${color}`);
-        });
-      });
-      if (debugRows.length > 0) {
-        console.log("=== ArticleVisualizer Cell Highlight Debug ===\n" + debugRows.join("\n"));
-      }
-    }
-  }, [activeTable, searchResult, draftRow]);
 
   return (
     <div
@@ -441,7 +394,7 @@ const ArticleVisualizer: React.FC = () => {
                       setIsFilterActive(isFiltered)
                     }
                     onQuickFilterFocus={handleQuickFilterFocus}
-                    draftRow={activeTable === "article_search" && searchResult ? draftRow : null}
+                    cellColorMap={activeTable === "article_search" ? cellColorMap : undefined}
                   />
                 </div>
               </div>

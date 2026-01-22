@@ -1,54 +1,10 @@
-QuickFilter Debug Log
-====================
-
-This file will log each call to applyQuickFilter in ArticleGrid.tsx.
-
-Format:
----
-Column: <col>
-Query: <query>
-Exact: <exact>
-Operator: <op>
-Sample Data: <first 10 values in column>
----
-
-=== ArticleVisualizer Cell Highlight Debug ===
-// This file contains the debug output for cell coloring in article_search sheet.
-// Format: [DEBUG] row=<rowIdx>, col=<colIdx> (<colName>), draftVal='<draftValStr>', cellVal='<cellVal>' => <color>
-// Latest debug output below:
-[DEBUG] No cell highlight debug output was written. Please check that the fetch('/debug.txt', ...) POST request is supported by your dev server, or use Node.js fs to write directly if running locally.
-// If you want to see debug output, you may need to use a backend route or Node.js script to append to this file.
-// Alternatively, check the browser console for debug output if fetch is not supported for file writing.
-
-
-=== ArticleVisualizer Cell Highlight Debug ===
-[DEBUG] article_id=-11, col=Ansteuerung, ext_col=Ansteuerung, draftVal='s120', cellVal='1445 s120' => GREEN (cell contains draft)
-[DEBUG] article_id=7, col=Ansteuerung, ext_col=Ansteuerung, draftVal='s120', cellVal='50 fc_s120' => GREEN (cell contains draft)
-[DEBUG] article_id=16, col=Ansteuerung, ext_col=Ansteuerung, draftVal='s120', cellVal='150 fc_s120' => GREEN (cell contains draft)
-[DEBUG] article_id=49, col=Ansteuerung, ext_col=Ansteuerung, draftVal='s120', cellVal='1.395 fc_s120' => GREEN (cell contains draft)
-
-=== ArticleVisualizer Cell Highlight Debug ===
-[DEBUG] article_id=-11, col=Ansteuerung, ext_col=Ansteuerung, draftVal='s120', cellVal='1445 s120' => GREEN (cell contains draft)
-[DEBUG] article_id=7, col=Ansteuerung, ext_col=Ansteuerung, draftVal='s120', cellVal='50 fc_s120' => GREEN (cell contains draft)
-[DEBUG] article_id=16, col=Ansteuerung, ext_col=Ansteuerung, draftVal='s120', cellVal='150 fc_s120' => GREEN (cell contains draft)
-[DEBUG] article_id=49, col=Ansteuerung, ext_col=Ansteuerung, draftVal='s120', cellVal='1.395 fc_s120' => GREEN (cell contains draft)
-
-=== ArticleVisualizer Cell Highlight Debug ===
-[DEBUG] article_id=-11, col=Ansteuerung, ext_col=Ansteuerung, draftVal='s120', cellVal='1445 s120' => GREEN (cell contains draft)
-[DEBUG] article_id=7, col=Ansteuerung, ext_col=Ansteuerung, draftVal='s120', cellVal='50 fc_s120' => GREEN (cell contains draft)
-[DEBUG] article_id=16, col=Ansteuerung, ext_col=Ansteuerung, draftVal='s120', cellVal='150 fc_s120' => GREEN (cell contains draft)
-[DEBUG] article_id=49, col=Ansteuerung, ext_col=Ansteuerung, draftVal='s120', cellVal='1.395 fc_s120' => GREEN (cell contains draft)
-
-=== ArticleVisualizer Cell Highlight Debug ===
-[DEBUG] article_id=22, col=Hersteller, ext_col=Hersteller, draftVal='wsp', cellVal='wsp' => GREEN (cell contains draft)
-[DEBUG] article_id=32, col=Hersteller, ext_col=Hersteller, draftVal='wsp', cellVal='wsp' => GREEN (cell contains draft)
-[DEBUG] article_id=47, col=Hersteller, ext_col=Hersteller, draftVal='wsp', cellVal='wsp' => GREEN (cell contains draft)
-[DEBUG] article_id=52, col=Hersteller, ext_col=Hersteller, draftVal='wsp', cellVal='wsp' => GREEN (cell contains draft)
-[DEBUG] article_id=53, col=Hersteller, ext_col=Hersteller, draftVal='wsp', cellVal='wsp' => GREEN (cell contains draft)
-[DEBUG] article_id=59, col=Hersteller, ext_col=Hersteller, draftVal='wsp', cellVal='wsp' => GREEN (cell contains draft)
-[DEBUG] article_id=112, col=Hersteller, ext_col=Hersteller, draftVal='wsp', cellVal='wsp' => GREEN (cell contains draft)
-[DEBUG] article_id=143, col=Hersteller, ext_col=Hersteller, draftVal='wsp', cellVal='wsp' => GREEN (cell contains draft)
-[DEBUG] article_id=153, col=Hersteller, ext_col=Hersteller, draftVal='wsp', cellVal='wsp' => GREEN (cell contains draft)
-[DEBUG] article_id=159, col=Hersteller, ext_col=Hersteller, draftVal='wsp', cellVal='wsp' => GREEN (cell contains draft)
-[DEBUG] article_id=171, col=Hersteller, ext_col=Hersteller, draftVal='wsp', cellVal='wsp' => GREEN (cell contains draft)
-[DEBUG] article_id=360, col=Hersteller, ext_col=Hersteller, draftVal='wsp', cellVal='wsp' => GREEN (cell contains draft)
+[DEBUG] Cell color map (only red/green):
+GREEN: row=10, col=article_typ
+RED: row=10, col=Leistung.r [kW]
+RED: row=10, col=Ansteuerung
+GREEN: row=12, col=article_typ
+RED: row=12, col=Leistung.r [kW]
+RED: row=12, col=Ansteuerung
+GREEN: row=13, col=article_typ
+RED: row=13, col=Leistung.r [kW]
+RED: row=13, col=Ansteuerung
