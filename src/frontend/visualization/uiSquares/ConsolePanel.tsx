@@ -32,12 +32,9 @@ export function ConsolePanel({ logs }: { logs: ConsoleLog[] }) {
   return (
     <div
       style={{
-        position: "absolute",
-        top: "0.5rem",
-        right: "1rem",
-        zIndex: 10,
+        // Removed position, top, right for embedding in a flex row
         width: 340,
-        height: "170px", // responsive height
+        height: "150px", // responsive height
         background: "#222",
         borderRadius: 8,
         boxShadow: "0 2px 12px rgba(0,0,0,0.35)",
@@ -45,6 +42,7 @@ export function ConsolePanel({ logs }: { logs: ConsoleLog[] }) {
         flexDirection: "column",
         overflow: "hidden",
         border: "1px solid #444",
+        marginTop: 0, // ensure flush with parent top
       }}
       ref={containerRef}
     >

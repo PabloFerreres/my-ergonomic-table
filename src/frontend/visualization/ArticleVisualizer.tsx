@@ -7,6 +7,8 @@ import SquareQuickFilter from "./uiSquares/SquareQuickFilter";
 import SquareFilter from "./uiButtonFunctions/FilterStatus";
 import SquareSearch from "./uiSquares/SquareSearch";
 import type { ArticleGridHandle } from "./ArticleGrid";
+import { ConsolePanel } from "./uiSquares/ConsolePanel";
+import { subscribeToConsole, unsubscribeFromConsole } from "../utils/uiConsole";
 
 const API_PREFIX = config.BACKEND_URL || "";
 const ZOOM_CONTAINER_WIDTH = "90vw"; // Easily adjustable width
@@ -14,16 +16,19 @@ const ZOOM_CONTAINER_WIDTH = "90vw"; // Easily adjustable width
 const ArticleVisualizer: React.FC = () => {
   const [headers, setHeaders] = useState<string[]>([]);
   const [data, setData] = useState<(string | number)[][]>([]);
-  const [activeTable, setActiveTable] = useState<5 | 6>(6); // Default to articles (6)
-
-  // Add filter/search state
+  const [activeTable, setActiveTable] = useState<5 | 6 | "article_search">(6); // Add 'article_search' as a possible sheet
+  const [searchResult, setSearchResult] = useState<{
+    headers: string[];
+    data: (string | number)[][];
+  } | null>(null);
   const [isFilterActive, setIsFilterActive] = useState(false);
   const [searchMatchIndex, setSearchMatchIndex] = useState(0);
   const [searchMatchCount, setSearchMatchCount] = useState(0);
-
-  // Track which column to quick filter and the quick filter input value
   const [quickFilterCol, setQuickFilterCol] = useState<number>(0);
   const [quickFilterInput, setQuickFilterInput] = useState<string>("");
+  const [consoleLogs, setConsoleLogs] = useState<
+    { text: string; time: string }[]
+  >([]);
 
   const articleGridRef = useRef<ArticleGridHandle>(null);
 
@@ -81,7 +86,8 @@ const ArticleVisualizer: React.FC = () => {
     if (articleGridRef.current) {
       const matches = articleGridRef.current.matchesRef?.current || [];
       if (matches.length === 0) return;
-      const prevIndex = (searchMatchIndex - 1 + matches.length) % matches.length;
+      const prevIndex =
+        (searchMatchIndex - 1 + matches.length) % matches.length;
       setSearchMatchIndex(prevIndex);
       // Select the previous match
       const [r, c] = matches[prevIndex];
@@ -100,7 +106,9 @@ const ArticleVisualizer: React.FC = () => {
     setQuickFilterInput(""); // Clear input for new column
     // Focus the input after a short delay to ensure UI is ready
     setTimeout(() => {
-      const input = document.querySelector<HTMLInputElement>("input[placeholder='Wert eingeben…']");
+      const input = document.querySelector<HTMLInputElement>(
+        "input[placeholder='Wert eingeben…']"
+      );
       input?.focus();
       input?.select();
     }, 100);
@@ -116,6 +124,7 @@ const ArticleVisualizer: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (activeTable === "article_search") return; // Don't fetch for search sheet
     fetch(`${API_PREFIX}/api/articles_table?table=${activeTable}`)
       .then((res) => res.json())
       .then((result) => {
@@ -133,12 +142,16 @@ const ArticleVisualizer: React.FC = () => {
       const articleIdCol = headers.indexOf("article_id");
       if (articleIdCol < 0) return;
       // Find the row with the matching article_id (exact match, string or number)
-      const rowIndex = data.findIndex(row => String(row[articleIdCol]) === String(articleId));
+      const rowIndex = data.findIndex(
+        (row) => String(row[articleIdCol]) === String(articleId)
+      );
       if (rowIndex >= 0 && articleGridRef.current) {
         // Select and scroll to the cell
         const hot = articleGridRef.current.hotRef?.current?.hotInstance;
         if (hot) {
-          const visualRow = hot.toVisualRow ? hot.toVisualRow(rowIndex) : rowIndex;
+          const visualRow = hot.toVisualRow
+            ? hot.toVisualRow(rowIndex)
+            : rowIndex;
           hot.selectCell(visualRow, articleIdCol);
           hot.scrollViewportTo(visualRow, articleIdCol, true, true);
         } else {
@@ -148,8 +161,35 @@ const ArticleVisualizer: React.FC = () => {
       }
     }
     window.addEventListener("message", handleShowArticleMessage);
-    return () => window.removeEventListener("message", handleShowArticleMessage);
+    return () =>
+      window.removeEventListener("message", handleShowArticleMessage);
   }, [headers, data]);
+
+  useEffect(() => {
+    function handleShowComparison(event: MessageEvent) {
+      if (!event.data || event.data.type !== "show-comparison") return;
+      const comparison = event.data.comparison;
+      if (!comparison || !comparison.headers || !comparison.results) return;
+      setSearchResult({
+        headers: comparison.headers,
+        data: comparison.results.map(
+          (r: { row: Record<string, string | number> }) =>
+            comparison.headers.map((h: string) => r.row[h])
+        ),
+      });
+      setActiveTable("article_search");
+    }
+    window.addEventListener("message", handleShowComparison);
+    return () => window.removeEventListener("message", handleShowComparison);
+  }, []);
+
+  useEffect(() => {
+    const handler = (entry: { text: string; time: string }) => {
+      setConsoleLogs((prev) => [...prev.slice(-99), entry]);
+    };
+    subscribeToConsole(handler);
+    return () => unsubscribeFromConsole(handler);
+  }, []);
 
   return (
     <div
@@ -168,8 +208,7 @@ const ArticleVisualizer: React.FC = () => {
         style={{
           position: "absolute",
           right: "10px",
-          // Use the same top as sheet buttons, but anchor the bottom of the bar to this line
-          top: "calc(50% - 40vh - 65px)", // move higher by increasing the negative offset
+          top: "10px", // changed from 10px to 0 for flush alignment
           zIndex: 202,
           display: "flex",
           flexDirection: "column",
@@ -183,30 +222,51 @@ const ArticleVisualizer: React.FC = () => {
             flexDirection: "row",
             gap: 16,
             background: "#f6f6f6",
-            padding: "0px 16px 5px 16px", // remove bottom padding so bottom edge is flush
+            padding: "0px 16px 5px 16px",
             borderRadius: 8,
             boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-            alignItems: "flex-end",
+            alignItems: "flex-start",
+            minWidth: 600,
+            justifyContent: "space-between", // changed from flex-start for left/right alignment
           }}
         >
-          <SquareFilter
-            isFilterActive={isFilterActive}
-            onResetFilters={handleResetFilters}
-          />
-          <SquareQuickFilter
-            header={headers[quickFilterCol]}
-            onApply={handleQuickFilterApply}
-            onClear={handleQuickFilterClear}
-            value={quickFilterInput}
-            setValue={setQuickFilterInput}
-          />
-          <SquareSearch
-            onSearch={handleSearch}
-            onNext={handleSearchNext}
-            onPrev={handleSearchPrev}
-            matchIndex={searchMatchIndex}
-            matchCount={searchMatchCount}
-          />
+          {/* Left: filter/search controls */}
+          <div
+            style={{ display: "flex", flexDirection: "row", gap: 16, flex: 1 }}
+          >
+            <SquareFilter
+              isFilterActive={isFilterActive}
+              onResetFilters={handleResetFilters}
+            />
+            <SquareQuickFilter
+              header={headers[quickFilterCol]}
+              onApply={handleQuickFilterApply}
+              onClear={handleQuickFilterClear}
+              value={quickFilterInput}
+              setValue={setQuickFilterInput}
+            />
+            <SquareSearch
+              onSearch={handleSearch}
+              onNext={handleSearchNext}
+              onPrev={handleSearchPrev}
+              matchIndex={searchMatchIndex}
+              matchCount={searchMatchCount}
+            />
+          </div>
+          {/* Right: ConsolePanel, aligned to same top as search */}
+          <div
+            style={{
+              width: 320,
+              minWidth: 220,
+              maxHeight: 80,
+              marginLeft: 24,
+              display: "flex",
+              alignItems: "flex-start", // aligns top with search
+              height: "100%", // match height of row
+            }}
+          >
+            <ConsolePanel logs={consoleLogs} />
+          </div>
         </div>
       </div>
       <div style={{ position: "relative", width: "100%", height: "100%" }}>
@@ -258,6 +318,21 @@ const ArticleVisualizer: React.FC = () => {
           >
             articles
           </button>
+          <button
+            onClick={() => setActiveTable("article_search")}
+            style={{
+              background: activeTable === "article_search" ? "#6a6aff" : "#eee",
+              color: activeTable === "article_search" ? "#fff" : "#222",
+              border: "1px solid #bbb",
+              borderRadius: 4,
+              padding: "4px 12px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            disabled={!searchResult}
+          >
+            article_search
+          </button>
         </div>
         <Zoom>
           {(zoom, controls) => (
@@ -291,9 +366,19 @@ const ArticleVisualizer: React.FC = () => {
                 >
                   <ArticleGrid
                     ref={articleGridRef}
-                    data={data}
-                    colHeaders={headers}
-                    onStatusChange={({ isFiltered }) => setIsFilterActive(isFiltered)}
+                    data={
+                      activeTable === "article_search" && searchResult
+                        ? searchResult.data
+                        : data
+                    }
+                    colHeaders={
+                      activeTable === "article_search" && searchResult
+                        ? searchResult.headers
+                        : headers
+                    }
+                    onStatusChange={({ isFiltered }) =>
+                      setIsFilterActive(isFiltered)
+                    }
                     onQuickFilterFocus={handleQuickFilterFocus}
                   />
                 </div>

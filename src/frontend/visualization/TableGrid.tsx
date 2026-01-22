@@ -556,6 +556,80 @@ function TableGrid({
                 }
               },
             },
+            compare_article_draft: {
+              name: "Search article",
+              disabled: () => {
+                if (isBlocked || selectionHasHeader()) return true;
+                const hot = hotRef?.current?.hotInstance;
+                if (!hot) return true;
+                // Only enable if selected row has no article_id and has at least one non-empty article data column
+                const selected = hot.getSelectedLast();
+                if (!selected) return true;
+                const rowIdx = selected[0];
+                const articleIdColIdx = colHeaders.indexOf("article_id");
+                if (articleIdColIdx < 0) return true;
+                const articleId = hot.getDataAtCell(rowIdx, articleIdColIdx);
+                if (articleId) return true; // disable if article_id is set
+                // Check if at least one article data column is non-empty (excluding article_id and article_revision_char)
+                const hasData = colHeaders.some((col, i) => {
+                  if (["article_id", "article_revision_char"].includes(col))
+                    return false;
+                  const val = hot.getDataAtCell(rowIdx, i);
+                  return (
+                    val !== null &&
+                    val !== undefined &&
+                    String(val).trim() !== ""
+                  );
+                });
+                return !hasData;
+              },
+              callback: async function () {
+                const hot = hotRef?.current?.hotInstance;
+                if (!hot || selectionHasHeader()) return;
+                const selected = hot.getSelectedLast();
+                if (!selected) return;
+                const rowIdx = selected[0];
+                // Build draft_row from current row
+                const draft_row: Record<string, string | number> = {};
+                colHeaders.forEach((col, i) => {
+                  draft_row[col] = hot.getDataAtCell(rowIdx, i);
+                });
+                // Determine base_view_id (5 if Motor, 6 otherwise)
+                const articleTypColIdx = colHeaders.indexOf("article_typ");
+                let base_view_id = 6;
+                if (articleTypColIdx >= 0) {
+                  const typ = hot.getDataAtCell(rowIdx, articleTypColIdx);
+                  if (typ === "Motor") base_view_id = 5;
+                }
+                // Call backend
+                const res = await fetch(
+                  `${API_PREFIX}/api/compare_article_draft`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ draft_row, base_view_id }),
+                  }
+                );
+                const result = await res.json();
+                // Open ArticleVisualizer in new tab with comparison result
+                // @ts-expect-error: custom property for ArticleVisualizerWindow
+                let win = window.ArticleVisualizerWindow;
+                if (!win || win.closed) {
+                  win = window.open(
+                    "/article-visualizer.html",
+                    "ArticleVisualizerWindow",
+                    "width=1400,height=700"
+                  );
+                  // Wait for window to load
+                  await new Promise((resolve) => setTimeout(resolve, 1000));
+                }
+                win.postMessage(
+                  { type: "show-comparison", comparison: result },
+                  "*"
+                );
+                win.focus();
+              },
+            },
             clear_column: {},
             undo: {},
             redo: {},
