@@ -28,7 +28,7 @@ export function ConsolePanel({ logs }: { logs: ConsoleLog[] }) {
     let i = prevCount;
     let j = 0;
     // Fill previous lines instantly
-    let newLines = logs
+    const newLines = logs
       .slice(0, prevCount)
       .map((l) => `> ${l.text} [${l.time}]`);
     // Fill animated lines with empty string initially
