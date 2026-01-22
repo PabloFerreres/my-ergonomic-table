@@ -29,7 +29,9 @@ const ArticleVisualizer: React.FC = () => {
   const [consoleLogs, setConsoleLogs] = useState<
     { text: string; time: string }[]
   >([]);
-  const [cellColorMap, setCellColorMap] = useState<Record<number, Record<string, "match" | "mismatch">>>({});
+  const [cellColorMap, setCellColorMap] = useState<
+    Record<number, Record<string, "match" | "mismatch">>
+  >({});
 
   const articleGridRef = useRef<ArticleGridHandle>(null);
 
@@ -181,17 +183,34 @@ const ArticleVisualizer: React.FC = () => {
       setActiveTable("article_search");
       // Build cellColorMap: { rowIdx: { colName: "match"|"mismatch" } }
       const colorMap: Record<number, Record<string, "match" | "mismatch">> = {};
-      comparison.results.forEach((result: { cell_matches?: Record<string, "match" | "mismatch"> }, rowIdx: number) => {
-        colorMap[rowIdx] = {};
-        if (result.cell_matches) {
-          Object.entries(result.cell_matches).forEach(([col, val]) => {
-            if (val === "match" || val === "mismatch") {
-              colorMap[rowIdx][col] = val;
-            }
-          });
+      comparison.results.forEach(
+        (
+          result: { cell_matches?: Record<string, "match" | "mismatch"> },
+          rowIdx: number
+        ) => {
+          colorMap[rowIdx] = {};
+          if (result.cell_matches) {
+            Object.entries(result.cell_matches).forEach(([col, val]) => {
+              if (val === "match" || val === "mismatch") {
+                colorMap[rowIdx][col] = val;
+              }
+            });
+          }
         }
-      });
+      );
       setCellColorMap(colorMap);
+      // Count perfect matches (all columns match exactly, case-insensitive)
+      const perfectMatches = comparison.results.filter(
+        (r: { perfect_match?: boolean }) => r.perfect_match === true
+      ).length;
+      // Print to UI console
+      import("../utils/uiConsole").then(({ uiConsole }) => {
+        uiConsole(
+          `Article search: ${perfectMatches} perfect match${
+            perfectMatches === 1 ? "" : "es"
+          } found.`
+        );
+      });
     }
     window.addEventListener("message", handleShowComparison);
     return () => window.removeEventListener("message", handleShowComparison);
@@ -394,7 +413,11 @@ const ArticleVisualizer: React.FC = () => {
                       setIsFilterActive(isFiltered)
                     }
                     onQuickFilterFocus={handleQuickFilterFocus}
-                    cellColorMap={activeTable === "article_search" ? cellColorMap : undefined}
+                    cellColorMap={
+                      activeTable === "article_search"
+                        ? cellColorMap
+                        : undefined
+                    }
                   />
                 </div>
               </div>
