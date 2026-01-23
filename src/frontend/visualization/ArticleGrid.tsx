@@ -1,4 +1,11 @@
-import React, { useMemo, useImperativeHandle, useRef, forwardRef, useState, useEffect } from "react";
+import React, {
+  useMemo,
+  useImperativeHandle,
+  useRef,
+  forwardRef,
+  useState,
+  useEffect,
+} from "react";
 import { HotTable, HotTableClass } from "@handsontable/react";
 import "handsontable/dist/handsontable.full.min.css";
 import { registerAllModules } from "handsontable/registry";
@@ -34,6 +41,7 @@ interface ArticleGridProps {
   onStatusChange?: (status: { isFiltered: boolean }) => void;
   onQuickFilterFocus?: (col: number) => void;
   cellColorMap?: Record<number, Record<string, "match" | "mismatch">>;
+  useFiveColorRows?: boolean; // NEW: allow toggling row coloring mode
 }
 
 const MAX_COL_WIDTH = 70;
@@ -54,7 +62,20 @@ function getColumnWidths(data: (string | number)[][], colHeaders: string[]) {
   });
 }
 
-// Custom renderer for striped rows
+// 5-color and 2-color gradient for row backgrounds
+const ROW_GRADIENT_COLORS_5 = [
+  "#ffffff", // white
+  "#f2f2f2", // very light grey
+  "#e0e0e0", // light grey
+  "#cccccc", // medium grey
+  "#b3b3b3", // dark grey
+];
+const ROW_GRADIENT_COLORS_2 = [
+  "#ffffff", // white
+  "#f5f5f5", // light grey
+];
+
+// Custom renderer for striped rows with 5-color gradient
 function stripedRenderer(
   instance: unknown,
   td: HTMLTableCellElement,
@@ -73,8 +94,12 @@ function stripedRenderer(
     value,
     cellProperties
   );
-  td.style.backgroundColor = row % 2 === 1 ? "#f5f5f5" : "";
-  td.style.color = "#222";
+  // Use 5-color or 2-color based on cellProperties (set in columns below)
+  const colorArray = cellProperties.useFiveColorRows
+    ? ROW_GRADIENT_COLORS_5
+    : ROW_GRADIENT_COLORS_2;
+  td.style.backgroundColor = colorArray[row % colorArray.length];
+  td.style.color = "#111";
   td.style.borderColor = "#bbb";
 }
 
@@ -89,13 +114,21 @@ Object.entries(ColumnStyleMap).forEach(([className, obj]) => {
 });
 
 const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
-  ({ data, colHeaders, onStatusChange, onQuickFilterFocus, cellColorMap }, ref) => {
+  (
+    { data, colHeaders, onStatusChange, onQuickFilterFocus, cellColorMap, useFiveColorRows = true },
+    ref
+  ) => {
     const hotRef = useRef<HotTableClass | null>(null);
     // Search state for matches
     const matchesRef = useRef<[number, number][]>([]);
 
     // Custom context menu state
-    const [menu, setMenu] = useState<{ x: number; y: number; row: number; col: number } | null>(null);
+    const [menu, setMenu] = useState<{
+      x: number;
+      y: number;
+      row: number;
+      col: number;
+    } | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
 
     const colWidths = useMemo(
@@ -107,12 +140,23 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
     const columns = useMemo(() => {
       return colHeaders.map((header) => {
         return {
-          renderer: stripedRenderer,
+          renderer: (
+            instance: Handsontable,
+            td: HTMLTableCellElement,
+            row: number,
+            col: number,
+            prop: string | number,
+            value: unknown,
+            cellProperties: Handsontable.CellProperties
+          ) => {
+            cellProperties.useFiveColorRows = useFiveColorRows;
+            stripedRenderer(instance, td, row, col, prop, value, cellProperties);
+          },
           className: "", // No color class for data cells
           headerClassName: headerToColorClass[header] || "", // Use color class for header only
         };
       });
-    }, [colHeaders]);
+    }, [colHeaders, useFiveColorRows]);
 
     // Add header color styling
     const headerColorStyles = Object.entries(ColumnStyleMap)
@@ -140,8 +184,10 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
           const op = exact ? "eq" : "contains";
           // Debug output: log what we are receiving and sending
           const colHeader = colHeaders[col];
-          const colData = data.map(row => row[col]);
-          const debugMsg = `applyQuickFilter\ncol: ${col} (${colHeader})\nquery: '${query}'\noperator: ${op}\nsampleData: ${JSON.stringify(colData.slice(0, 10))}\n---\n`;
+          const colData = data.map((row) => row[col]);
+          const debugMsg = `applyQuickFilter\ncol: ${col} (${colHeader})\nquery: '${query}'\noperator: ${op}\nsampleData: ${JSON.stringify(
+            colData.slice(0, 10)
+          )}\n---\n`;
           // Only log to console (browser-safe)
           console.log(debugMsg);
           filters.addCondition(col, op, [query], "conjunction");
@@ -183,7 +229,8 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
       goNext: () => {
         const hot = hotRef.current?.hotInstance as Handsontable | undefined;
         if (!hot || matchesRef.current.length === 0) return;
-        const next = (matchesRef.current.length + 1) % matchesRef.current.length;
+        const next =
+          (matchesRef.current.length + 1) % matchesRef.current.length;
         const [r, c] = matchesRef.current[next];
         const visualRow = hot.toVisualRow(r);
         hot.selectCell(visualRow, c);
@@ -191,7 +238,9 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
       goPrev: () => {
         const hot = hotRef.current?.hotInstance as Handsontable | undefined;
         if (!hot || matchesRef.current.length === 0) return;
-        const next = (matchesRef.current.length - 1 + matchesRef.current.length) % matchesRef.current.length;
+        const next =
+          (matchesRef.current.length - 1 + matchesRef.current.length) %
+          matchesRef.current.length;
         const [r, c] = matchesRef.current[next];
         const visualRow = hot.toVisualRow(r);
         hot.selectCell(visualRow, c);
@@ -201,8 +250,15 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
         if (!hot) return false;
         const filters = hot.getPlugin("filters");
         // Check internal _conditions array for any active filter
-        if (filters && Array.isArray((filters as unknown as { _conditions: unknown[] })._conditions)) {
-          return (filters as unknown as { _conditions: unknown[] })._conditions.some((c) => Array.isArray(c) && c.length > 0);
+        if (
+          filters &&
+          Array.isArray(
+            (filters as unknown as { _conditions: unknown[] })._conditions
+          )
+        ) {
+          return (
+            filters as unknown as { _conditions: unknown[] }
+          )._conditions.some((c) => Array.isArray(c) && c.length > 0);
         }
         return false;
       },
@@ -216,12 +272,18 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
     };
 
     // Alt+Click: open quick filter for column
-    const handleOnCellMouseDown = (event: unknown, coords: { row: number; col: number }) => {
+    const handleOnCellMouseDown = (
+      event: unknown,
+      coords: { row: number; col: number }
+    ) => {
       const e = event as MouseEvent & { altKey?: boolean };
       const hot = hotRef.current?.hotInstance;
       if (e?.altKey && coords?.col != null && coords.col >= 0 && hot) {
         // Select only the clicked cell (not the whole column)
-        const r = typeof coords.row === "number" && coords.row >= 0 ? coords.row : hot.getSelectedLast()?.[0] ?? 0;
+        const r =
+          typeof coords.row === "number" && coords.row >= 0
+            ? coords.row
+            : hot.getSelectedLast()?.[0] ?? 0;
         hot.selectCell(r, coords.col);
         // Open & focus QuickFilter (parent handles focus)
         if (onQuickFilterFocus) onQuickFilterFocus(coords.col);
@@ -243,8 +305,10 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
       if (!cellColorMap) return {};
       const colName = colHeaders[col];
       const color = cellColorMap[row]?.[colName];
-      if (color === "match") return { className: "cell-match-green cell-match-force" };
-      if (color === "mismatch") return { className: "cell-match-red cell-match-force" };
+      if (color === "match")
+        return { className: "cell-match-green cell-match-force" };
+      if (color === "mismatch")
+        return { className: "cell-match-red cell-match-force" };
       return {};
     };
 
@@ -261,7 +325,9 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
     }, [menu]);
 
     return (
-      <div style={{ height: "100%", width: "calc(100%)", position: "relative" }}>
+      <div
+        style={{ height: "100%", width: "calc(100%)", position: "relative" }}
+      >
         <HotTable
           ref={hotRef}
           data={data}
@@ -362,7 +428,7 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
                   let articleId = null;
                   if (Array.isArray(rowData)) {
                     articleId = rowData[articleIdCol];
-                  } else if (rowData && typeof rowData === 'object') {
+                  } else if (rowData && typeof rowData === "object") {
                     const header = colHeaders[articleIdCol];
                     articleId = rowData[header];
                   }
@@ -383,7 +449,7 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
                   if (Array.isArray(rowData)) {
                     articleId = rowData[articleIdCol];
                     if (revCol >= 0) revision = rowData[revCol];
-                  } else if (rowData && typeof rowData === 'object') {
+                  } else if (rowData && typeof rowData === "object") {
                     const header = colHeaders[articleIdCol];
                     articleId = rowData[header];
                     if (revCol >= 0) revision = rowData[colHeaders[revCol]];
@@ -398,7 +464,7 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
                     const res = await fetch(`${API_PREFIX}/api/open-explorer`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ path: folderPath })
+                      body: JSON.stringify({ path: folderPath }),
                     });
                     if (!res.ok) {
                       const msg = await res.text();
@@ -454,6 +520,9 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
           }
           .article-grid .htCore td, .article-grid .htCore th {
             border-color: #bbb !important;
+          }
+          .article-grid .htCore td {
+            color: #111 !important;
           }
           ${headerColorStyles}
         `}</style>
