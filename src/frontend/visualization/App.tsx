@@ -707,8 +707,17 @@ function App() {
             )}
           />
 
-          {/* Console Panel - replaced inline code with shared component */}
-          <ConsolePanel logs={logs} />
+          {/* Console Panel - moved to the top-right corner */}
+          <div
+            style={{
+              position: "absolute",
+              top: "1rem",
+              right: "1rem",
+              zIndex: 1000,
+            }}
+          >
+            <ConsolePanel logs={logs} />
+          </div>
         </div>
         {/* Sheet Tabs */}
         <div
