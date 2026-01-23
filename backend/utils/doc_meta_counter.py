@@ -2,7 +2,7 @@ import os
 import json
 from typing import Dict
 
-PREFIXES = ["Betr", "Wart", "Kurz", "Zeich", "Daten", "Extr"]
+PREFIXES = ["Ba", "Wa", "Ka", "Zng", "Db", "Ex"]
 
 def count_doc_meta_for_article(article_id: int, base_path: str) -> Dict[str, int]:
     """

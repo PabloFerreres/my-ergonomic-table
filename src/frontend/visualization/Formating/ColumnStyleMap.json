@@ -132,12 +132,12 @@
   "header-pink": {
     "color": "#E49EDD",
     "headers": [
-      "Betr",
-      "Wart",
-      "Kurz",
-      "Zeich",
-      "Extr",
-      "Daten"
+      "BA",
+      "WA",
+      "KA",
+      "Zng",
+      "EX",
+      "DB"
     ]
   },
   "grid-header-rows": {
