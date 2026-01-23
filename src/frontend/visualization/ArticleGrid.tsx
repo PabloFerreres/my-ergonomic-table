@@ -33,6 +33,7 @@ export interface ArticleGridHandle {
    * Ref to the Handsontable instance, for parent to control selection, etc.
    */
   hotRef: React.RefObject<HotTableClass | null>;
+  setColorCycle: (cycle: number) => void; // New method to set color cycle
 }
 
 interface ArticleGridProps {
@@ -75,34 +76,6 @@ const ROW_GRADIENT_COLORS_2 = [
   "#f5f5f5", // light grey
 ];
 
-// Custom renderer for striped rows with 5-color gradient
-function stripedRenderer(
-  instance: unknown,
-  td: HTMLTableCellElement,
-  row: number,
-  col: number,
-  prop: string | number,
-  value: unknown,
-  cellProperties: Handsontable.CellProperties
-) {
-  Handsontable.renderers.TextRenderer(
-    instance as Handsontable,
-    td,
-    row,
-    col,
-    prop,
-    value,
-    cellProperties
-  );
-  // Use 5-color or 2-color based on cellProperties (set in columns below)
-  const colorArray = cellProperties.useFiveColorRows
-    ? ROW_GRADIENT_COLORS_5
-    : ROW_GRADIENT_COLORS_2;
-  td.style.backgroundColor = colorArray[row % colorArray.length];
-  td.style.color = "#111";
-  td.style.borderColor = "#bbb";
-}
-
 // Move headerToColorClass outside the component to avoid React hook warning
 const headerToColorClass: Record<string, string> = {};
 Object.entries(ColumnStyleMap).forEach(([className, obj]) => {
@@ -136,42 +109,40 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
       [data, colHeaders]
     );
 
-    // Build column definitions with color classes
-    const columns = useMemo(() => {
-      return colHeaders.map((header) => {
-        return {
-          renderer: (
-            instance: Handsontable,
-            td: HTMLTableCellElement,
-            row: number,
-            col: number,
-            prop: string | number,
-            value: unknown,
-            cellProperties: Handsontable.CellProperties
-          ) => {
-            cellProperties.useFiveColorRows = useFiveColorRows;
-            stripedRenderer(instance, td, row, col, prop, value, cellProperties);
-          },
-          className: "", // No color class for data cells
-          headerClassName: headerToColorClass[header] || "", // Use color class for header only
-        };
-      });
-    }, [colHeaders, useFiveColorRows]);
+    const [colorCycle, setColorCycle] = useState<number>(5); // Default to 5-color cycle
 
-    // Add header color styling
-    const headerColorStyles = Object.entries(ColumnStyleMap)
-      .map(([className, obj]) =>
-        obj.color
-          ? `.article-grid .${className} { background-color: ${obj.color} !important; }`
-          : ""
-      )
-      .join("\n");
-
-    const emitStatus = () => {
-      const hot = hotRef.current?.hotInstance ?? null;
-      const s = computeHotStatus(hot);
-      onStatusChange?.(s);
-    };
+    const customRenderer = useMemo(() => {
+      return (
+        instance: unknown,
+        td: HTMLTableCellElement,
+        row: number,
+        col: number,
+        prop: string | number,
+        value: unknown,
+        cellProperties: Handsontable.CellProperties
+      ) => {
+        Handsontable.renderers.TextRenderer(
+          instance as Handsontable,
+          td,
+          row,
+          col,
+          prop,
+          value,
+          cellProperties
+        );
+        const colorArray =
+          colorCycle === 2
+            ? ROW_GRADIENT_COLORS_2
+            : colorCycle === 3
+            ? ["#ffffff", "#e6e6e6", "#cccccc"]
+            : colorCycle === 4
+            ? ["#ffffff", "#f2f2f2", "#e0e0e0", "#cccccc"]
+            : ROW_GRADIENT_COLORS_5;
+        td.style.backgroundColor = colorArray[row % colorArray.length];
+        td.style.color = "#111";
+        td.style.borderColor = "#bbb";
+      };
+    }, [colorCycle]);
 
     useImperativeHandle(ref, () => ({
       applyQuickFilter: (col, query, exact) => {
@@ -264,7 +235,47 @@ const ArticleGrid = forwardRef<ArticleGridHandle, ArticleGridProps>(
       },
       matchesRef,
       hotRef,
+      setColorCycle: (cycle: number) => {
+        setColorCycle(cycle);
+      },
     }));
+
+    // Build column definitions with color classes
+    const columns = useMemo(() => {
+      return colHeaders.map((header) => {
+        return {
+          renderer: (
+            instance: Handsontable,
+            td: HTMLTableCellElement,
+            row: number,
+            col: number,
+            prop: string | number,
+            value: unknown,
+            cellProperties: Handsontable.CellProperties
+          ) => {
+            cellProperties.useFiveColorRows = useFiveColorRows;
+            customRenderer(instance, td, row, col, prop, value, cellProperties);
+          },
+          className: "", // No color class for data cells
+          headerClassName: headerToColorClass[header] || "", // Use color class for header only
+        };
+      });
+    }, [colHeaders, useFiveColorRows, customRenderer]);
+
+    // Add header color styling
+    const headerColorStyles = Object.entries(ColumnStyleMap)
+      .map(([className, obj]) =>
+        obj.color
+          ? `.article-grid .${className} { background-color: ${obj.color} !important; }`
+          : ""
+      )
+      .join("\n");
+
+    const emitStatus = () => {
+      const hot = hotRef.current?.hotInstance ?? null;
+      const s = computeHotStatus(hot);
+      onStatusChange?.(s);
+    };
 
     // Add afterFilter hook to always update status after any filter action
     const afterFilter = () => {

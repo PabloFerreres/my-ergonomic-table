@@ -9,6 +9,7 @@ import SquareSearch from "./uiSquares/SquareSearch";
 import type { ArticleGridHandle } from "./ArticleGrid";
 import { ConsolePanel } from "./uiSquares/ConsolePanel";
 import { subscribeToConsole, unsubscribeFromConsole } from "../utils/uiConsole";
+import Dropdown from "./uiComponents/Dropdown"; // Assuming you have a Dropdown component
 
 const API_PREFIX = config.BACKEND_URL || "";
 const ZOOM_CONTAINER_WIDTH = "90vw"; // Easily adjustable width
@@ -32,6 +33,8 @@ const ArticleVisualizer: React.FC = () => {
   const [cellColorMap, setCellColorMap] = useState<
     Record<number, Record<string, "match" | "mismatch">>
   >({});
+  const [colorCycle, setColorCycle] = useState<number>(5); // Default to 5-color cycle
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const articleGridRef = useRef<ArticleGridHandle>(null);
 
@@ -115,6 +118,13 @@ const ArticleVisualizer: React.FC = () => {
       input?.focus();
       input?.select();
     }, 100);
+  };
+
+  const handleColorCycleChange = (value: number) => {
+    setColorCycle(value);
+    if (articleGridRef.current) {
+      articleGridRef.current.setColorCycle(value); // Assuming ArticleGrid has a method to set color cycle
+    }
   };
 
   useEffect(() => {
@@ -234,6 +244,51 @@ const ArticleVisualizer: React.FC = () => {
         overflow: "hidden",
       }}
     >
+      {/* Settings button */}
+      <div
+        style={{
+          position: "absolute",
+          left: "10px",
+          top: "10px",
+          zIndex: 203,
+        }}
+      >
+        <button
+          onClick={() => setIsSettingsOpen((prev) => !prev)}
+          style={{
+            background: "#6a6aff",
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px",
+            padding: "8px 16px",
+            cursor: "pointer",
+          }}
+        >
+          Settings
+        </button>
+        {isSettingsOpen && (
+          <div
+            style={{
+              position: "absolute",
+              top: "40px",
+              left: "0",
+              background: "#fff",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+              padding: "10px",
+              zIndex: 204,
+            }}
+          >
+            <div style={{ marginBottom: "10px" }}>Color Cycle:</div>
+            <Dropdown
+              options={[2, 3, 4, 5]} // Dropdown options for color cycle
+              value={colorCycle}
+              onChange={handleColorCycleChange}
+            />
+          </div>
+        )}
+      </div>
       {/* Top bar placeholder for spacing, simulating App's top controls */}
       <div style={{ height: 56, minHeight: 56 }} />
       {/* Top filter/search bar container, bottom edge touching the top blue border of the grid container */}
