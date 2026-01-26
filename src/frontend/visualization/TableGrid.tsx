@@ -387,26 +387,6 @@ function TableGrid({
         }}
         contextMenu={{
           items: {
-            row_above: {
-              name: "Insert row above",
-              disabled: () => isBlocked || selectionHasHeader(),
-            },
-            row_below: {
-              name: "Insert row below",
-              disabled: () => isBlocked || selectionHasHeader(),
-            },
-            insert_5_below: {
-              name: "Insert 5 rows below",
-              disabled: () => isBlocked || selectionHasHeader(),
-              callback: function () {
-                const hot = hotRef?.current?.hotInstance;
-                if (!hot || selectionHasHeader()) return;
-                const selected = hot.getSelectedLast();
-                if (!selected) return;
-                const row = selected[0];
-                hot.alter("insert_row_below", row, 5);
-              },
-            },
             send_update_articles: {
               name: "Send/Update Articles 📤🐘",
               disabled: () => isBlocked || selectionHasHeader(),
@@ -414,7 +394,6 @@ function TableGrid({
                 const hot = hotRef?.current?.hotInstance;
                 if (!hot || selectionHasHeader()) return;
 
-                // Selection is read directly from Handsontable here
                 const selected = hot.getSelected();
                 if (!selected) return;
 
@@ -630,10 +609,8 @@ function TableGrid({
                 win.focus();
               },
             },
-            clear_column: {},
             undo: {},
             redo: {},
-            alignment: {},
             copy: {},
             paste: {},
             separator: Handsontable.plugins.ContextMenu.SEPARATOR,
