@@ -151,32 +151,47 @@ const ArticleVisualizer: React.FC = () => {
       if (!event.data || event.data.type !== "show-article") return;
       const articleId = event.data.articleId;
       if (!articleId || !headers.length || !data.length) return;
+
       // Find the article_id column
       const articleIdCol = headers.indexOf("article_id");
       if (articleIdCol < 0) return;
+
       // Find the row with the matching article_id (exact match, string or number)
       const rowIndex = data.findIndex(
         (row) => String(row[articleIdCol]) === String(articleId)
       );
-      if (rowIndex >= 0 && articleGridRef.current) {
-        // Select and scroll to the cell
-        const hot = articleGridRef.current.hotRef?.current?.hotInstance;
-        if (hot) {
-          const visualRow = hot.toVisualRow
-            ? hot.toVisualRow(rowIndex)
-            : rowIndex;
-          hot.selectCells([[visualRow, articleIdCol, visualRow, articleIdCol]]);
-          hot.scrollViewportTo(visualRow, articleIdCol, true, true);
-        } else {
-          // fallback: use search logic
-          articleGridRef.current.search(String(articleId), true);
+
+      if (rowIndex >= 0) {
+        // Switch to the correct sheet first
+        if (activeTable !== 6) {
+          setActiveTable(6); // Switch to the "articles" sheet
         }
+
+        // Wait for the sheet to load before scrolling to the row
+        setTimeout(() => {
+          if (articleGridRef.current) {
+            const hot = articleGridRef.current.hotRef?.current?.hotInstance;
+            if (hot) {
+              const visualRow = hot.toVisualRow
+                ? hot.toVisualRow(rowIndex)
+                : rowIndex;
+              hot.selectCells([
+                [visualRow, articleIdCol, visualRow, articleIdCol],
+              ]);
+              hot.scrollViewportTo(visualRow, articleIdCol, true, true);
+            } else {
+              // fallback: use search logic
+              articleGridRef.current.search(String(articleId), true);
+            }
+          }
+        }, 100); // Delay to ensure the sheet has switched
       }
     }
+
     window.addEventListener("message", handleShowArticleMessage);
     return () =>
       window.removeEventListener("message", handleShowArticleMessage);
-  }, [headers, data]);
+  }, [headers, data, activeTable]);
 
   useEffect(() => {
     function handleShowComparison(event: MessageEvent) {
